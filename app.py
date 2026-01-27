@@ -259,4 +259,4 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
                 outputs=webcam_output,
             )
 
-demo.launch(share=True, css=CUSTOM_CSS)
+    demo.launch(share=True, css=CUSTOM_CSS,ssr_mode=False)

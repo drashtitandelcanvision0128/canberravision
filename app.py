@@ -146,7 +146,7 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
         """
 <div align="center">
   <p>
-    <a href="https://platform.ultralytics.com/" target="_blank">
+    <a href="https://platform.ultralytics.com/?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=banner" target="_blank">
       <img width="50%" src="https://raw.githubusercontent.com/ultralytics/assets/main/yolov8/banner-yolov8.png" alt="Ultralytics YOLO banner"></a>
   </p>
   <p style="margin: 3px 0;">
@@ -169,7 +169,7 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
   </div>
 </div>
 
-[Ultralytics](https://www.ultralytics.com/) YOLO26 is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
+[Ultralytics](https://www.ultralytics.com/) [YOLO26](https://platform.ultralytics.com/ultralytics/yolo26?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual_model_link) is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
 """
     )
 

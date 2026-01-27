@@ -169,7 +169,7 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
   </div>
 </div>
 
-[Ultralytics](https://www.ultralytics.com/) [YOLO26](https://platform.ultralytics.com/ultralytics/yolo26?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual_model_link) is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
+[Ultralytics]( https://www.ultralytics.com/?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual) [YOLO26](https://platform.ultralytics.com/ultralytics/yolo26?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual_model_link) is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
 """
     )
 

@@ -146,7 +146,7 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
         """
 <div align="center">
   <p>
-    <a href="https://www.ultralytics.com/blog/ultralytics-yolo26-the-new-standard-for-edge-first-vision-ai" target="_blank">
+    <a href="https://platform.ultralytics.com/" target="_blank">
       <img width="50%" src="https://raw.githubusercontent.com/ultralytics/assets/main/yolov8/banner-yolov8.png" alt="Ultralytics YOLO banner"></a>
   </p>
   <p style="margin: 3px 0;">

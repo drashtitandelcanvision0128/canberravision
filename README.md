@@ -1,7 +1,7 @@
 ---
 title: YOLO26
 emoji: 💻
-colorFrom: gray
+colorFrom: blue
 colorTo: purple
 sdk: gradio
 sdk_version: 6.4.0

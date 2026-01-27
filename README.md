@@ -1,5 +1,5 @@
 ---
-title: YOLO26
+title: Ultralytics YOLO26
 emoji: 💻
 colorFrom: blue
 colorTo: purple

@@ -1,13 +1,13 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 import tempfile
+from pathlib import Path
+
 import cv2
 import gradio as gr
 import numpy as np
 import PIL.Image as Image
 from ultralytics import YOLO
-from pathlib import Path
-
 
 MODEL_CHOICES = [
     "yolo26n",
@@ -29,6 +29,7 @@ MODEL_CHOICES = [
 
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
 CUSTOM_CSS = (Path(__file__).parent / "ultralytics.css").read_text()
+
 
 def predict_image(img, conf_threshold, iou_threshold, model_name, show_labels, show_conf, imgsz):
     """Predicts objects in an image using a Ultralytics YOLO model with adjustable confidence and IOU thresholds."""
@@ -97,8 +98,10 @@ def predict_video(video_path, conf_threshold, iou_threshold, model_name, show_la
 
     return output_path
 
+
 # Cache model for streaming performance
 _model_cache = {}
+
 
 def get_model(model_name):
     """Get or create a cached model instance."""
@@ -119,7 +122,7 @@ def predict_webcam(frame, conf_threshold, iou_threshold, model_name, show_labels
         # Gradio webcam sends RGB, but Ultralytics YOLO expects BGR for OpenCV operations
         # Convert RGB to BGR for YOLO
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        
+
         # Run inference
         results = model.predict(
             source=frame_bgr,
@@ -166,7 +169,7 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
   </div>
 </div>
 
-**[YOLO26](https://docs.ultralytics.com/models/yolo26/)** is the latest flagship model from [Ultralytics](https://www.ultralytics.com/) — setting a new standard for **edge-first vision AI**. Engineered for maximum efficiency on edge devices while maintaining exceptional accuracy, YOLO26 builds on years of pioneering research in real-time computer vision.
+[Ultralytics](https://www.ultralytics.com/) YOLO26 is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
 """
     )
 
@@ -259,4 +262,4 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
                 outputs=webcam_output,
             )
 
-    demo.launch(share=True, css=CUSTOM_CSS,ssr_mode=False)
+demo.launch(share=True, css=CUSTOM_CSS, ssr_mode=False)

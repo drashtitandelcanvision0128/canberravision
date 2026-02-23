@@ -1,13 +1,24 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
+import asyncio
+import os
+import sys
 import tempfile
 from pathlib import Path
+
+# Set OpenCV environment variables to reduce camera detection warnings
+os.environ['OPENCV_VIDEOIO_PRIORITY_MSMF'] = '0'
+os.environ['OPENCV_VIDEOIO_PRIORITY_DSHOW'] = '0'
 
 import cv2
 import gradio as gr
 import numpy as np
 import PIL.Image as Image
+import torch
 from ultralytics import YOLO
+
+if sys.platform.startswith("win"):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 MODEL_CHOICES = [
     "yolo26n",
@@ -28,18 +39,50 @@ MODEL_CHOICES = [
 ]
 
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
-CUSTOM_CSS = (Path(__file__).parent / "ultralytics.css").read_text()
+
+
+def _get_device():
+    """Get the best available device for processing."""
+    if torch.cuda.is_available():
+        device_count = torch.cuda.device_count()
+        print(f"[INFO] CUDA available with {device_count} GPU(s)")
+        for i in range(device_count):
+            print(f"[INFO] GPU {i}: {torch.cuda.get_device_name(i)}")
+        return 0  # Use first GPU
+    else:
+        print("[WARNING] CUDA not available, using CPU (slower performance)")
+        return "cpu"
+
+
+def _extract_video_path(video_value):
+    if video_value is None:
+        return None
+    if isinstance(video_value, str):
+        return video_value
+    if isinstance(video_value, dict):
+        return video_value.get("path") or video_value.get("name")
+    if isinstance(video_value, (list, tuple)) and video_value:
+        first = video_value[0]
+        if isinstance(first, str):
+            return first
+        if isinstance(first, dict):
+            return first.get("path") or first.get("name")
+    return None
 
 
 def predict_image(img, conf_threshold, iou_threshold, model_name, show_labels, show_conf, imgsz):
-    """Predicts objects in an image using a Ultralytics YOLO model with adjustable confidence and IOU thresholds."""
-    model = YOLO(model_name)
+    """Predicts objects in an image using a Ultralytics YOLO model with CUDA support."""
+    model = get_model(model_name)
+    device = _get_device()
+    
     results = model.predict(
         source=img,
         conf=conf_threshold,
         iou=iou_threshold,
         imgsz=imgsz,
+        device=device,
         verbose=False,
+        half=True if device != "cpu" else False,  # Use FP16 on CUDA for speed
     )
 
     for r in results:
@@ -50,52 +93,123 @@ def predict_image(img, conf_threshold, iou_threshold, model_name, show_labels, s
 
 
 def predict_video(video_path, conf_threshold, iou_threshold, model_name, show_labels, show_conf, imgsz):
-    """Predicts objects in a video using a Ultralytics YOLO model and returns the annotated video."""
+    """Predicts objects in a video using a Ultralytics YOLO model with CUDA support."""
+    video_path = _extract_video_path(video_path)
     if video_path is None:
+        print("[ERROR] No valid video path provided")
         return None
 
-    model = YOLO(model_name)
+    # Validate video file exists and is readable
+    if not os.path.exists(video_path):
+        print(f"[ERROR] Video file does not exist: {video_path}")
+        return None
+    
+    # Check file size (prevent processing very large files that might cause issues)
+    file_size = os.path.getsize(video_path)
+    if file_size == 0:
+        print(f"[ERROR] Video file is empty: {video_path}")
+        return None
+    
+    print(f"[INFO] Processing video: {video_path} ({file_size / (1024*1024):.1f} MB)")
 
-    # Open the video
+    model = get_model(model_name)
+    device = _get_device()
+    print(f"[INFO] Processing video on device: {device}")
+
+    # Open the video with error handling
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        return None
+        print(f"[ERROR] Could not open video file: {video_path}")
+        # Try alternative method
+        cap.release()
+        cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        if not cap.isOpened():
+            print("[ERROR] Failed to open video with FFMPEG backend")
+            return None
 
-    # Get video properties
-    fps = int(cap.get(cv2.CAP_PROP_FPS))
+    # Get video properties with validation
+    fps = cap.get(cv2.CAP_PROP_FPS)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    if width <= 0 or height <= 0:
+        print("[ERROR] Invalid video dimensions")
+        cap.release()
+        return None
+    
+    if fps <= 0:
+        fps = 30  # Default FPS if not detected
+        print(f"[WARNING] Could not detect FPS, using default: {fps}")
+    
+    print(f"[INFO] Video: {width}x{height} @ {fps} FPS, {frame_count} frames")
 
-    # Create temporary output file
+    # Create temporary output file with proper extension
     temp_output = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
     output_path = temp_output.name
     temp_output.close()
 
-    # Initialize video writer
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    # Initialize video writer with more compatible codec
+    try:
+        # Try H.264 first (most compatible)
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
+        out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        if not out.isOpened():
+            # Fallback to MP4V
+            fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+            out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+            if not out.isOpened():
+                # Final fallback to XVID
+                fourcc = cv2.VideoWriter_fourcc(*'XVID')
+                out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    except Exception as e:
+        print(f"[ERROR] Failed to initialize video writer: {e}")
+        cap.release()
+        return None
 
+    processed_frames = 0
+    success_count = 0
+    
     while True:
         ret, frame = cap.read()
         if not ret:
             break
 
-        # Run inference on the frame
-        results = model.predict(
-            source=frame,
-            conf=conf_threshold,
-            iou=iou_threshold,
-            imgsz=imgsz,
-            verbose=False,
-        )
+        processed_frames += 1
+        if processed_frames % 30 == 0:  # Progress update every 30 frames
+            print(f"[INFO] Processing frame {processed_frames}/{frame_count}...")
 
-        # Get the annotated frame
-        annotated_frame = results[0].plot(labels=show_labels, conf=show_conf)
-        out.write(annotated_frame)
+        try:
+            # Run inference on the frame with CUDA support
+            results = model.predict(
+                source=frame,
+                conf=conf_threshold,
+                iou=iou_threshold,
+                imgsz=imgsz,
+                device=device,
+                verbose=False,
+                half=True if device != "cpu" else False,  # Use FP16 on CUDA for speed
+            )
+
+            # Get the annotated frame
+            annotated_frame = results[0].plot(labels=show_labels, conf=show_conf)
+            out.write(annotated_frame)
+            success_count += 1
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to process frame {processed_frames}: {e}")
+            # Write original frame if processing fails
+            out.write(frame)
 
     cap.release()
     out.release()
-
+    
+    # Verify output file was created successfully
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        print("[ERROR] Output video file was not created properly")
+        return None
+    
+    print(f"[INFO] Video processing complete. Processed {success_count}/{processed_frames} frames successfully.")
     return output_path
 
 
@@ -104,78 +218,84 @@ _model_cache = {}
 
 
 def get_model(model_name):
-    """Get or create a cached model instance."""
+    """Get or create a cached model instance with CUDA support."""
     if model_name not in _model_cache:
-        _model_cache[model_name] = YOLO(model_name)
+        print(f"[INFO] Loading model: {model_name}")
+        model = YOLO(model_name)
+        
+        # Move model to CUDA device if available
+        device = _get_device()
+        if device != "cpu":
+            model.to(device)
+            print(f"[INFO] Model moved to CUDA device: {device}")
+        
+        _model_cache[model_name] = model
+        print(f"[INFO] Model {model_name} loaded and cached successfully")
+    
     return _model_cache[model_name]
 
 
 def predict_webcam(frame, conf_threshold, iou_threshold, model_name, show_labels, show_conf, imgsz):
-    """Predicts objects in a webcam frame using a Ultralytics YOLO model (optimized for streaming)."""
+    """Predicts objects in a webcam frame using a Ultralytics YOLO model with CUDA support."""
     if frame is None:
         return None
 
-    # Use cached model for better streaming performance
-    model = get_model(model_name)
+    try:
+        # Validate frame dimensions
+        if not isinstance(frame, np.ndarray):
+            return frame
+        
+        if frame.size == 0:
+            return frame
 
-    if isinstance(frame, np.ndarray):
+        # Check frame dimensions
+        if len(frame.shape) != 3 or frame.shape[2] != 3:
+            return frame
+
+        # Use cached model for better streaming performance
+        model = get_model(model_name)
+        device = _get_device()
+
         # Gradio webcam sends RGB, but Ultralytics YOLO expects BGR for OpenCV operations
-        # Convert RGB to BGR for YOLO
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        # Run inference
+        # Run inference with CUDA support
         results = model.predict(
             source=frame_bgr,
             conf=conf_threshold,
             iou=iou_threshold,
             imgsz=imgsz,
+            device=device,
             verbose=False,
+            half=True if device != "cpu" else False,
         )
 
         # YOLO's plot() returns BGR, convert back to RGB for Gradio display
         annotated_frame = results[0].plot(labels=show_labels, conf=show_conf)
-        # Convert BGR to RGB for Gradio
-        return cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+        if annotated_frame is not None:
+            return cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+        else:
+            return frame
 
-    return None
+    except Exception as e:
+        print(f"[ERROR] Webcam prediction failed: {e}")
+        return frame
 
 
-# Create the Gradio app with tabs
-with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
-    gr.Markdown(
-        """
-<div align="center">
-  <p>
-    <a href="https://platform.ultralytics.com/?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=banner" target="_blank">
-      <img width="50%" src="https://raw.githubusercontent.com/ultralytics/assets/main/yolov8/banner-yolov8.png" alt="Ultralytics YOLO banner"></a>
-  </p>
-  <p style="margin: 3px 0;">
-    <a href="https://docs.ultralytics.com/zh/">中文</a> | <a href="https://docs.ultralytics.com/ko/">한국어</a> | <a href="https://docs.ultralytics.com/ja/">日本語</a> | <a href="https://docs.ultralytics.com/ru/">Русский</a> | <a href="https://docs.ultralytics.com/de/">Deutsch</a> | <a href="https://docs.ultralytics.com/fr/">Français</a> | <a href="https://docs.ultralytics.com/es">Español</a> | <a href="https://docs.ultralytics.com/pt/">Português</a> | <a href="https://docs.ultralytics.com/tr/">Türkçe</a> | <a href="https://docs.ultralytics.com/vi/">Tiếng Việt</a> | <a href="https://docs.ultralytics.com/ar/">العربية</a>
-  </p>
-
-  <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px; margin-top: 3px;">
-    <a href="https://github.com/ultralytics/ultralytics/actions/workflows/ci.yml"><img src="https://github.com/ultralytics/ultralytics/actions/workflows/ci.yml/badge.svg" alt="Ultralytics CI"></a>
-    <a href="https://pepy.tech/projects/ultralytics"><img src="https://static.pepy.tech/badge/ultralytics" alt="Ultralytics Downloads"></a>
-    <a href="https://zenodo.org/badge/latestdoi/264818686"><img src="https://zenodo.org/badge/264818686.svg" alt="Ultralytics YOLO Citation"></a>
-    <a href="https://discord.com/invite/ultralytics"><img alt="Ultralytics Discord" src="https://img.shields.io/discord/1089800235347353640?logo=discord&logoColor=white&label=Discord&color=blue"></a>
-    <a href="https://community.ultralytics.com/"><img alt="Ultralytics Forums" src="https://img.shields.io/discourse/users?server=https%3A%2F%2Fcommunity.ultralytics.com&logo=discourse&label=Forums&color=blue"></a>
-    <a href="https://www.reddit.com/r/ultralytics/"><img alt="Ultralytics Reddit" src="https://img.shields.io/reddit/subreddit-subscribers/ultralytics?style=flat&logo=reddit&logoColor=white&label=Reddit&color=blue"></a>
-  </div>
-  <div style="display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 3px; margin-top: 3px;">
-    <a href="https://console.paperspace.com/github/ultralytics/ultralytics"><img src="https://assets.paperspace.io/img/gradient-badge.svg" alt="Run Ultralytics on Gradient"></a>
-    <a href="https://colab.research.google.com/github/ultralytics/ultralytics/blob/main/examples/tutorial.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open Ultralytics In Colab"></a>
-    <a href="https://www.kaggle.com/models/ultralytics/yolo26"><img src="https://kaggle.com/static/images/open-in-kaggle.svg" alt="Open Ultralytics In Kaggle"></a>
-    <a href="https://mybinder.org/v2/gh/ultralytics/ultralytics/HEAD?labpath=examples%2Ftutorial.ipynb"><img src="https://mybinder.org/badge_logo.svg" alt="Open Ultralytics In Binder"></a>
-  </div>
-</div>
-
-[Ultralytics]( https://www.ultralytics.com/?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual) [YOLO26](https://platform.ultralytics.com/ultralytics/yolo26?utm_source=huggingface&utm_medium=referral&utm_campaign=yolo26&utm_content=contextual_model_link) is the latest evolution in the YOLO series of real-time object detectors, engineered from the ground up for edge and low-power devices. It introduces a streamlined design that removes unnecessary complexity while integrating targeted innovations to deliver faster, lighter, and more accessible deployment.
-"""
-    )
+# Create the Gradio app with simplified interface
+with gr.Blocks(title="YOLO26 Object Detection") as demo:
+    # Display device status
+    device = _get_device()
+    if device != "cpu":
+        gr.Markdown(f"### 🚀 GPU Acceleration Enabled - Processing on {torch.cuda.get_device_name(0)}")
+    else:
+        gr.Markdown("### ⚠️ CPU Processing Mode")
+    
+    gr.Markdown("# YOLO26 Object Detection")
 
     with gr.Tabs():
         # Image Tab
-        with gr.TabItem("📷 Image"):
+        with gr.TabItem("Image"):
             with gr.Row():
                 with gr.Column():
                     img_input = gr.Image(type="pil", label="Upload Image")
@@ -195,17 +315,8 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
                 outputs=img_output,
             )
 
-            gr.Examples(
-                examples=[
-                    ["https://ultralytics.com/images/bus.jpg", 0.25, 0.7, "yolo26n", True, True, 640],
-                    ["https://ultralytics.com/images/zidane.jpg", 0.25, 0.7, "yolo26n-seg", True, True, 640],
-                    ["https://ultralytics.com/images/boats.jpg", 0.25, 0.7, "yolo26n-obb", True, True, 1024],
-                ],
-                inputs=[img_input, img_conf, img_iou, img_model, img_labels, img_conf_show, img_size],
-            )
-
         # Video Tab
-        with gr.TabItem("🎬 Video"):
+        with gr.TabItem("Video"):
             with gr.Row():
                 with gr.Column():
                     vid_input = gr.Video(label="Upload Video")
@@ -225,41 +336,40 @@ with gr.Blocks(title="Ultralytics YOLO26 Inference 🚀") as demo:
                 outputs=vid_output,
             )
 
-        # Webcam Tab - Real-time streaming
-        with gr.TabItem("📹 Webcam"):
-            gr.Markdown("### Real-time Webcam Detection")
-            gr.Markdown("Enable streaming for live detection as you move!")
+        # Webcam Tab
+        with gr.TabItem("Webcam"):
             with gr.Row():
                 with gr.Column():
-                    webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.25, label="Confidence threshold")
+                    webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.25, label="Confidence")
                     webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.7, label="IoU threshold")
-                    webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model Name", value="yolo26n")
+                    webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
                     webcam_labels = gr.Checkbox(value=True, label="Show Labels")
                     webcam_conf_show = gr.Checkbox(value=True, label="Show Confidence")
-                    webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
+                    webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=640)
                 with gr.Column():
-                    # Streaming webcam input with real-time output
                     webcam_input = gr.Image(
                         sources=["webcam"],
                         type="numpy",
-                        label="Webcam (streaming)",
+                        label="Webcam",
                         streaming=True,
                     )
-                    webcam_output = gr.Image(type="numpy", label="Detection Result")
+                    webcam_output = gr.Image(type="numpy", label="Live Result")
 
-            # Stream event for real-time detection
             webcam_input.stream(
                 predict_webcam,
-                inputs=[
-                    webcam_input,
-                    webcam_conf,
-                    webcam_iou,
-                    webcam_model,
-                    webcam_labels,
-                    webcam_conf_show,
-                    webcam_size,
-                ],
+                inputs=[webcam_input, webcam_conf, webcam_iou, webcam_model, webcam_labels, webcam_conf_show, webcam_size],
                 outputs=webcam_output,
+                show_progress=False,
+                time_limit=30,
             )
 
-demo.launch(css=CUSTOM_CSS, ssr_mode=False)
+demo.launch(
+    ssr_mode=False,
+    share=False,
+    show_error=True,
+    quiet=False,
+    inbrowser=True,
+    server_name="127.0.0.1",
+    server_port=7863,
+    prevent_thread_lock=False,
+)

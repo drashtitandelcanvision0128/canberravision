@@ -370,6 +370,6 @@ demo.launch(
     quiet=False,
     inbrowser=True,
     server_name="127.0.0.1",
-    server_port=7863,
+    server_port=7864,
     prevent_thread_lock=False,
 )

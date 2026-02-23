@@ -1,2 +1,4 @@
 gradio==6.3.0
 ultralytics
+pathlib
+typing

@@ -190,7 +190,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         progress_callback: Progress callback function
         
     Returns:
-        Path to processed video
+        (output_path, detection_summary) - Path to processed video and detection summary
     """
     try:
         print(f"[INFO] 🚀 Starting ULTRA-FAST video processing: {mode} mode")
@@ -200,7 +200,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         video_path = _extract_video_path(video_path)
         if video_path is None or not os.path.exists(video_path):
             print("[ERROR] Invalid video path")
-            return None
+            return None, None
             
         print(f"[INFO] Processing: {video_path}")
         
@@ -234,7 +234,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             print(f"[ERROR] Cannot open video: {video_path}")
-            return None
+            return None, None
         
         # Get video properties
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -258,12 +258,13 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         if not out.isOpened():
             print("[ERROR] Cannot create video writer")
             cap.release()
-            return None
+            return None, None
         
         # Processing variables
         processed_count = 0
         actual_processed = 0
         total_detections = 0
+        all_detections = []  # Store all detections for summary
         
         print("[INFO] 🚀 Starting optimized frame processing...")
         
@@ -310,9 +311,10 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                 if results and len(results) > 0:
                     result = results[0]
                     
-                    # Count detections
+                    # Count detections and store for summary
                     if hasattr(result, 'boxes') and result.boxes is not None:
                         total_detections += len(result.boxes)
+                        all_detections.append(result.boxes)
                     
                     # Fast annotation
                     annotated_frame = _annotate_frame_fast_video(frame, result)
@@ -343,12 +345,16 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         print(f"[INFO] Speedup achieved: {speedup}x faster")
         print(f"[INFO] Output saved: {output_path}")
         
+        # Generate detection summary
+        detection_summary = _generate_video_detection_summary(all_detections, model.names, total_time, mode)
+        print(f"[INFO] Detection Summary: {detection_summary}")
+        
         # Verify output
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-            return output_path
+            return output_path, detection_summary
         else:
             print("[ERROR] Output file creation failed")
-            return None
+            return None, None
             
     except Exception as e:
         print(f"[ERROR] Ultra-fast video processing failed: {e}")
@@ -364,12 +370,218 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         except:
             pass
         
-        return None
+        return None, None
+
+
+def _generate_video_detection_summary(all_detections, names, processing_time, mode):
+    """
+    Generate comprehensive detection summary for the entire video
+    """
+    try:
+        if not all_detections:
+            return "🎯 No objects detected in video"
+        
+        # Aggregate all detections
+        category_counts = {}
+        object_counts = {}
+        total_objects = 0
+        
+        for boxes in all_detections:
+            if hasattr(boxes, 'cls'):
+                for i in range(len(boxes)):
+                    class_id = int(boxes.cls[i].cpu().numpy()) if hasattr(boxes.cls[i], 'cpu') else int(boxes.cls[i])
+                    class_name = names.get(class_id, f"class_{class_id}")
+                    
+                    # Get classification
+                    display_name, category, _ = _classify_object_with_category(class_name, class_id)
+                    
+                    # Count by category
+                    if category not in category_counts:
+                        category_counts[category] = 0
+                    category_counts[category] += 1
+                    
+                    # Count specific objects
+                    if display_name not in object_counts:
+                        object_counts[display_name] = 0
+                    object_counts[display_name] += 1
+                    
+                    total_objects += 1
+        
+        # Create summary
+        summary_lines = []
+        summary_lines.append(f"🎯 **Video Processing Complete!**")
+        summary_lines.append(f"⚡ **Mode:** {mode.upper()} | ⏱️ **Time:** {processing_time:.1f}s")
+        summary_lines.append(f"📊 **Total Objects Detected:** {total_objects}")
+        summary_lines.append("")
+        
+        # Category summary
+        summary_lines.append("**📋 By Category:**")
+        for category, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True):
+            summary_lines.append(f"  • {count} {category}(s)")
+        
+        summary_lines.append("")
+        
+        # Top objects
+        summary_lines.append("**🔍 Top Objects:**")
+        top_objects = sorted(object_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        for obj_name, count in top_objects:
+            summary_lines.append(f"  • {count} {obj_name}(s)")
+        
+        if len(object_counts) > 10:
+            summary_lines.append(f"  • ... and {len(object_counts) - 10} more object types")
+        
+        return "\n".join(summary_lines)
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to generate detection summary: {e}")
+        return f"🎯 Detection summary generation failed: {str(e)}"
+
+
+def _classify_object_with_category(class_name, class_id):
+    """
+    Enhanced object classification with proper categories
+    Returns: (display_name, category, color)
+    """
+    # Define object categories with colors
+    categories = {
+        # Persons
+        'person': ('Person', 'Person', (255, 0, 0)),  # Red
+        
+        # Vehicles
+        'bicycle': ('Bicycle', 'Vehicle', (0, 255, 255)),  # Yellow
+        'car': ('Car', 'Vehicle', (255, 165, 0)),  # Orange
+        'motorcycle': ('Motorcycle', 'Vehicle', (255, 165, 0)),  # Orange
+        'bus': ('Bus', 'Vehicle', (255, 165, 0)),  # Orange
+        'truck': ('Truck', 'Vehicle', (255, 165, 0)),  # Orange
+        'boat': ('Boat', 'Vehicle', (255, 165, 0)),  # Orange
+        'train': ('Train', 'Vehicle', (255, 165, 0)),  # Orange
+        'airplane': ('Airplane', 'Vehicle', (255, 165, 0)),  # Orange
+        
+        # Traffic Objects
+        'traffic light': ('Traffic Light', 'Traffic', (0, 0, 255)),  # Blue
+        'stop sign': ('Stop Sign', 'Traffic', (0, 0, 255)),  # Blue
+        'parking meter': ('Parking Meter', 'Traffic', (0, 0, 255)),  # Blue
+        'fire hydrant': ('Fire Hydrant', 'Traffic', (0, 0, 255)),  # Blue
+        
+        # Animals
+        'bird': ('Bird', 'Animal', (255, 0, 255)),  # Magenta
+        'cat': ('Cat', 'Animal', (255, 0, 255)),  # Magenta
+        'dog': ('Dog', 'Animal', (255, 0, 255)),  # Magenta
+        'horse': ('Horse', 'Animal', (255, 0, 255)),  # Magenta
+        'sheep': ('Sheep', 'Animal', (255, 0, 255)),  # Magenta
+        'cow': ('Cow', 'Animal', (255, 0, 255)),  # Magenta
+        'elephant': ('Elephant', 'Animal', (255, 0, 255)),  # Magenta
+        'bear': ('Bear', 'Animal', (255, 0, 255)),  # Magenta
+        'zebra': ('Zebra', 'Animal', (255, 0, 255)),  # Magenta
+        'giraffe': ('Giraffe', 'Animal', (255, 0, 255)),  # Magenta
+        
+        # Objects
+        'backpack': ('Backpack', 'Object', (128, 128, 128)),  # Gray
+        'umbrella': ('Umbrella', 'Object', (128, 128, 128)),  # Gray
+        'handbag': ('Handbag', 'Object', (128, 128, 128)),  # Gray
+        'tie': ('Tie', 'Object', (128, 128, 128)),  # Gray
+        'suitcase': ('Suitcase', 'Object', (128, 128, 128)),  # Gray
+        'frisbee': ('Frisbee', 'Object', (128, 128, 128)),  # Gray
+        'skis': ('Skis', 'Object', (128, 128, 128)),  # Gray
+        'snowboard': ('Snowboard', 'Object', (128, 128, 128)),  # Gray
+        'sports ball': ('Sports Ball', 'Object', (128, 128, 128)),  # Gray
+        'kite': ('Kite', 'Object', (128, 128, 128)),  # Gray
+        'baseball bat': ('Baseball Bat', 'Object', (128, 128, 128)),  # Gray
+        'baseball glove': ('Baseball Glove', 'Object', (128, 128, 128)),  # Gray
+        'skateboard': ('Skateboard', 'Object', (128, 128, 128)),  # Gray
+        'surfboard': ('Surfboard', 'Object', (128, 128, 128)),  # Gray
+        'tennis racket': ('Tennis Racket', 'Object', (128, 128, 128)),  # Gray
+        'bottle': ('Bottle', 'Object', (128, 128, 128)),  # Gray
+        'wine glass': ('Wine Glass', 'Object', (128, 128, 128)),  # Gray
+        'cup': ('Cup', 'Object', (128, 128, 128)),  # Gray
+        'fork': ('Fork', 'Object', (128, 128, 128)),  # Gray
+        'knife': ('Knife', 'Object', (128, 128, 128)),  # Gray
+        'spoon': ('Spoon', 'Object', (128, 128, 128)),  # Gray
+        'bowl': ('Bowl', 'Object', (128, 128, 128)),  # Gray
+        'banana': ('Banana', 'Food', (0, 255, 0)),  # Green
+        'apple': ('Apple', 'Food', (0, 255, 0)),  # Green
+        'sandwich': ('Sandwich', 'Food', (0, 255, 0)),  # Green
+        'orange': ('Orange', 'Food', (0, 255, 0)),  # Green
+        'broccoli': ('Broccoli', 'Food', (0, 255, 0)),  # Green
+        'carrot': ('Carrot', 'Food', (0, 255, 0)),  # Green
+        'hot dog': ('Hot Dog', 'Food', (0, 255, 0)),  # Green
+        'pizza': ('Pizza', 'Food', (0, 255, 0)),  # Green
+        'donut': ('Donut', 'Food', (0, 255, 0)),  # Green
+        'cake': ('Cake', 'Food', (0, 255, 0)),  # Green
+        'chair': ('Chair', 'Furniture', (139, 69, 19)),  # Brown
+        'couch': ('Couch', 'Furniture', (139, 69, 19)),  # Brown
+        'potted plant': ('Potted Plant', 'Furniture', (139, 69, 19)),  # Brown
+        'bed': ('Bed', 'Furniture', (139, 69, 19)),  # Brown
+        'dining table': ('Dining Table', 'Furniture', (139, 69, 19)),  # Brown
+        'toilet': ('Toilet', 'Furniture', (139, 69, 19)),  # Brown
+        'tv': ('TV', 'Electronics', (255, 0, 0)),  # Red
+        'laptop': ('Laptop', 'Electronics', (255, 0, 0)),  # Red
+        'mouse': ('Mouse', 'Electronics', (255, 0, 0)),  # Red
+        'remote': ('Remote', 'Electronics', (255, 0, 0)),  # Red
+        'keyboard': ('Keyboard', 'Electronics', (255, 0, 0)),  # Red
+        'cell phone': ('Cell Phone', 'Electronics', (255, 0, 0)),  # Red
+        'microwave': ('Microwave', 'Electronics', (255, 0, 0)),  # Red
+        'oven': ('Oven', 'Electronics', (255, 0, 0)),  # Red
+        'toaster': ('Toaster', 'Electronics', (255, 0, 0)),  # Red
+        'sink': ('Sink', 'Electronics', (255, 0, 0)),  # Red
+        'refrigerator': ('Refrigerator', 'Electronics', (255, 0, 0)),  # Red
+        'book': ('Book', 'Object', (128, 128, 128)),  # Gray
+        'clock': ('Clock', 'Object', (128, 128, 128)),  # Gray
+        'vase': ('Vase', 'Object', (128, 128, 128)),  # Gray
+        'scissors': ('Scissors', 'Object', (128, 128, 128)),  # Gray
+        'teddy bear': ('Teddy Bear', 'Object', (128, 128, 128)),  # Gray
+        'hair drier': ('Hair Drier', 'Object', (128, 128, 128)),  # Gray
+        'toothbrush': ('Toothbrush', 'Object', (128, 128, 128)),  # Gray
+    }
+    
+    # Get classification
+    class_info = categories.get(class_name.lower(), (class_name.title(), 'Unknown', (255, 255, 255)))
+    
+    return class_info
+
+
+def _get_detections_summary(boxes, names):
+    """
+    Get summary of detected objects by category
+    """
+    if not boxes or len(boxes) == 0:
+        return "No objects detected"
+    
+    category_counts = {}
+    object_details = []
+    
+    for i in range(len(boxes)):
+        if hasattr(boxes, 'cls'):
+            class_id = int(boxes.cls[i].cpu().numpy()) if hasattr(boxes.cls[i], 'cpu') else int(boxes.cls[i])
+            class_name = names.get(class_id, f"class_{class_id}")
+            
+            # Get classification
+            display_name, category, _ = _classify_object_with_category(class_name, class_id)
+            
+            # Count by category
+            if category not in category_counts:
+                category_counts[category] = 0
+            category_counts[category] += 1
+            
+            # Add object details
+            object_details.append(f"{display_name}")
+    
+    # Create summary
+    summary_parts = []
+    for category, count in category_counts.items():
+        if count > 0:
+            summary_parts.append(f"{count} {category}(s)")
+    
+    objects_str = ", ".join(object_details[:10])  # Show first 10 objects
+    if len(object_details) > 10:
+        objects_str += f" and {len(object_details) - 10} more..."
+    
+    return f"🎯 Detected: {' | '.join(summary_parts)}\n📋 Objects: {objects_str}"
 
 
 def _annotate_frame_fast_video(frame, result):
     """
-    Fast frame annotation for video processing
+    Enhanced fast frame annotation with object classification
     """
     try:
         annotated = frame.copy()
@@ -387,7 +599,7 @@ def _annotate_frame_fast_video(frame, result):
         cls = boxes.cls.cpu().numpy()
         names = result.names
         
-        # Draw detections (optimized for speed)
+        # Draw detections with enhanced classification
         for i in range(len(boxes)):
             if conf[i] > 0.3:  # Only draw confident detections
                 x1, y1, x2, y2 = map(int, xyxy[i])
@@ -395,17 +607,36 @@ def _annotate_frame_fast_video(frame, result):
                 class_id = int(cls[i])
                 class_name = names.get(class_id, f"class_{class_id}")
                 
-                # Green box for all detections
-                cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                # Get enhanced classification
+                display_name, category, color = _classify_object_with_category(class_name, class_id)
                 
-                # Simple label
-                label = f"{class_name}: {confidence:.2f}"
-                cv2.putText(annotated, label, (x1, y1 - 10), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                # Draw box with category-specific color
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
+                
+                # Enhanced label with category
+                label = f"{display_name} ({category}): {confidence:.2f}"
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+                
+                # Background for label
+                cv2.rectangle(annotated, (x1, y1 - label_size[1] - 10), 
+                            (x1 + label_size[0], y1), color, -1)
+                
+                # Text
+                cv2.putText(annotated, label, (x1, y1 - 5), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
-        # Add processing info
+        # Add processing info and detection summary
         cv2.putText(annotated, "ULTRA-FAST PROCESSING", (10, 30), 
                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        
+        # Add detection summary
+        summary = _get_detections_summary(boxes, names)
+        if summary != "No objects detected":
+            # Split summary into lines
+            lines = summary.split('\n')
+            for i, line in enumerate(lines[:2]):  # Show first 2 lines
+                cv2.putText(annotated, line[:50], (10, 60 + i*20), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
         
         return annotated
         
@@ -2535,6 +2766,9 @@ def predict_video(
     
     Args:
         processing_mode: "ultra_fast" (3-4 min), "fast" (5-8 min), "balanced" (8-12 min), "original" (slow, 50 min)
+    
+    Returns:
+        (output_path, detection_summary) - Path and summary
     """
     try:
         print(f"[INFO] 🚀 Starting VIDEO PROCESSING in {processing_mode} mode")
@@ -2551,15 +2785,19 @@ def predict_video(
         
         # Original slow processing (if someone really wants it)
         print(f"[WARNING] Using ORIGINAL SLOW mode - this will take 50+ minutes")
-        return _predict_video_original(
+        result_path = _predict_video_original(
             video_path, conf_threshold, iou_threshold, model_name,
             show_labels, show_conf, imgsz, enable_resnet, max_boxes,
             resnet_every_n, enable_ocr, ocr_every_n
         )
         
+        # Create basic summary for original mode
+        summary = f"🎯 Video processed in ORIGINAL mode\n⏱️ Processing time: 50+ minutes\n📁 Output: {result_path}"
+        return result_path, summary
+        
     except Exception as e:
         print(f"[ERROR] Video processing failed: {e}")
-        return None
+        return None, None
 
 
 def _predict_video_original(
@@ -3759,7 +3997,7 @@ with gr.Blocks(
                     print(f"[DEBUG] Starting video processing for input: {video}")
                     
                     # Process video
-                    result_path = predict_video(video, conf, iou, model, labels, conf_show, imgsz, enable_resnet, max_boxes, every_n, enable_ocr, ocr_every_n, speed_mode)
+                    result_path, detection_summary = predict_video(video, conf, iou, model, labels, conf_show, imgsz, enable_resnet, max_boxes, every_n, enable_ocr, ocr_every_n, speed_mode)
                     print(f"[DEBUG] Video processing completed. Result path: {result_path}")
                     
                     if result_path and os.path.exists(result_path):
@@ -3778,6 +4016,11 @@ with gr.Blocks(
                             info = f"✅ Processed: {frames} frames | Size: {width}x{height} | FPS: {fps:.1f} | Duration: {duration:.1f}s"
                             print(f"[INFO] {info}")
                             
+                            # Use detection summary for detailed info
+                            if detection_summary:
+                                detailed_info = f"{info}\n\n{detection_summary}"
+                            else:
+                                detailed_info = info
                             
                             timestamp = int(time.time())
                             permanent_name = f"processed_video_{timestamp}.mp4"
@@ -3798,19 +4041,19 @@ with gr.Blocks(
                                     transcoded = _transcode_to_browser_mp4(permanent_path, compatible_path)
                                     if transcoded:
                                         print(f"[DEBUG] Created browser-compatible version: {transcoded}")
-                                        return transcoded, transcoded, "🎉 Processing complete!", info
+                                        return transcoded, transcoded, "🎉 Processing complete!", detailed_info
 
                                     print("[WARNING] Could not create browser-compatible H.264 mp4; returning original output")
-                                    return permanent_path, permanent_path, "🎉 Processing complete!", info
+                                    return permanent_path, permanent_path, "🎉 Processing complete!", detailed_info
                                 else:
                                     print("[ERROR] Permanent video file is not accessible")
-                                    return result_path, result_path, "⚠️ Processing complete but display issues", "Video processed but may have display issues"
+                                    return result_path, result_path, "⚠️ Processing complete but display issues", detailed_info
                             except Exception as copy_error:
                                 print(f"[ERROR] Failed to copy video: {copy_error}")
-                                return result_path, result_path, "⚠️ Processing complete but copy failed", "Video processed but could not create accessible copy"
+                                return result_path, result_path, "⚠️ Processing complete but copy failed", detailed_info
                         else:
                             print("[ERROR] Could not open processed video for verification")
-                            return result_path, result_path, "⚠️ Processing complete but verification failed", "Video processed but could not verify output"
+                            return result_path, result_path, "⚠️ Processing complete but verification failed", detection_summary or "Video processed but could not verify output"
                     else:
                         error_msg = f"❌ Processing failed - No output file created. Result path: {result_path}"
                         print(error_msg)

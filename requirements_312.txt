@@ -1,0 +1,29 @@
+gradio==6.3.0
+ultralytics
+pathlib
+typing
+imageio-ffmpeg
+torch==2.2.0
+torchvision==0.17.0
+pytesseract
+transformers
+sentencepiece
+protobuf==3.20.2
+opencv-python
+timm
+# Enhanced detection dependencies
+numpy
+pillow
+scipy
+
+# PaddleOCR dependencies for Python 3.12 (GPU enabled for CUDA support)
+paddlepaddle-gpu==3.0.0b2
+paddleocr==3.4.0
+
+# Fallback to CPU version if GPU not available
+# paddlepaddle==3.0.0b2
+
+setuptools==68.0.0
+
+# Additional GPU dependencies for RTX 4050
+# CUDA 12.1+ required for best compatibility

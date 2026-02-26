@@ -112,3 +112,15 @@ statistics/
 test_*
 debug_*
 sample_*
+
+# Virtual environments
+.venv/
+.venv_gpu/
+yolo26_gpu_env/
+env/
+venv/
+
+# Python package files
+*.egg-info/
+dist/
+build/

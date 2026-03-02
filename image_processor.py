@@ -139,10 +139,19 @@ class ImageProcessor:
         """Detect objects using YOLO"""
         try:
             # Import YOLO from your main app
-            from app import get_model
+            from app import get_model, _get_device
             
             model = get_model("yolo26n.pt")
-            detection_results = model(image)
+            device = _get_device()
+            detection_results = model.predict(
+                source=image,
+                conf=0.25,
+                iou=0.5,
+                imgsz=640,
+                device=device,
+                verbose=False,
+                half=True if device != "cpu" else False,
+            )
             
             objects = []
             

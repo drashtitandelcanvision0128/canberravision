@@ -98,7 +98,7 @@ def _detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
     """
     try:
         # Import here to avoid circular imports
-        from .utils import get_model
+        from .utils import get_model, _get_device
         
         # Vehicle classes that should trigger text extraction
         VEHICLE_CLASSES = {
@@ -109,7 +109,16 @@ def _detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
         
         # Get YOLO model
         model = get_model("yolo26n.pt")
-        detection_results = model(image_bgr)
+        device = _get_device()
+        detection_results = model.predict(
+            source=image_bgr,
+            conf=0.25,
+            iou=0.5,
+            imgsz=640,
+            device=device,
+            verbose=False,
+            half=True if device != "cpu" else False,
+        )
         
         detected_vehicles = []
         
@@ -244,16 +253,12 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
         # Import here to avoid circular imports
         from .utils import detect_license_plates_as_objects, get_model
         
-        # STEP 0: Check if vehicles are present in the image
-        print(f"[DEBUG] Step 0: Checking for vehicles in the image...")
+        # STEP 0: ALWAYS EXTRACT TEXT - regardless of vehicles or objects
+        print(f"[DEBUG] Step 0: Starting comprehensive text extraction...")
         vehicles_detected = _detect_vehicles_in_image(image_bgr)
         
-        if not vehicles_detected:
-            print(f"[DEBUG] ❌ No vehicles detected. Skipping text extraction.")
-            print(f"[DEBUG] Reason: License plates and vehicle text only extracted when vehicles are present.")
-            return result
-        
-        print(f"[DEBUG] ✅ Vehicles detected: {[v['class_name'] for v in vehicles_detected]}")
+        print(f"[DEBUG] ✅ Text extraction will run for ALL images")
+        print(f"[DEBUG] Vehicles detected: {[v['class_name'] for v in vehicles_detected] if vehicles_detected else 'None'}")
         print(f"[DEBUG] Proceeding with text extraction...")
         
         # STEP 1: Detect license plates as objects FIRST
@@ -382,29 +387,22 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                             })
                             result["text_extraction"]["summary"]["license_plates_found"] += 1
                         
-                        # Add general text if found (filter for vehicle-related text only)
+                        # Add general text if found (ACCEPT ALL TEXT)
                         if text_found["general_text"]:
-                            filtered_general_text = []
+                            # ACCEPT ALL GENERAL TEXT (no filtering)
+                            object_info["general_text"] = text_found["general_text"]
+                            result["text_extraction"]["general_text"].extend([
+                                {
+                                    "object_id": object_info["object_id"],
+                                    "text": text_item["text"],
+                                    "confidence": text_item["confidence"],
+                                    "method": text_item["method"]
+                                }
+                                for text_item in text_found["general_text"]
+                            ])
+                            result["text_extraction"]["summary"]["general_text_found"] += len(text_found["general_text"])
                             for text_item in text_found["general_text"]:
-                                # Check if text is vehicle-related
-                                if _is_vehicle_related_text(text_item["text"], vehicles_detected):
-                                    filtered_general_text.append(text_item)
-                                    print(f"[DEBUG] ✅ Vehicle-related text found: {text_item['text']}")
-                                else:
-                                    print(f"[DEBUG] ❌ Ignored non-vehicle text: {text_item['text']}")
-                            
-                            if filtered_general_text:
-                                object_info["general_text"] = filtered_general_text
-                                result["text_extraction"]["general_text"].extend([
-                                    {
-                                        "object_id": object_info["object_id"],
-                                        "text": text_item["text"],
-                                        "confidence": text_item["confidence"],
-                                        "method": text_item["method"]
-                                    }
-                                    for text_item in filtered_general_text
-                                ])
-                                result["text_extraction"]["summary"]["general_text_found"] += len(filtered_general_text)
+                                print(f"[DEBUG] ✅ General text found: {text_item['text']}")
                     
                     result["text_extraction"]["all_objects"].append(object_info)
                     result["text_extraction"]["summary"]["total_objects"] += 1
@@ -435,19 +433,16 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                     else:
                         print(f"[DEBUG] Ignored non-vehicle license plate in full image: {plate_text}")
                 else:
-                    # This is general text - filter for vehicle-related only
-                    if _is_vehicle_related_text(text_item["text"], vehicles_detected):
-                        result["text_extraction"]["full_image_text"].append(text_item)
-                        result["text_extraction"]["general_text"].append({
-                            "object_id": "full_image",
-                            "text": text_item["text"],
-                            "confidence": text_item["confidence"],
-                            "method": text_item["method"]
-                        })
-                        result["text_extraction"]["summary"]["general_text_found"] += 1
-                        print(f"[DEBUG] Found vehicle-related general text: {text_item['text']}")
-                    else:
-                        print(f"[DEBUG] Ignored non-vehicle general text: {text_item['text']}")
+                    # This is general text - ACCEPT ALL TEXT (no filtering)
+                    result["text_extraction"]["full_image_text"].append(text_item)
+                    result["text_extraction"]["general_text"].append({
+                        "object_id": "full_image",
+                        "text": text_item["text"],
+                        "confidence": text_item["confidence"],
+                        "method": text_item["method"]
+                    })
+                    result["text_extraction"]["summary"]["general_text_found"] += 1
+                    print(f"[DEBUG] Found general text: {text_item['text']}")
         
         print(f"[DEBUG] Text extraction summary:")
         print(f"[DEBUG]   Total objects: {result['text_extraction']['summary']['total_objects']}")
@@ -904,60 +899,184 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
 
 
 def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
-    """Extract text from the entire image using general OCR methods."""
+    """Extract text from the entire image using multiple methods."""
     text_items = []
     
     try:
-        # Try LightOnOCR on full image
-        if LIGHTON_AVAILABLE:
+        # Method 1: Optimized PaddleOCR GPU (PRIMARY - FORCE RUN)
+        print("[DEBUG] 🚀 FORCING Optimized PaddleOCR for full image text extraction...")
+        
+        if OPTIMIZED_PADDLEOCR_AVAILABLE:
             try:
-                full_text = extract_text_with_lighton(image_bgr, confidence_threshold=0.4)
+                # Extract text with optimized GPU processing
+                paddleocr_result = extract_text_optimized(
+                    image_bgr, 
+                    confidence_threshold=0.2,  # Very low threshold
+                    lang='en',
+                    use_gpu=None,  # Auto-detect GPU
+                    use_cache=False,  # No cache for testing
+                    preprocess=True
+                )
+                
+                print(f"[DEBUG] PaddleOCR result: {paddleocr_result}")
+                
+                if paddleocr_result["text"] and paddleocr_result["text"].strip():
+                    cleaned = _clean_general_text(paddleocr_result["text"])
+                    if cleaned and len(cleaned) >= 1:  # Accept even 1 character
+                        text_items.append({
+                            "text": cleaned,
+                            "confidence": paddleocr_result["confidence"],
+                            "method": "full_image_optimized_paddleocr"
+                        })
+                        print(f"[DEBUG] ✅ Optimized PaddleOCR SUCCESS: '{cleaned}' (conf: {paddleocr_result['confidence']:.3f})")
+                        
+                        # Extract individual text regions for better JSON output
+                        if paddleocr_result.get("text_regions"):
+                            for region in paddleocr_result["text_regions"]:
+                                region_text = region.get("text", "").strip()
+                                if region_text and len(region_text) >= 1:
+                                    text_items.append({
+                                        "text": region_text,
+                                        "confidence": region.get("confidence", 0.8),
+                                        "method": "full_image_optimized_paddleocr_region",
+                                        "bounding_box": region.get("bbox")
+                                    })
+                                    print(f"[DEBUG] ✅ PaddleOCR region: '{region_text}'")
+                else:
+                    print(f"[DEBUG] ❌ PaddleOCR returned empty text: '{paddleocr_result['text']}'")
+                
+            except Exception as e:
+                print(f"[DEBUG] ❌ Optimized PaddleOCR failed: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"[DEBUG] ❌ OPTIMIZED_PADDLEOCR_AVAILABLE is False")
+        
+        # Method 1.5: Enhanced Multi-Angle Extraction (FORCE RUN)
+        print("[DEBUG] ✨ FORCING Enhanced Multi-Angle extraction...")
+        
+        try:
+            from optimized_paddleocr_gpu import extract_text_with_multiple_angles
+            enhanced_result = extract_text_with_multiple_angles(
+                image_bgr,
+                confidence_threshold=0.15,  # Very low threshold
+                lang='en',
+                use_gpu=None
+            )
+            
+            print(f"[DEBUG] Enhanced result: {enhanced_result}")
+            
+            if enhanced_result["text"] and enhanced_result["text"].strip():
+                cleaned = _clean_general_text(enhanced_result["text"])
+                if cleaned and len(cleaned) >= 1:
+                    text_items.append({
+                        "text": cleaned,
+                        "confidence": enhanced_result["confidence"],
+                        "method": "full_image_enhanced_multi_angle",
+                        "angle_corrected": enhanced_result.get('angle_corrected', False)
+                    })
+                    print(f"[DEBUG] ✅ Enhanced Multi-Angle SUCCESS: '{cleaned}' (angle_corrected: {enhanced_result.get('angle_corrected', False)})")
+                    
+                    # Add enhanced regions
+                    if enhanced_result.get('text_regions'):
+                        for region in enhanced_result['text_regions']:
+                            region_text = region.get('text', '').strip()
+                            if region_text and len(region_text) >= 1:
+                                text_items.append({
+                                    "text": region_text,
+                                    "confidence": region.get('confidence', 0.8),
+                                    "method": "enhanced_multi_angle_region",
+                                    "bounding_box": region.get('bbox'),
+                                    "angle_corrected": enhanced_result.get('angle_corrected', False)
+                                })
+                                print(f"[DEBUG] ✅ Enhanced region: '{region_text}'")
+            else:
+                print(f"[DEBUG] ❌ Enhanced returned empty text: '{enhanced_result['text']}'")
+                
+        except Exception as e:
+            print(f"[DEBUG] ❌ Enhanced multi-angle failed: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Method 2: Legacy PaddleOCR (FALLBACK)
+        if PADDLEOCR_AVAILABLE:
+            try:
+                print("[DEBUG] Using Legacy PaddleOCR for full image text extraction")
+                processed_image = preprocess_image_for_paddleocr(image_bgr)
+                
+                paddleocr_result = extract_text_with_paddleocr(
+                    processed_image, 
+                    confidence_threshold=0.2,
+                    lang='en'
+                )
+                
+                if paddleocr_result and paddleocr_result.strip():
+                    cleaned = _clean_general_text(paddleocr_result)
+                    if cleaned and len(cleaned) >= 1:
+                        text_items.append({
+                            "text": cleaned,
+                            "confidence": 0.7,
+                            "method": "full_image_legacy_paddleocr"
+                        })
+                        print(f"[DEBUG] ✅ Legacy PaddleOCR SUCCESS: '{cleaned}'")
+            except Exception as e:
+                print(f"[DEBUG] ❌ Legacy PaddleOCR failed: {e}")
+        
+        # Method 3: LightOnOCR (ONLY IF OTHERS FAIL)
+        if LIGHTON_AVAILABLE and not text_items:
+            try:
+                print("[DEBUG] Using LightOnOCR as fallback")
+                full_text = extract_text_with_lighton(image_bgr, confidence_threshold=0.2)
                 if full_text and full_text.strip():
                     cleaned = _clean_general_text(full_text)
-                    if cleaned and len(cleaned) >= 3:
+                    if cleaned and len(cleaned) >= 1:
                         text_items.append({
                             "text": cleaned,
                             "confidence": 0.6,
                             "method": "full_image_lighton"
                         })
-                        
-                        # Special handling: Look for license plates in full image text
-                        license_plates = _extract_license_plates_from_text(cleaned)
-                        for plate_text in license_plates:
-                            text_items.append({
-                                "text": plate_text,
-                                "confidence": 0.8,
-                                "method": "full_image_lighton_plate"
-                            })
-            except:
-                pass
+                        print(f"[DEBUG] ✅ LightOnOCR SUCCESS: '{cleaned}'")
+            except Exception as e:
+                print(f"[DEBUG] ❌ LightOnOCR failed: {e}")
         
-        # Try Tesseract on full image
-        try:
-            gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
-            text = pytesseract.image_to_string(gray, config=r'--oem 3 --psm 6')
-            if text and text.strip():
-                cleaned = _clean_general_text(text)
-                if cleaned and len(cleaned) >= 3:
-                    text_items.append({
-                        "text": cleaned,
-                        "confidence": 0.5,
-                        "method": "full_image_tesseract"
-                    })
-                    
-                    # Special handling: Look for license plates in full image text
-                    license_plates = _extract_license_plates_from_text(cleaned)
-                    for plate_text in license_plates:
+        # Method 4: Tesseract (LAST FALLBACK - if available)
+        if TESSERACT_AVAILABLE and not text_items:
+            try:
+                print("[DEBUG] Using Tesseract as last fallback")
+                gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+                text = pytesseract.image_to_string(gray, config=r'--oem 3 --psm 6')
+                if text and text.strip():
+                    cleaned = _clean_general_text(text)
+                    if cleaned and len(cleaned) >= 1:
                         text_items.append({
-                            "text": plate_text,
-                            "confidence": 0.7,
-                            "method": "full_image_tesseract_plate"
+                            "text": cleaned,
+                            "confidence": 0.5,
+                            "method": "full_image_tesseract"
                         })
-        except:
-            pass
-    
+                        print(f"[DEBUG] ✅ Tesseract SUCCESS: '{cleaned}'")
+            except Exception as e:
+                print(f"[DEBUG] ❌ Tesseract failed: {e}")
+        
+        # Special handling: Look for license plates in any extracted text
+        all_text = " ".join([item["text"] for item in text_items])
+        if all_text:
+            license_plates = _extract_license_plates_from_text(all_text)
+            for plate_text in license_plates:
+                text_items.append({
+                    "text": plate_text,
+                    "confidence": 0.8,
+                    "method": "full_image_license_plate"
+                })
+                print(f"[DEBUG] Found license plate in full image: {plate_text}")
+        
     except Exception as e:
-        print(f"[DEBUG] Error in full image text extraction: {e}")
+        print(f"[DEBUG] Full image text extraction failed: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print(f"[DEBUG] Final text items found: {len(text_items)}")
+    for i, item in enumerate(text_items):
+        print(f"[DEBUG]   {i+1}. '{item['text']}' (method: {item['method']}, conf: {item['confidence']:.3f})")
     
     return text_items
 

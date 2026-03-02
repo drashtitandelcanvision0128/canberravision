@@ -16,12 +16,15 @@ try:
     from image_processor import ImageProcessor, image_processor
     from video_output_handler import save_processed_video, save_detection_frame, get_outputs_info
     from simple_plate_detection import extract_license_plates_simple
+    from kmeans_color_detector import kmeans_detector, detect_image_colors, categorize_detected_object, analyze_scene
     IMAGE_PROCESSOR_AVAILABLE = True
     VIDEO_OUTPUT_AVAILABLE = True
+    KMEANS_COLOR_AVAILABLE = True
 except ImportError as e:
     print(f"[WARNING] Some modules not available: {e}")
     IMAGE_PROCESSOR_AVAILABLE = False
     VIDEO_OUTPUT_AVAILABLE = False
+    KMEANS_COLOR_AVAILABLE = False
 
 class VideoProcessor:
     """
@@ -32,6 +35,17 @@ class VideoProcessor:
         self.processed_count = 0
         self.start_time = time.time()
         self.current_video_info = {}
+        self.kmeans_detector = None
+        
+        # Initialize K-means color detector
+        if KMEANS_COLOR_AVAILABLE:
+            try:
+                self.kmeans_detector = kmeans_detector
+                print("[INFO] K-means color detector initialized in video processor")
+            except Exception as e:
+                print(f"[WARNING] Failed to initialize K-means color detector: {e}")
+                self.kmeans_detector = None
+        
         print("[INFO] Video Processor initialized")
     
     def process_video(self, video_path: str, save_output: bool = True, 
@@ -260,7 +274,7 @@ class VideoProcessor:
         }
     
     def _process_frame(self, frame: np.ndarray, frame_number: int) -> Dict:
-        """Process single frame"""
+        """Process single frame with K-means color detection"""
         try:
             if IMAGE_PROCESSOR_AVAILABLE:
                 # Use image processor for frame processing
@@ -270,6 +284,50 @@ class VideoProcessor:
                 result['frame_number'] = frame_number
                 result['has_detections'] = len(result['detections']['license_plates']) > 0
                 
+                # Add K-means color analysis
+                if self.kmeans_detector:
+                    try:
+                        # Get objects from image processor result
+                        objects = result.get('objects', [])
+                        
+                        if objects:
+                            # Analyze scene colors
+                            scene_analysis = self.kmeans_detector.analyze_scene_colors(frame, objects)
+                            result['scene_analysis'] = scene_analysis
+                            
+                            # Process each object with K-means colors
+                            kmeans_colors = []
+                            for obj in objects:
+                                if 'bounding_box' in obj:
+                                    x1, y1, x2, y2 = obj['bounding_box']
+                                    color_result = self.kmeans_detector.detect_colors_kmeans(frame, (x1, y1, x2, y2))
+                                    
+                                    # Categorize object with color
+                                    categorized_obj = self.kmeans_detector.categorize_object_with_color(
+                                        obj.get('class_name', ''), color_result, obj.get('confidence', 0.8)
+                                    )
+                                    
+                                    # Update object with enhanced info
+                                    obj.update({
+                                        'kmeans_color_info': color_result,
+                                        'enhanced_category': categorized_obj,
+                                        'color_family': color_result.get('primary_color', {}).get('family', 'Unknown'),
+                                        'color_shade': color_result.get('primary_color', {}).get('shade', 'Unknown')
+                                    })
+                                    
+                                    kmeans_colors.append(color_result)
+                            
+                            result['kmeans_colors'] = kmeans_colors
+                            result['has_color_analysis'] = True
+                        else:
+                            result['kmeans_colors'] = []
+                            result['has_color_analysis'] = False
+                            
+                    except Exception as e:
+                        print(f"[ERROR] K-means color processing failed for frame {frame_number}: {e}")
+                        result['kmeans_colors'] = []
+                        result['has_color_analysis'] = False
+                
                 return result
             else:
                 # Simple fallback processing
@@ -278,6 +336,8 @@ class VideoProcessor:
                     'has_detections': False,
                     'license_plates': [],
                     'objects': [],
+                    'kmeans_colors': [],
+                    'has_color_analysis': False,
                     'error': 'Image processor not available'
                 }
                 
@@ -286,11 +346,13 @@ class VideoProcessor:
             return {
                 'frame_number': frame_number,
                 'has_detections': False,
+                'kmeans_colors': [],
+                'has_color_analysis': False,
                 'error': str(e)
             }
     
     def _create_annotated_frame(self, frame: np.ndarray, frame_result: Dict) -> np.ndarray:
-        """Create annotated frame with detections"""
+        """Create annotated frame with detections and K-means colors"""
         try:
             annotated = frame.copy()
             
@@ -307,6 +369,42 @@ class VideoProcessor:
                     cv2.putText(annotated, f"Plate: {plate_text}", 
                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
+            # Draw objects with K-means color information
+            objects = frame_result.get('objects', [])
+            for i, obj in enumerate(objects[:10]):  # Limit to 10 objects
+                if 'bounding_box' in obj:
+                    x1, y1, x2, y2 = obj['bounding_box']
+                    
+                    # Get enhanced display name with color
+                    if 'enhanced_category' in obj:
+                        display_name = obj['enhanced_category'].get('enhanced_label', obj.get('class_name', 'Unknown'))
+                        color_family = obj.get('color_family', 'Unknown')
+                        color_shade = obj.get('color_shade', 'Unknown')
+                    else:
+                        display_name = obj.get('class_name', 'Unknown')
+                        color_family = 'Unknown'
+                        color_shade = 'Unknown'
+                    
+                    confidence = obj.get('confidence', 0.0)
+                    
+                    # Draw bounding box
+                    box_color = (0, 255, 255)  # Yellow for objects
+                    cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, 2)
+                    
+                    # Create enhanced label
+                    if color_family != 'Unknown':
+                        label = f"{display_name[:12]} 🎨{color_shade[:6]}"
+                    else:
+                        label = f"{display_name[:15]} {confidence:.2f}"
+                    
+                    # Draw label background
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+                    cv2.rectangle(annotated, (x1, y1 - 25), (x1 + label_size[0], y1), box_color, -1)
+                    
+                    # Draw label text
+                    cv2.putText(annotated, label, 
+                               (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+            
             # Add frame number
             frame_text = f"Frame: {frame_result.get('frame_number', 0)}"
             cv2.putText(annotated, frame_text, 
@@ -317,6 +415,31 @@ class VideoProcessor:
                 status_text = f"Plates: {len(frame_result.get('license_plates', []))}"
                 cv2.putText(annotated, status_text, 
                            (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            # Add object count
+            obj_text = f"Objects: {len(objects)}"
+            cv2.putText(annotated, obj_text, 
+                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            
+            # Add color analysis status
+            if frame_result.get('has_color_analysis', False):
+                kmeans_colors = frame_result.get('kmeans_colors', [])
+                color_count = len([c for c in kmeans_colors if c.get('success')])
+                color_text = f"Colors: {color_count}"
+                cv2.putText(annotated, color_text, 
+                           (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+                
+                # Add scene theme if available
+                scene_analysis = frame_result.get('scene_analysis', {})
+                if scene_analysis.get('dominant_theme'):
+                    theme = scene_analysis['dominant_theme'][:25]
+                    theme_text = f"Theme: {theme}"
+                    cv2.putText(annotated, theme_text, 
+                               (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+            
+            # Add processing indicator
+            cv2.putText(annotated, "🎬 K-MEANS VIDEO PROCESSING", 
+                       (10, annotated.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
             
             return annotated
             

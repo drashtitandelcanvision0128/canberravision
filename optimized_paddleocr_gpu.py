@@ -32,6 +32,7 @@ _gpu_available = False
 _device_info = {}
 _cache_lock = threading.Lock()
 _text_cache = {}
+_ocr_init_failed = False
 
 def initialize_gpu_environment():
     """Initialize GPU environment and detect CUDA availability"""
@@ -92,10 +93,14 @@ def get_paddle_ocr_instance(
     Returns:
         Optimized PaddleOCR instance or None if not available
     """
-    global _paddle_ocr_instances, _ocr_initialized, _gpu_available
+    global _paddle_ocr_instances, _ocr_initialized, _gpu_available, _ocr_init_failed
     
     if not PADDLEOCR_AVAILABLE:
         print("[ERROR] PaddleOCR not installed")
+        return None
+
+    # If initialization already failed in this process, don't keep retrying every frame
+    if _ocr_init_failed:
         return None
     
     # Auto-detect GPU if not specified
@@ -108,35 +113,49 @@ def get_paddle_ocr_instance(
     # Return existing instance if available
     if instance_key in _paddle_ocr_instances:
         return _paddle_ocr_instances[instance_key]
+
+    def _create_ocr_with_retry(initial_kwargs: Dict) -> Optional[PaddleOCR]:
+        """Create PaddleOCR while handling version-specific unsupported kwargs."""
+        kwargs = dict(initial_kwargs)
+        last_err = None
+        for attempt in range(10):
+            try:
+                print(f"[DEBUG] OCR attempt {attempt+1}: kwargs={list(kwargs.keys())}")
+                return PaddleOCR(**kwargs)
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                print(f"[DEBUG] OCR attempt {attempt+1} failed: {msg}")
+                # PaddleOCR often raises: "Unknown argument: <name>"
+                if "Unknown argument:" in msg:
+                    bad = msg.split("Unknown argument:", 1)[1].strip()
+                    bad = bad.split()[0].strip().strip(',').strip()  # defensive
+                    if bad in kwargs:
+                        print(f"[DEBUG] Removing unsupported kwarg: {bad}")
+                        kwargs.pop(bad, None)
+                        continue
+                break
+        if last_err is not None:
+            print(f"[ERROR] All OCR attempts failed. Last error: {last_err}")
+            raise last_err
+        return None
     
     try:
         print(f"[INFO] Initializing optimized PaddleOCR (lang={lang}, gpu={use_gpu}, batch={batch_size})")
-        
-        # GPU configuration for maximum performance
-        gpu_mem = 8000 if use_gpu else 0  # 8GB for GPU
-        
-        # Create optimized PaddleOCR instance
-        ocr_instance = PaddleOCR(
-            use_textline_orientation=True,      # Enable text direction classification
-            lang=lang,                          # Language
-            text_det_thresh=0.3,               # Text detection threshold
-            text_det_box_thresh=0.5,           # Text box threshold
-            text_recognition_batch_size=batch_size,  # Optimized batch size
-            use_gpu=use_gpu,                   # GPU acceleration
-            gpu_mem=gpu_mem,                   # GPU memory allocation
-            show_log=False,                    # Reduce log spam
-            det_model_dir=None,                # Use default models
-            rec_model_dir=None,
-            cls_model_dir=None,
-            # use_angle_cls=True,                # Disabled to avoid conflict with use_textline_orientation
-            drop_score=0.3,                    # Drop low-confidence results
-            # Performance optimizations
-            use_mp=True if not use_gpu else False,  # Multiprocessing for CPU
-            total_process_num=4 if not use_gpu else 1,
-            use_space_char=True,               # Recognize spaces
-            save_crop_res=False,               # Don't save crops for speed
-            crop_res_save_dir=None
-        )
+
+        # NOTE: PaddleOCR argument support varies significantly by version.
+        # We retry automatically if a kwarg is not supported by the installed paddleocr version.
+        base_kwargs = {
+            'lang': lang,
+            'use_textline_orientation': True,
+            'text_det_thresh': 0.3,
+            'text_det_box_thresh': 0.5,
+            'text_recognition_batch_size': batch_size,
+            'show_log': False,
+            'drop_score': 0.3,
+            'use_space_char': True,
+        }
+        ocr_instance = _create_ocr_with_retry(base_kwargs)
         
         # Cache the instance
         _paddle_ocr_instances[instance_key] = ocr_instance
@@ -148,29 +167,40 @@ def get_paddle_ocr_instance(
         
     except Exception as e:
         print(f"[ERROR] Failed to initialize PaddleOCR: {e}")
-        
-        # Try fallback to CPU if GPU failed
-        if use_gpu:
-            print("[INFO] Attempting CPU fallback...")
+
+        # Single CPU fallback attempt with minimal args
+        print("[INFO] Attempting CPU fallback...")
+        try:
+            cpu_kwargs = {
+                'lang': lang,
+                'use_textline_orientation': True,
+                'text_det_thresh': 0.3,
+                'text_det_box_thresh': 0.5,
+                'text_recognition_batch_size': 4,
+                'show_log': False,
+                'drop_score': 0.3,
+                'use_space_char': True,
+            }
+            cpu_instance = _create_ocr_with_retry(cpu_kwargs)
+            _paddle_ocr_instances[instance_key] = cpu_instance
+            print("[INFO] PaddleOCR initialized with CPU fallback")
+            return cpu_instance
+        except Exception as e2:
+            print(f"[ERROR] CPU fallback failed: {e2}")
+            _ocr_init_failed = True
+            
+            # Last-ditch: try with only 'lang' kwarg
+            print("[INFO] Trying minimal OCR init (lang only)...")
             try:
-                cpu_instance = PaddleOCR(
-                    use_textline_orientation=True,
-                    lang=lang,
-                    text_det_thresh=0.3,
-                    text_det_box_thresh=0.5,
-                    text_recognition_batch_size=4,  # Smaller batch for CPU
-                    use_gpu=False,
-                    show_log=False,
-                    # use_angle_cls=True,  # Disabled to avoid conflict with use_textline_orientation
-                    drop_score=0.3
-                )
-                _paddle_ocr_instances[instance_key] = cpu_instance
-                print("[INFO] PaddleOCR initialized with CPU fallback")
-                return cpu_instance
-            except Exception as e2:
-                print(f"[ERROR] CPU fallback failed: {e2}")
-        
-        return None
+                minimal_instance = PaddleOCR(lang='en')
+                _paddle_ocr_instances[instance_key] = minimal_instance
+                _ocr_init_failed = False  # reset flag since we succeeded
+                print("[INFO] OCR initialized with minimal args (lang only)")
+                return minimal_instance
+            except Exception as e3:
+                print(f"[ERROR] Minimal OCR init also failed: {e3}")
+                _ocr_init_failed = True
+                return None
 
 def get_image_hash(image: np.ndarray) -> str:
     """Generate hash for image caching"""
@@ -207,7 +237,10 @@ def extract_text_optimized(
     start_time = time.time()
     
     try:
+        print(f"[DEBUG] 🚀 extract_text_optimized called with: image_shape={image.shape if image is not None else 'None'}, threshold={confidence_threshold}")
+        
         if image is None or image.size == 0:
+            print(f"[DEBUG] ❌ Invalid image provided")
             return {"text": "", "confidence": 0.0, "processing_time": 0.0, "method": "none"}
         
         # Check cache first
@@ -228,16 +261,20 @@ def extract_text_optimized(
             processed_image = preprocess_image_for_ocr(image)
         
         # Get optimized PaddleOCR instance
+        print(f"[DEBUG] Getting PaddleOCR instance...")
         ocr = get_paddle_ocr_instance(lang=lang, use_gpu=use_gpu)
         if ocr is None:
+            print(f"[DEBUG] ❌ Failed to get PaddleOCR instance")
             return {"text": "", "confidence": 0.0, "processing_time": 0.0, "method": "error"}
         
-        print(f"[DEBUG] Running optimized PaddleOCR on {image.shape} (GPU: {use_gpu})")
+        print(f"[DEBUG] ✅ PaddleOCR instance obtained, running OCR on {image.shape} (GPU: {use_gpu})")
         
         # Run OCR with optimized parameters
         ocr_start = time.time()
         result = ocr.ocr(processed_image, cls=True)
         ocr_time = time.time() - ocr_start
+        
+        print(f"[DEBUG] OCR completed in {ocr_time:.3f}s, result: {result}")
         
         # Extract and process results
         extracted_texts = []
@@ -245,10 +282,13 @@ def extract_text_optimized(
         text_regions = []
         
         if result and len(result) > 0 and result[0] is not None:
-            for line in result[0]:
+            print(f"[DEBUG] Processing {len(result[0])} detected text lines...")
+            for i, line in enumerate(result[0]):
                 if line and len(line) >= 2:
                     # line format: [[x1,y1,x2,y2,x3,y3,x4,y4], (text, confidence)]
                     box_points, (text, confidence) = line
+                    
+                    print(f"[DEBUG] Line {i+1}: text='{text}', confidence={confidence:.3f}")
                     
                     if confidence >= confidence_threshold:
                         cleaned_text = text.strip()
@@ -263,11 +303,22 @@ def extract_text_optimized(
                                 "bbox": box_points,
                                 "area": calculate_bbox_area(box_points)
                             })
+                            print(f"[DEBUG] ✅ Accepted: '{cleaned_text}' (conf: {confidence:.3f})")
+                        else:
+                            print(f"[DEBUG] ❌ Rejected empty text")
+                    else:
+                        print(f"[DEBUG] ❌ Rejected low confidence: '{text}' (conf: {confidence:.3f} < {confidence_threshold})")
+                else:
+                    print(f"[DEBUG] ❌ Invalid line format: {line}")
+        else:
+            print(f"[DEBUG] ❌ No text detected - result: {result}")
         
         # Calculate metrics
         final_text = ' '.join(extracted_texts)
         avg_confidence = total_confidence / len(extracted_texts) if extracted_texts else 0.0
         processing_time = time.time() - start_time
+        
+        print(f"[DEBUG] Final result: '{final_text}' (avg_conf: {avg_confidence:.3f}, texts_found: {len(extracted_texts)})")
         
         result_dict = {
             "text": final_text,
@@ -297,8 +348,12 @@ def extract_text_optimized(
         return result_dict
         
     except Exception as e:
-        print(f"[ERROR] Optimized PaddleOCR extraction failed: {e}")
-        return {"text": "", "confidence": 0.0, "processing_time": time.time() - start_time, "method": "error"}
+        processing_time = time.time() - start_time
+        print(f"[ERROR] ❌ Optimized PaddleOCR extraction failed: {e}")
+        print(f"[ERROR] Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return {"text": "", "confidence": 0.0, "processing_time": processing_time, "method": "error", "error": str(e)}
 
 def extract_license_plates_optimized(
     image: np.ndarray,
@@ -386,16 +441,32 @@ def extract_license_plates_optimized(
         print(f"[ERROR] Optimized license plate extraction failed: {e}")
         return []
 
-def preprocess_image_for_ocr(image: np.ndarray) -> np.ndarray:
+def preprocess_image_for_ocr(image: np.ndarray, enhance_for_video: bool = True) -> np.ndarray:
     """
-    Optimized image preprocessing for better OCR results.
+    Advanced image preprocessing for better OCR results with angle correction.
+    Enhanced for video frames with rotation and perspective handling.
     
     Args:
         image: Input image in BGR format
+        enhance_for_video: Apply video-specific enhancements (angle correction, etc.)
     
     Returns:
         Preprocessed image in BGR format
     """
+    try:
+        if enhance_for_video:
+            # Use advanced preprocessing for videos
+            return preprocess_image_for_video_ocr(image)
+        else:
+            # Use standard preprocessing for images
+            return _standard_preprocess(image)
+        
+    except Exception as e:
+        print(f"[ERROR] Image preprocessing failed: {e}")
+        return image
+
+def _standard_preprocess(image: np.ndarray) -> np.ndarray:
+    """Standard preprocessing for regular images"""
     try:
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -417,8 +488,232 @@ def preprocess_image_for_ocr(image: np.ndarray) -> np.ndarray:
         return processed
         
     except Exception as e:
-        print(f"[ERROR] Image preprocessing failed: {e}")
+        print(f"[ERROR] Standard preprocessing failed: {e}")
         return image
+
+def preprocess_image_for_video_ocr(image: np.ndarray) -> np.ndarray:
+    """
+    Advanced preprocessing specifically for video frames with angle correction.
+    Handles rotated text, perspective issues, and video compression artifacts.
+    
+    Args:
+        image: Input video frame in BGR format
+    
+    Returns:
+        Preprocessed image in BGR format with corrected angles
+    """
+    try:
+        print(f"[DEBUG] Applying advanced video preprocessing with angle correction...")
+        
+        # Step 1: Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Step 2: Denoise for video compression artifacts
+        denoised = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+        
+        # Step 3: Apply bilateral filter for edge preservation
+        bilateral = cv2.bilateralFilter(denoised, 9, 75, 75)
+        
+        # Step 4: Enhance contrast with CLAHE
+        clahe = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(8,8))
+        enhanced = clahe.apply(bilateral)
+        
+        # Step 5: Detect and correct text angle (deskewing)
+        deskewed = _correct_text_angle(enhanced)
+        
+        # Step 6: Apply adaptive threshold for better text separation
+        adaptive_thresh = cv2.adaptiveThreshold(
+            deskewed, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2
+        )
+        
+        # Step 7: Morphological operations to clean up text
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+        morph = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_CLOSE, kernel)
+        
+        # Step 8: Advanced sharpening for text clarity
+        sharpened = _advanced_sharpen(morph)
+        
+        # Step 9: Convert back to 3-channel for PaddleOCR
+        processed = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
+        
+        print(f"[DEBUG] Video preprocessing completed with angle correction")
+        return processed
+        
+    except Exception as e:
+        print(f"[ERROR] Video preprocessing failed: {e}")
+        return image
+
+def _correct_text_angle(image: np.ndarray) -> np.ndarray:
+    """
+    Detect and correct text angle in the image.
+    Handles rotated text in video frames.
+    
+    Args:
+        image: Grayscale image
+    
+    Returns:
+        Angle-corrected image
+    """
+    try:
+        # Edge detection
+        edges = cv2.Canny(image, 50, 150, apertureSize=3)
+        
+        # Find lines using Hough Transform
+        lines = cv2.HoughLines(edges, 1, np.pi/180, threshold=100)
+        
+        if lines is not None:
+            angles = []
+            for rho, theta in lines[:50]:  # Process first 50 lines
+                angle = theta * 180 / np.pi
+                # Convert to angle relative to horizontal
+                if angle > 90:
+                    angle = angle - 180
+                elif angle > 45:
+                    angle = angle - 90
+                elif angle < -45:
+                    angle = angle + 90
+                angles.append(angle)
+            
+            if angles:
+                # Find the most common angle
+                median_angle = np.median(angles)
+                
+                # Only rotate if angle is significant (> 2 degrees)
+                if abs(median_angle) > 2:
+                    print(f"[DEBUG] Correcting text angle: {median_angle:.2f} degrees")
+                    
+                    # Rotate the image
+                    (h, w) = image.shape[:2]
+                    center = (w // 2, h // 2)
+                    M = cv2.getRotationMatrix2D(center, median_angle, 1.0)
+                    rotated = cv2.warpAffine(image, M, (w, h), 
+                                           flags=cv2.INTER_CUBIC, 
+                                           borderMode=cv2.BORDER_REPLICATE)
+                    return rotated
+        
+        return image
+        
+    except Exception as e:
+        print(f"[DEBUG] Angle correction failed: {e}")
+        return image
+
+def _advanced_sharpen(image: np.ndarray) -> np.ndarray:
+    """
+    Advanced sharpening specifically for text in video frames.
+    
+    Args:
+        image: Grayscale image
+    
+    Returns:
+        Sharpened image
+    """
+    try:
+        # Multiple sharpening kernels for different text types
+        kernels = [
+            np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]]),  # Standard sharpen
+            np.array([[0,-1,0], [-1,5,-1], [0,-1,0]]),      # Light sharpen
+            np.array([[-2,-1,-2], [-1,12,-1], [-2,-1,-2]])  # Heavy sharpen
+        ]
+        
+        # Apply standard sharpening
+        sharpened = cv2.filter2D(image, -1, kernels[0])
+        
+        # Apply unsharp masking for fine details
+        gaussian = cv2.GaussianBlur(image, (0, 0), 2.0)
+        unsharp_mask = cv2.addWeighted(image, 1.5, gaussian, -0.5, 0)
+        
+        # Combine results
+        result = cv2.addWeighted(sharpened, 0.7, unsharp_mask, 0.3, 0)
+        
+        return result
+        
+    except Exception as e:
+        print(f"[DEBUG] Advanced sharpening failed: {e}")
+        return image
+
+def extract_text_with_multiple_angles(image: np.ndarray, confidence_threshold: float = 0.3, lang: str = 'en', use_gpu: Optional[bool] = None) -> Dict:
+    """
+    Extract text using multiple angle approaches for best results.
+    Especially useful for video frames with rotated text.
+    
+    Args:
+        image: Input image in BGR format
+        confidence_threshold: Minimum confidence for text detection
+        lang: Language code for OCR
+        use_gpu: Whether to use GPU (auto-detect if None)
+    
+    Returns:
+        Dictionary containing extracted text and metadata
+    """
+    try:
+        print(f"[DEBUG] Running multi-angle text extraction...")
+        
+        # Method 1: Standard preprocessing
+        standard_result = extract_text_optimized(
+            image, confidence_threshold, lang, use_gpu, use_cache=False, preprocess=False
+        )
+        
+        # Apply standard preprocessing
+        standard_processed = preprocess_image_for_ocr(image, enhance_for_video=False)
+        standard_preprocessed_result = extract_text_optimized(
+            standard_processed, confidence_threshold, lang, use_gpu, use_cache=False, preprocess=False
+        )
+        
+        # Method 2: Video preprocessing with angle correction
+        video_processed = preprocess_image_for_ocr(image, enhance_for_video=True)
+        video_result = extract_text_optimized(
+            video_processed, confidence_threshold, lang, use_gpu, use_cache=False, preprocess=False
+        )
+        
+        # Method 3: Try different rotation angles if needed
+        rotation_results = []
+        if video_result["text"] and len(video_result["text"]) < 3:  # If very little text found
+            for angle in [-15, -10, -5, 5, 10, 15]:
+                (h, w) = image.shape[:2]
+                center = (w // 2, h // 2)
+                M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                rotated = cv2.warpAffine(image, M, (w, h), 
+                                       flags=cv2.INTER_CUBIC, 
+                                       borderMode=cv2.BORDER_REPLICATE)
+                
+                rotated_result = extract_text_optimized(
+                    rotated, confidence_threshold * 0.8, lang, use_gpu, use_cache=False, preprocess=False
+                )
+                
+                if rotated_result["text"] and len(rotated_result["text"]) > len(video_result["text"]):
+                    rotation_results.append(rotated_result)
+        
+        # Select the best result
+        all_results = [standard_result, standard_preprocessed_result, video_result] + rotation_results
+        
+        # Filter valid results and sort by text length and confidence
+        valid_results = [r for r in all_results if r["text"] and r["text"].strip()]
+        
+        if valid_results:
+            # Score each result (text length + confidence)
+            def score_result(result):
+                text_length = len(result["text"].strip())
+                confidence = result["confidence"]
+                return text_length * confidence
+            
+            best_result = max(valid_results, key=score_result)
+            
+            # Add method information
+            best_result["extraction_method"] = "multi_angle_enhanced"
+            best_result["angle_corrected"] = True
+            
+            print(f"[DEBUG] Multi-angle extraction best result: '{best_result['text']}' (conf: {best_result['confidence']:.3f})")
+            return best_result
+        
+        # Fallback to video result
+        video_result["extraction_method"] = "video_enhanced"
+        video_result["angle_corrected"] = True
+        return video_result
+        
+    except Exception as e:
+        print(f"[ERROR] Multi-angle extraction failed: {e}")
+        # Fallback to standard method
+        return extract_text_optimized(image, confidence_threshold, lang, use_gpu, use_cache=True, preprocess=True)
 
 def calculate_bbox_area(bbox_points: List) -> float:
     """Calculate area of bounding box from corner points"""

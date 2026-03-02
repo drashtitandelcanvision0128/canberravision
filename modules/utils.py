@@ -1149,11 +1149,7 @@ def _annotate_with_color(
                     _ocr_stream_state["texts"][key] = ocr_text
 
         boy_girl = None
-        try:
-            if str(class_name).strip().lower() == "person":
-                boy_girl = _predict_boy_girl_from_person_crop(crop)
-        except Exception:
-            boy_girl = None
+        boy_girl = None
 
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
@@ -1162,9 +1158,6 @@ def _annotate_with_color(
             if show_conf and i < len(conf):
                 parts.append(f"{float(conf[i]):.2f}")
             parts.append(str(color_name))
-            if boy_girl:
-                parts.append("|")
-                parts.append(str(boy_girl))
             if enable_resnet and resnet_label:
                 parts.append("|")
                 parts.append(str(resnet_label))

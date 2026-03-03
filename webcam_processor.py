@@ -8,10 +8,38 @@ import cv2
 import numpy as np
 import time
 import threading
+import os
+import sys
+import re
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Callable
 from queue import Queue
 import json
+
+# YOLOv8 (Ultralytics) import
+try:
+    from ultralytics import YOLO
+    ULTRALYTICS_AVAILABLE = True
+except Exception:
+    YOLO = None
+    ULTRALYTICS_AVAILABLE = False
+
+from collections import deque
+
+# Tesseract fallback (optional)
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+    if sys.platform.startswith("win"):
+        try:
+            _default_tesseract = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+            if os.path.exists(_default_tesseract):
+                pytesseract.pytesseract.tesseract_cmd = _default_tesseract
+        except Exception:
+            pass
+except Exception:
+    pytesseract = None
+    TESSERACT_AVAILABLE = False
 
 # Import torch for GPU detection
 try:
@@ -84,6 +112,49 @@ class WebcamProcessor:
         self.ocr_every_n = 10
         self._frame_idx = 0
         self._ocr_cache = {}
+        self._tesseract_checked = False
+        self._tesseract_ok = False
+        self._last_ocr_debug_ts = 0.0
+
+        # OCR class filtering
+        self._ocr_skip_classes = {
+            'person',
+            'bird',
+            'cat',
+            'dog',
+            'horse',
+            'sheep',
+            'cow',
+            'elephant',
+            'bear',
+            'zebra',
+            'giraffe',
+        }
+        self._ocr_allow_classes = {
+            'cup',
+            'bottle',
+            'book',
+            'laptop',
+            'cell phone',
+            'tv',
+            'keyboard',
+            'remote',
+            'backpack',
+            'handbag',
+            'suitcase',
+            'tie',
+            'umbrella',
+            'license plate',
+        }
+        self._ocr_vehicle_classes = {'car', 'truck', 'bus', 'motorcycle'}
+
+        # License plate de-dup buffer
+        self._plate_history = deque(maxlen=50)
+        self._plate_seen_ttl_s = 8.0
+
+        # YOLOv8s model cache
+        self._yolo_v8_model = None
+        self._yolo_v8_names = None
         
         # Initialize advanced color detector
         if ADVANCED_COLOR_AVAILABLE:
@@ -130,6 +201,20 @@ class WebcamProcessor:
         }
         
         print("[INFO] Webcam Processor initialized")
+
+    def _get_yolov8s_model(self):
+        if self._yolo_v8_model is not None:
+            return self._yolo_v8_model
+        if not ULTRALYTICS_AVAILABLE:
+            raise RuntimeError("Ultralytics is not available. Please install ultralytics.")
+
+        # Load YOLOv8s for general object detection
+        self._yolo_v8_model = YOLO("yolov8s.pt")
+        try:
+            self._yolo_v8_names = self._yolo_v8_model.names
+        except Exception:
+            self._yolo_v8_names = None
+        return self._yolo_v8_model
     
     def list_available_cameras(self) -> List[Dict]:
         """List all available cameras"""
@@ -315,6 +400,7 @@ class WebcamProcessor:
                 # Process EVERY frame for real-time - no skipping
                 start_time = time.time()
                 result = self._process_frame_realtime_maximum_speed(frame)
+                self._frame_idx += 1
                 processing_time = time.time() - start_time
                 
                 # Very strict timeout on GPU; more lenient on CPU fallback
@@ -488,18 +574,53 @@ class WebcamProcessor:
             # OCR on all objects now (not just priority list), with specialized crops for some classes
             should_run_ocr = self.enable_ocr and objects
             if should_run_ocr:
-                # Always run OCR for cups/plates regardless of frame skip
-                has_priority = any(str(obj.get('class_name', '')).strip().lower() in ('cup', 'bottle', 'book', 'license plate', 'cell phone') for obj in objects[:4])
+                # Filter objects for OCR (skip people/animals/birds)
+                objects_for_ocr = []
+                for o in objects:
+                    cn = str(o.get('class_name', '')).strip().lower()
+                    if not cn:
+                        continue
+                    if cn in self._ocr_skip_classes:
+                        continue
+                    if (cn in self._ocr_allow_classes) or (cn in self._ocr_vehicle_classes):
+                        objects_for_ocr.append(o)
+
+                if not objects_for_ocr:
+                    result['ocr_results'] = []
+                    objects_for_ocr = []
+
+                # Always run OCR for priority text objects regardless of frame skip
+                has_priority = any(
+                    str(obj.get('class_name', '')).strip().lower() in ('cup', 'bottle', 'book', 'license plate', 'cell phone', 'laptop')
+                    for obj in objects_for_ocr[:4]
+                )
                 run_now = has_priority or (self._frame_idx % int(max(1, self.ocr_every_n)) == 0)
                 if run_now:
                     try:
-                        result['ocr_results'] = self._extract_text_for_objects(frame, objects)
+                        # Webcam previews are often mirrored; flip crops before OCR to read text correctly.
+                        result['ocr_results'] = self._extract_text_for_objects(frame, objects_for_ocr, mirrored=True)
                         for item in result['ocr_results']:
                             text = (item.get('text') or '').strip()
                             if text:
                                 self.stats['unique_texts'].add(text)
                     except Exception as e:
-                        print(f"[DEBUG] OCR processing failed: {e}")
+                        print(f"[DEBUG] OCR extraction failed: {e}")
+                        result['ocr_results'] = []
+                
+                # Vehicle -> license plate detection + OCR (runs even if general OCR is throttled)
+                try:
+                    vehicle_classes = {"car", "truck", "bus", "motorcycle"}
+                    vehicles = [o for o in objects if str(o.get('class_name', '')).strip().lower() in vehicle_classes]
+                    if vehicles:
+                        plates = self._detect_and_read_license_plates(frame, vehicles)
+                        result['license_plates'] = plates
+                        for p in plates:
+                            t = (p.get('text') or '').strip()
+                            if t:
+                                self.stats['unique_plates'].add(t)
+                except Exception as e:
+                    print(f"[DEBUG] Vehicle plate pipeline failed: {e}")
+                    result['license_plates'] = []
             
             return result
             
@@ -516,13 +637,61 @@ class WebcamProcessor:
                 'fallback_colors': []
             }
 
-    def _extract_text_for_objects(self, frame: np.ndarray, objects: List[Dict]) -> List[Dict]:
+    def _extract_text_for_objects(self, frame: np.ndarray, objects: List[Dict], mirrored: bool = False) -> List[Dict]:
         try:
             h, w = frame.shape[:2]
             results = []
 
-            # Keep OCR bounded for speed; now process all objects up to limit
-            for obj in objects[:6]:
+            def _clean_text(s: str) -> str:
+                try:
+                    s = (s or "")
+                    s = s.upper()
+                    s = re.sub(r"[^A-Z0-9]+", "", s)
+                    return s
+                except Exception:
+                    return ""
+
+            def _split_alpha_num(s: str) -> tuple[str, str]:
+                try:
+                    letters = re.sub(r"[^A-Z]+", "", s)
+                    digits = re.sub(r"[^0-9]+", "", s)
+                    return letters, digits
+                except Exception:
+                    return "", ""
+
+            def _filter_noise_digits(cleaned: str, ocr_conf: float, class_name: str, is_plate_like: bool) -> str:
+                """Prevent digit hallucination for brand-like text on non-plate objects."""
+                try:
+                    if not cleaned:
+                        return ""
+                    letters, digits = _split_alpha_num(cleaned)
+                    has_letters = bool(letters)
+                    has_digits = bool(digits)
+
+                    # Always keep alphanumeric for plates/vehicles
+                    if is_plate_like:
+                        return cleaned
+
+                    # If only letters => OK
+                    if has_letters and (not has_digits):
+                        return letters
+
+                    # If only digits on non-plate objects: usually noise; suppress unless very confident
+                    if has_digits and (not has_letters):
+                        return cleaned if float(ocr_conf or 0.0) >= 0.80 else ""
+
+                    # Mixed letters+digits: if confidence is low, drop digits and keep letters only
+                    if has_letters and has_digits:
+                        if float(ocr_conf or 0.0) < 0.65:
+                            return letters
+                        return cleaned
+
+                    return ""
+                except Exception:
+                    return cleaned
+
+            # OCR all provided objects (caller already bounds this list for real-time performance)
+            for obj in objects:
                 if 'bounding_box' not in obj:
                     continue
                 x1, y1, x2, y2 = obj['bounding_box']
@@ -533,13 +702,39 @@ class WebcamProcessor:
                 if x2 <= x1 or y2 <= y1:
                     continue
 
+                # Skip tiny crops (usually unreadable) - lowered threshold for cups/plates/person/vehicles
+                class_name = str(obj.get('class_name', '')).strip().lower()
+                is_priority = class_name in ('cup', 'bottle', 'book', 'license plate', 'person', 'car', 'truck', 'bus', 'motorcycle')
+
                 crop = frame[y1:y2, x1:x2]
                 if crop.size == 0:
                     continue
 
-                # Skip tiny crops (usually unreadable) - lowered threshold for cups/plates/person/vehicles
-                class_name = str(obj.get('class_name', '')).strip().lower()
-                is_priority = class_name in ('cup', 'bottle', 'book', 'license plate', 'person', 'car', 'truck', 'bus', 'motorcycle')
+                if mirrored:
+                    try:
+                        crop = cv2.flip(crop, 1)
+                    except Exception:
+                        pass
+
+                # Expand crop slightly for text-heavy objects so printed labels aren't clipped
+                if is_priority and class_name in ('cup', 'bottle', 'book', 'person'):
+                    try:
+                        pad_x = int(max(2, (x2 - x1) * 0.08))
+                        pad_y = int(max(2, (y2 - y1) * 0.08))
+                        ex1 = int(max(0, x1 - pad_x))
+                        ey1 = int(max(0, y1 - pad_y))
+                        ex2 = int(min(w, x2 + pad_x))
+                        ey2 = int(min(h, y2 + pad_y))
+                        if ex2 > ex1 and ey2 > ey1:
+                            crop = frame[ey1:ey2, ex1:ex2]
+                            x1, y1, x2, y2 = ex1, ey1, ex2, ey2
+                            if mirrored:
+                                try:
+                                    crop = cv2.flip(crop, 1)
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
                 min_crop_w = 30 if is_priority else 80
                 min_crop_h = 20 if is_priority else 60
                 conf_thresh = 0.2 if is_priority else 0.4
@@ -554,11 +749,18 @@ class WebcamProcessor:
                 # Cache key is coarse to avoid flicker
                 key = f"{class_name}:{x1//20}:{y1//20}:{x2//20}:{y2//20}"
                 cached = self._ocr_cache.get(key)
-                if cached and isinstance(cached, dict) and (time.time() - cached.get('ts', 0)) < cache_ttl:
-                    results.append(cached['data'])
-                    continue
+                if cached and isinstance(cached, dict):
+                    cached_ttl = float(cached.get('ttl', cache_ttl))
+                    cached_text = ((cached.get('data') or {}).get('text') or '').strip()
+                    # Don't hold onto empty text for long; allow quick retries
+                    if not cached_text:
+                        cached_ttl = min(cached_ttl, 0.25 if is_priority else 0.75)
+                    if (time.time() - cached.get('ts', 0)) < cached_ttl:
+                        results.append(cached['data'])
+                        continue
 
                 text = ''
+                text_conf = 0.0
 
                 # If car, try quick plate region extraction first (if available)
                 if class_name == 'car':
@@ -574,13 +776,16 @@ class WebcamProcessor:
                                 px1, py1, px2, py2 = first
                                 plate_crop = crop[int(py1):int(py2), int(px1):int(px2)]
                             if plate_crop is not None and plate_crop.size > 0:
-                                text = self._run_ocr_on_crop(plate_crop, confidence_threshold=0.3, is_plate=True)
+                                t, c = self._run_ocr_on_crop_with_conf(plate_crop, confidence_threshold=0.3, is_plate=True)
+                                text = t
+                                text_conf = c
                     except Exception:
                         pass
 
                 # General text for any object with lower threshold for priority objects
                 if not text:
-                    thresh = 0.2 if class_name in ('cup', 'bottle', 'book', 'license plate', 'person', 'car', 'truck', 'bus', 'motorcycle') else 0.4
+                    # More permissive threshold for priority objects to avoid missing faint/blurred print
+                    thresh = 0.12 if class_name in ('cup', 'bottle', 'book', 'license plate', 'person', 'car', 'truck', 'bus', 'motorcycle') else 0.4
 
                     best_text = ''
                     best_len = 0
@@ -623,7 +828,7 @@ class WebcamProcessor:
                                 crops_to_try.insert(0, plate_crop)
 
                     for c in crops_to_try:
-                        t = self._run_ocr_on_crop(
+                        t, cconf = self._run_ocr_on_crop_with_conf(
                             c,
                             confidence_threshold=thresh,
                             is_plate=(class_name in ('license plate', 'car', 'truck', 'bus', 'motorcycle')),
@@ -632,13 +837,14 @@ class WebcamProcessor:
                         if t and len(t) > best_len:
                             best_text = t
                             best_len = len(t)
+                            text_conf = float(cconf or 0.0)
                             if best_len >= 10:
                                 break
 
                     # If still empty for priority objects, do a more permissive pass
                     if (not best_text) and class_name in ('cup', 'bottle', 'book', 'license plate', 'person', 'car', 'truck', 'bus', 'motorcycle'):
                         for c in crops_to_try:
-                            t = self._run_ocr_on_crop(
+                            t, cconf = self._run_ocr_on_crop_with_conf(
                                 c,
                                 confidence_threshold=0.15,
                                 is_plate=(class_name in ('license plate', 'car', 'truck', 'bus', 'motorcycle')),
@@ -647,18 +853,34 @@ class WebcamProcessor:
                             if t and len(t) > best_len:
                                 best_text = t
                                 best_len = len(t)
+                                text_conf = float(cconf or 0.0)
                                 if best_len >= 8:
                                     break
 
                     text = best_text
 
+                cleaned = _clean_text(text)
+                plate_like = (class_name in ('license plate', 'car', 'truck', 'bus', 'motorcycle'))
+                cleaned = _filter_noise_digits(cleaned, float(text_conf or 0.0), class_name, plate_like)
+                # Suppress meaningless very short results
+                if cleaned and len(cleaned) < 3:
+                    letters, digits = _split_alpha_num(cleaned)
+                    if len(letters) < 3 and (not plate_like):
+                        cleaned = ""
+                text = cleaned
+
                 data = {
                     'object_id': obj.get('object_id'),
                     'class_name': obj.get('class_name'),
                     'bounding_box': (x1, y1, x2, y2),
-                    'text': text
+                    'text': text,
+                    'confidence': float(text_conf or 0.0),
                 }
-                self._ocr_cache[key] = {'ts': time.time(), 'data': data}
+                # Cache, but empty text should expire quickly so we keep retrying as camera moves
+                entry_ttl = cache_ttl
+                if not (text or '').strip():
+                    entry_ttl = 0.25 if is_priority else 0.75
+                self._ocr_cache[key] = {'ts': time.time(), 'ttl': float(entry_ttl), 'data': data}
                 results.append(data)
 
             # Limit cache growth
@@ -778,10 +1000,30 @@ class WebcamProcessor:
             print(f"[ERROR] Color extraction failed: {e}")
             return []
 
-    def _run_ocr_on_crop(self, crop: np.ndarray, confidence_threshold: float = 0.4, is_plate: bool = False) -> str:
+    def _run_ocr_on_crop_with_conf(self, crop: np.ndarray, confidence_threshold: float = 0.4, is_plate: bool = False) -> Tuple[str, float]:
         try:
             if crop is None or crop.size == 0:
-                return ''
+                return '', 0.0
+
+            # Throttled debug info (avoid spamming console)
+            try:
+                now = time.time()
+                if (now - float(self._last_ocr_debug_ts or 0.0)) > 2.0:
+                    self._last_ocr_debug_ts = now
+                    if isinstance(crop, np.ndarray):
+                        print(f"[DEBUG] OCR input shape={getattr(crop, 'shape', None)} dtype={getattr(crop, 'dtype', None)}")
+            except Exception:
+                pass
+
+            # One-time check: pytesseract may be installed but the Tesseract engine might be missing.
+            if (not self._tesseract_checked) and TESSERACT_AVAILABLE and pytesseract is not None:
+                self._tesseract_checked = True
+                try:
+                    _ = pytesseract.get_tesseract_version()
+                    self._tesseract_ok = True
+                except Exception:
+                    self._tesseract_ok = False
+                    print("[WARN] Tesseract engine not found/configured. Install Tesseract-OCR and add it to PATH for pytesseract fallback.")
 
             # Preprocess for better OCR: resize if too small, enhance contrast, try multiple orientations
             processed_crops = self._preprocess_for_ocr(crop, is_plate=is_plate)
@@ -851,15 +1093,46 @@ class WebcamProcessor:
                                 best_text = text
                                 best_conf = est_conf
 
-            return best_text
+            # Last resort fallback: pytesseract (works even if PaddleOCR is broken)
+            if (not best_text) and self._tesseract_ok and TESSERACT_AVAILABLE and pytesseract is not None and processed_crops:
+                try:
+                    img = processed_crops[0][0]
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    gray = cv2.resize(gray, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+                    gray = cv2.GaussianBlur(gray, (3, 3), 0)
+                    _, th = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                    psm = "7" if is_plate else "6"
+                    config = f"--oem 3 --psm {psm}"
+                    t = pytesseract.image_to_string(th, config=config)
+                    t = (t or "").strip()
+                    t = " ".join(t.split())
+                    if t:
+                        best_text = t
+                except Exception:
+                    pass
+
+            return best_text, float(best_conf or 0.0)
         except Exception as e:
             print(f"[DEBUG] _run_ocr_on_crop failed: {e}")
-            return ''
+            return '', 0.0
+
+    def _run_ocr_on_crop(self, crop: np.ndarray, confidence_threshold: float = 0.4, is_plate: bool = False) -> str:
+        """Backward-compatible wrapper returning only text."""
+        t, _c = self._run_ocr_on_crop_with_conf(crop, confidence_threshold=confidence_threshold, is_plate=is_plate)
+        return t
 
     def _preprocess_for_ocr(self, crop: np.ndarray, is_plate: bool = False) -> List[Tuple[np.ndarray, float]]:
         """Generate multiple preprocessed versions of the crop for OCR, with rotation attempts."""
         processed = []
         try:
+            # Ensure BGR 3-channel input
+            if crop is None or (not isinstance(crop, np.ndarray)) or crop.size == 0:
+                return [(crop, 0.0)]
+            if len(crop.shape) == 2:
+                crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+            elif len(crop.shape) == 3 and crop.shape[2] == 4:
+                crop = cv2.cvtColor(crop, cv2.COLOR_BGRA2BGR)
+
             h, w = crop.shape[:2]
 
             # 1) Basic resize if too small (target ~300-400 px width for OCR)
@@ -869,49 +1142,89 @@ class WebcamProcessor:
                 new_h = int(h * scale)
                 crop = cv2.resize(crop, (target_w, new_h), interpolation=cv2.INTER_CUBIC)
 
-            # 2) Enhance contrast and sharpen
-            gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8,8))
-            enhanced = clahe.apply(gray)
+            # Always include original crop first (safe fallback)
+            processed.append((crop, 0.0))
 
-            # Sharpen
-            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-            sharpened = cv2.filter2D(enhanced, -1, kernel)
+            # 2) Blur detection + conditional enhancement (real-time safe)
+            gray0 = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+            try:
+                blur_score = float(cv2.Laplacian(gray0, cv2.CV_64F).var())
+            except Exception:
+                blur_score = 0.0
 
-            # Convert back to BGR for PaddleOCR
-            enhanced_bgr = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
-            processed.append((enhanced_bgr, 0.0))
+            # Threshold tuned for resized crops (~350-400px wide). Lower => more blurry.
+            blur_thresh = 70.0 if not is_plate else 90.0
+            is_blurry = blur_score > 0.0 and blur_score < blur_thresh
+
+            base_bgr = crop
+            base_gray = gray0
+
+            if is_blurry:
+                # Contrast enhancement (CLAHE)
+                clahe = cv2.createCLAHE(clipLimit=2.2, tileGridSize=(8, 8))
+                g = clahe.apply(gray0)
+
+                # Denoise (fast)
+                try:
+                    g = cv2.fastNlMeansDenoising(g, None, h=10, templateWindowSize=7, searchWindowSize=21)
+                except Exception:
+                    pass
+
+                # Unsharp mask (gentle sharpening for blur)
+                try:
+                    blur = cv2.GaussianBlur(g, (0, 0), 1.0)
+                    sharp = cv2.addWeighted(g, 1.35, blur, -0.35, 0)
+                    g = sharp
+                except Exception:
+                    pass
+
+                base_gray = g
+                base_bgr = cv2.cvtColor(base_gray, cv2.COLOR_GRAY2BGR)
+
+                # Add enhanced version as an additional candidate
+                processed.append((base_bgr, 0.0))
+
+                # Throttled blur debug log
+                try:
+                    now = time.time()
+                    if (now - float(self._last_ocr_debug_ts or 0.0)) > 2.0:
+                        print(f"[DEBUG] Blur detected score={blur_score:.1f} thresh={blur_thresh:.1f} crop={crop.shape}")
+                except Exception:
+                    pass
+
+            # Use enhanced (if created) for augmentations; otherwise original
+            aug_base = base_bgr if is_blurry else crop
 
             # 3) Try flips and rotations for text on cups or skewed plates
             # Horizontal flip for mirrored text (common in webcam/camera)
-            flipped_h = cv2.flip(enhanced_bgr, 1)
+            flipped_h = cv2.flip(aug_base, 1)
             processed.append((flipped_h, 0.0))
 
             # Vertical flip
-            flipped_v = cv2.flip(enhanced_bgr, 0)
+            flipped_v = cv2.flip(aug_base, 0)
             processed.append((flipped_v, 0.0))
 
             # Both flips (equivalent to 180 rotation)
-            flipped_hv = cv2.flip(enhanced_bgr, -1)
+            flipped_hv = cv2.flip(aug_base, -1)
             processed.append((flipped_hv, 0.0))
 
             # Rotations
             angles = [90, 180, 270] if not is_plate else [90, 270]
             for angle in angles:
-                rotated = cv2.rotate(enhanced_bgr, cv2.ROTATE_90_CLOCKWISE if angle == 90 else (cv2.ROTATE_180 if angle == 180 else cv2.ROTATE_90_COUNTERCLOCKWISE))
+                rotated = cv2.rotate(aug_base, cv2.ROTATE_90_CLOCKWISE if angle == 90 else (cv2.ROTATE_180 if angle == 180 else cv2.ROTATE_90_COUNTERCLOCKWISE))
                 processed.append((rotated, float(angle)))
 
             # Also try flips of rotated versions for cups
             if not is_plate:
                 for angle in [90, 270]:
-                    rotated = cv2.rotate(enhanced_bgr, cv2.ROTATE_90_CLOCKWISE if angle == 90 else cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    rotated = cv2.rotate(aug_base, cv2.ROTATE_90_CLOCKWISE if angle == 90 else cv2.ROTATE_90_COUNTERCLOCKWISE)
                     flipped_rot = cv2.flip(rotated, 1)  # horizontal flip of rotated
                     processed.append((flipped_rot, float(angle + 1000)))  # use angle+1000 to distinguish
 
             # 4) For plates, also try a slight deskew using morphological operations
             if is_plate:
                 # Binarize
-                _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                _, binary = cv2.threshold(base_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
                 # Morph open to reduce noise
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
                 cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
@@ -921,64 +1234,40 @@ class WebcamProcessor:
         except Exception as e:
             print(f"[DEBUG] _preprocess_for_ocr failed: {e}")
             # Fallback: return original crop
-            processed.append((crop, 0.0))
+            processed = [(crop, 0.0)] if crop is not None else [(crop, 0.0)]
 
         return processed
     
     def _detect_all_objects(self, frame: np.ndarray) -> List[Dict]:
-        """Maximum speed GPU-only object detection"""
+        """YOLOv8s object detection for webcam (conf > 0.5)"""
         try:
-            # Import YOLO from your main app
-            from app import get_model, _get_device
-            
-            # Use the nano model for maximum speed
-            model = get_model("yolo26n.pt")
-            
-            device = _get_device()
-            
-            # Ultra aggressive downsampling for maximum speed
+            model = self._get_yolov8s_model()
+
             height, width = frame.shape[:2]
-            max_size = 320  # Even smaller for maximum speed
-            
+            device = 0 if (TORCH_AVAILABLE and torch is not None and torch.cuda.is_available()) else "cpu"
+
+            # Mild downsampling for smoother performance while keeping accuracy reasonable
+            max_size = 640
             if max(height, width) > max_size:
                 scale = max_size / max(height, width)
                 new_width = int(width * scale)
                 new_height = int(height * scale)
-                # Use fastest interpolation
-                small_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_NEAREST)
+                small_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
             else:
                 small_frame = frame
                 new_width, new_height = width, height
-            
-            # Maximum speed detection settings
+
             import torch
-            try:
-                with torch.no_grad():  # Disable gradient calculation
-                    detection_results = model.predict(
-                        source=small_frame,
-                        conf=0.15,      # Very low confidence for more detections
-                        iou=0.35,       # Lower IoU for faster NMS
-                        max_det=6,      # Even fewer detections for speed
-                        device=device,
-                        verbose=False,
-                        half=True if device != "cpu" else False,
-                    )
-            except Exception as e:
-                if device != "cpu":
-                    print(f"[WARNING] GPU detection failed, falling back to CPU: {e}")
-                    device = "cpu"
-                    with torch.no_grad():
-                        detection_results = model.predict(
-                            source=small_frame,
-                            conf=0.15,
-                            iou=0.35,
-                            max_det=6,
-                            device=device,
-                            verbose=False,
-                            half=False,
-                        )
-                else:
-                    raise
+            with torch.no_grad():
+                detection_results = model.predict(
+                    source=small_frame,
+                    conf=0.5,
+                    iou=0.5,
+                    max_det=50,
+                    device=device,
+                    verbose=False,
+                    half=True if device != "cpu" else False,
+                )
             
             objects = []
             
@@ -1014,49 +1303,128 @@ class WebcamProcessor:
                         x2 = int(x2 * scale_x)
                         y2 = int(y2 * scale_y)
                         
-                        # Very low confidence threshold
-                        if confidence > 0.15:
-                            # Ultra-fast classification with emojis
-                            ultra_fast_categories = {
-                                'person': ('👤 Person', 'Person', (0, 255, 255)),
-                                'bird': ('🐦 Bird', 'Bird', (255, 105, 180)),
-                                'cat': ('🐱 Cat', 'Animal', (255, 0, 255)),
-                                'dog': ('🐕 Dog', 'Animal', (255, 0, 255)),
-                                'cup': ('☕ Cup', 'Drinkware', (139, 69, 19)),
-                                'bottle': ('🍶 Bottle', 'Drinkware', (139, 69, 19)),
-                                'cell phone': ('📱 Phone', 'Electronics', (0, 191, 255)),
-                                'laptop': ('💻 Laptop', 'Electronics', (0, 191, 255)),
-                                'car': ('🚗 Car', 'Vehicle', (255, 165, 0)),
-                                'bicycle': ('🚴 Bicycle', 'Vehicle', (0, 255, 255)),
-                                'motorcycle': ('🏍️ Moto', 'Vehicle', (255, 165, 0)),
-                                'bus': ('🚌 Bus', 'Vehicle', (255, 165, 0)),
-                                'truck': ('🚚 Truck', 'Vehicle', (255, 165, 0)),
-                                'chair': ('🪑 Chair', 'Furniture', (139, 69, 19)),
-                                'book': ('📚 Book', 'Object', (128, 128, 128)),
-                                'clock': ('🕐 Clock', 'Object', (128, 128, 128)),
-                                'handbag': ('👜 Bag', 'Object', (128, 128, 128)),
-                                'backpack': ('🎒 Pack', 'Object', (128, 128, 128)),
-                            }
-                            
-                            display_name, category, color = ultra_fast_categories.get(class_name.lower(), 
-                                (class_name.title(), 'Object', (255, 255, 255)))
-                            
+                        if confidence >= 0.5:
+                            cname = str(class_name).strip().lower()
+                            category = "Vehicle" if cname in ("car", "truck", "bus", "motorcycle", "bicycle") else "Object"
+                            if cname == "person":
+                                category = "Person"
+                            box_color = (0, 255, 0) if category == "Vehicle" else (255, 255, 0)
+
                             objects.append({
                                 'object_id': f"{class_name}_{i}",
                                 'class_name': class_name,
-                                'display_name': display_name,
+                                'display_name': str(class_name),
                                 'category': category,
                                 'confidence': confidence,
                                 'bounding_box': (x1, y1, x2, y2),
                                 'center': ((x1 + x2) // 2, (y1 + y2) // 2),
                                 'size': (x2 - x1, y2 - y1),
-                                'color': color
+                                'color': box_color
                             })
             
             return objects
             
         except Exception as e:
             print(f"[ERROR] Ultra-fast GPU detection failed: {e}")
+            return []
+
+    def _detect_license_plate_regions(self, vehicle_crop: np.ndarray) -> List[Tuple[int, int, int, int]]:
+        try:
+            if vehicle_crop is None or vehicle_crop.size == 0:
+                return []
+
+            h, w = vehicle_crop.shape[:2]
+            gray = cv2.cvtColor(vehicle_crop, cv2.COLOR_BGR2GRAY)
+            gray = cv2.bilateralFilter(gray, 7, 50, 50)
+            edges = cv2.Canny(gray, 50, 150)
+
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
+            edges = cv2.dilate(edges, kernel, iterations=1)
+            edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            candidates = []
+            for c in contours:
+                x, y, cw, ch = cv2.boundingRect(c)
+                if cw <= 0 or ch <= 0:
+                    continue
+                area = cw * ch
+                if area < (w * h) * 0.01:
+                    continue
+
+                ar = cw / float(ch)
+                if ar < 1.8 or ar > 7.5:
+                    continue
+
+                if y < int(0.25 * h):
+                    continue
+
+                candidates.append((x, y, x + cw, y + ch, area))
+
+            candidates.sort(key=lambda t: t[4], reverse=True)
+            return [(x1, y1, x2, y2) for (x1, y1, x2, y2, _) in candidates[:2]]
+
+        except Exception:
+            return []
+
+    def _normalize_plate_text(self, text: str) -> str:
+        if not text:
+            return ""
+        t = ''.join([c for c in text.upper() if c.isalnum()])
+        return t
+
+    def _is_recent_plate(self, plate_text: str) -> bool:
+        now = time.time()
+        for t, ts in list(self._plate_history):
+            if t == plate_text and (now - ts) < self._plate_seen_ttl_s:
+                return True
+        return False
+
+    def _mark_plate_seen(self, plate_text: str):
+        self._plate_history.append((plate_text, time.time()))
+
+    def _detect_and_read_license_plates(self, frame: np.ndarray, vehicles: List[Dict]) -> List[Dict]:
+        try:
+            h, w = frame.shape[:2]
+            plates_out: List[Dict] = []
+
+            for v in vehicles[:3]:
+                if 'bounding_box' not in v:
+                    continue
+                x1, y1, x2, y2 = v['bounding_box']
+                x1 = int(max(0, min(w - 1, x1)))
+                y1 = int(max(0, min(h - 1, y1)))
+                x2 = int(max(0, min(w - 1, x2)))
+                y2 = int(max(0, min(h - 1, y2)))
+                if x2 <= x1 or y2 <= y1:
+                    continue
+
+                crop = frame[y1:y2, x1:x2]
+                regions = self._detect_license_plate_regions(crop)
+                for (px1, py1, px2, py2) in regions:
+                    plate_crop = crop[int(py1):int(py2), int(px1):int(px2)]
+                    if plate_crop is None or plate_crop.size == 0:
+                        continue
+
+                    raw = self._run_ocr_on_crop(plate_crop, confidence_threshold=0.25, is_plate=True)
+                    norm = self._normalize_plate_text(raw)
+                    if len(norm) < 6:
+                        continue
+
+                    if self._is_recent_plate(norm):
+                        continue
+
+                    self._mark_plate_seen(norm)
+                    plates_out.append({
+                        'text': norm,
+                        'vehicle_object_id': v.get('object_id'),
+                        'vehicle_class': v.get('class_name'),
+                        'bounding_box': (x1 + int(px1), y1 + int(py1), x1 + int(px2), y1 + int(py2)),
+                    })
+
+            return plates_out
+        except Exception:
             return []
     
     def _detect_object_colors(self, frame: np.ndarray, objects: List[Dict]) -> List[Dict]:
@@ -1194,6 +1562,21 @@ class WebcamProcessor:
             cv2.putText(annotated, fps_text, 
                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
+            # Draw license plates (if found)
+            for plate in (result.get('license_plates', []) or [])[:5]:
+                bbox = plate.get('bounding_box')
+                if not bbox:
+                    continue
+                x1, y1, x2, y2 = bbox
+                cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                plate_text = (plate.get('text') or '').strip()
+                if plate_text:
+                    label = plate_text[:16]
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                    ly = max(20, int(y1) - 8)
+                    cv2.rectangle(annotated, (int(x1), ly - label_size[1] - 8), (int(x1) + label_size[0] + 8, ly + 4), (0, 0, 0), -1)
+                    cv2.putText(annotated, label, (int(x1) + 4, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+
             # Draw objects with multi-level fallback color information
             objects = result.get('objects', [])
             ocr_results = result.get('ocr_results', []) or []
@@ -1267,6 +1650,11 @@ class WebcamProcessor:
             obj_text = f"🎯 Objects: {len(objects)}"
             cv2.putText(annotated, obj_text, 
                        (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+            lp_count = len(result.get('license_plates', []) or [])
+            if lp_count:
+                lp_text = f"🚗 Plates: {lp_count} (unique: {len(self.stats['unique_plates'])})"
+                cv2.putText(annotated, lp_text, (10, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             if self.enable_ocr:
                 ocr_text = f"🔤 OCR: {len(ocr_results)} (unique: {len(self.stats['unique_texts'])})"

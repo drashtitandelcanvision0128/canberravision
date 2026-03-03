@@ -17,6 +17,13 @@ try:
 except ImportError:
     pytesseract = None
 
+try:
+    from optimized_paddleocr_gpu import extract_text_optimized
+    OPTIMIZED_PADDLEOCR_AVAILABLE = True
+except Exception:
+    extract_text_optimized = None
+    OPTIMIZED_PADDLEOCR_AVAILABLE = False
+
 # Import enhanced detection for challenging images
 try:
     from enhanced_detection import enhanced_license_plate_detection
@@ -1130,7 +1137,22 @@ def _annotate_with_color(
                 
                 # If no general text found with LightOnOCR, try regular OCR
                 if general_text is None:
-                    general_text = _extract_text_ocr(crop)
+                    if OPTIMIZED_PADDLEOCR_AVAILABLE and extract_text_optimized is not None:
+                        try:
+                            ocr_out = extract_text_optimized(
+                                crop,
+                                confidence_threshold=0.2,
+                                lang='en',
+                                use_gpu=None,
+                                use_cache=True,
+                                preprocess=True,
+                            )
+                            general_text = (ocr_out.get('text') or '').strip()
+                        except Exception:
+                            general_text = None
+
+                    if general_text is None:
+                        general_text = _extract_text_ocr(crop)
                     if general_text and general_text.strip():
                         general_text = _clean_general_text(general_text)
                 
@@ -1161,9 +1183,6 @@ def _annotate_with_color(
             if enable_resnet and resnet_label:
                 parts.append("|")
                 parts.append(str(resnet_label))
-            if enable_ocr and ocr_text:
-                parts.append("|")
-                parts.append(str(ocr_text))
             text = " ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -1183,6 +1202,21 @@ def _annotate_with_color(
             bg_y2 = min(ih - 1, bg_y2)
             cv2.rectangle(annotated, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 255, 0), -1)
             cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+
+            if enable_ocr and ocr_text:
+                ocr_disp = str(ocr_text).strip()
+                if ocr_disp:
+                    ocr_disp = ocr_disp[:42]
+                    (otw, oth), obase = cv2.getTextSize(ocr_disp, font, 0.55, 2)
+                    oy = y2 + oth + 6
+                    if oy + obase + 6 > ih:
+                        oy = max(20, y1 - 10)
+                    ox1 = x1
+                    ox2 = min(iw - 1, x1 + otw + 8)
+                    oy1 = max(0, oy - oth - obase - 6)
+                    oy2 = min(ih - 1, oy + 6)
+                    cv2.rectangle(annotated, (ox1, oy1), (ox2, oy2), (0, 0, 0), -1)
+                    cv2.putText(annotated, ocr_disp, (x1 + 4, oy), font, 0.55, (0, 255, 255), 2, cv2.LINE_AA)
 
     return annotated
 

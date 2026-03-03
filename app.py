@@ -11,11 +11,35 @@ from pathlib import Path
 import subprocess
 import shutil
 from pathlib import Path
+from typing import List, Dict
 
 try:
     import imageio_ffmpeg
 except Exception:
     imageio_ffmpeg = None
+
+import cv2
+import numpy as np
+import re
+import gradio as gr
+import PIL.Image as Image
+import torch
+import torchvision
+from torchvision.models import resnet18, ResNet18_Weights
+from ultralytics import YOLO
+
+# Force GPU usage if available
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(f"[INFO] Using device: {device}")
+
+# Force CUDA device if available
+if torch.cuda.is_available():
+    torch.cuda.set_device(0)
+    print(f"[INFO] CUDA device set to: {torch.cuda.get_device_name(0)}")
+    print(f"[INFO] CUDA memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+else:
+    print("[WARNING] CUDA not available, using CPU (slower performance)")
+    print("[INFO] To enable GPU, install NVIDIA drivers and CUDA Toolkit")
 
 # Prefer GPU 0 for all CUDA-accelerated components (YOLO/PyTorch/Paddle)
 # Only set if user/environment hasn't already specified a device mask.
@@ -26,14 +50,6 @@ if "CUDA_VISIBLE_DEVICES" not in os.environ:
 os.environ['OPENCV_VIDEOIO_PRIORITY_MSMF'] = '0'
 os.environ['OPENCV_VIDEOIO_PRIORITY_DSHOW'] = '0'
 
-import cv2
-import gradio as gr
-import numpy as np
-import PIL.Image as Image
-import torch
-import torchvision
-from torchvision.models import resnet18, ResNet18_Weights
-from ultralytics import YOLO
 try:
     import pytesseract
     TESSERACT_AVAILABLE = True
@@ -128,6 +144,7 @@ MODEL_CHOICES = [
     "yolo26n",
     "yolo26s",
     "yolo26m",
+    "yolov8s",
 ]
 
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
@@ -4325,6 +4342,88 @@ def _classify_object_resnet18(crop_bgr: np.ndarray) -> str:
     return str(idx)
 
 
+def _annotate_webcam_fast_with_detections(
+    frame_bgr: np.ndarray,
+    detections: List[Dict],
+    show_labels: bool,
+    show_conf: bool,
+    max_boxes: int,
+    enable_color: bool,
+    ocr_text_by_index: dict | None = None,
+) -> np.ndarray:
+    """Draw bounding boxes and labels on original frame using pre-scaled coordinates."""
+    if frame_bgr is None or not isinstance(frame_bgr, np.ndarray):
+        return frame_bgr
+    if not detections:
+        return frame_bgr
+
+    annotated = frame_bgr.copy()
+    ih, iw = annotated.shape[:2]
+
+    total = len(detections)
+    take = min(int(max(1, max_boxes)), total)
+
+    for i in range(take):
+        det = detections[i]
+        x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
+        # Clamp to frame bounds
+        x1 = int(max(0, min(iw - 1, x1)))
+        y1 = int(max(0, min(ih - 1, y1)))
+        x2 = int(max(0, min(iw - 1, x2)))
+        y2 = int(max(0, min(ih - 1, y2)))
+        if x2 <= x1 or y2 <= y1:
+            continue
+
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        if show_labels:
+            class_name = str(det.get("class_name", "unknown"))
+            display_name = class_name
+
+            color_name = None
+            if enable_color:
+                try:
+                    # Fast traditional color detection (no MobileNet; suitable for real-time webcam)
+                    from modules.utils import _classify_color_traditional_fallback
+                    crop = annotated[y1:y2, x1:x2]
+                    if isinstance(crop, np.ndarray) and crop.size > 0:
+                        color_name = _classify_color_traditional_fallback(crop)
+                except Exception:
+                    color_name = None
+
+            parts = [display_name]
+            if color_name:
+                parts.append(str(color_name))
+
+            ocr_t = ""
+            if ocr_text_by_index:
+                try:
+                    ocr_t = (ocr_text_by_index.get(i) or "").strip()
+                except Exception:
+                    ocr_t = ""
+            if ocr_t:
+                parts.append(ocr_t[:28])
+
+            text = " | ".join(parts)
+
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.5
+            thickness = 1
+            (tw, th), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            ty = y1 - 8
+            if ty - th - baseline < 0:
+                ty = y1 + th + baseline + 8
+
+            bg_x1 = x1
+            bg_y1 = max(0, ty - th - baseline)
+            bg_x2 = min(iw - 1, x1 + tw + 6)
+            bg_y2 = min(ih - 1, ty + 4)
+            cv2.rectangle(annotated, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 255, 0), -1)
+            cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+
+    return annotated
+
+
 def _annotate_webcam_fast(
     frame_bgr: np.ndarray,
     result,
@@ -4332,6 +4431,7 @@ def _annotate_webcam_fast(
     show_conf: bool,
     max_boxes: int,
     enable_color: bool,
+    ocr_text_by_index: dict | None = None,
 ) -> np.ndarray:
     if frame_bgr is None or not isinstance(frame_bgr, np.ndarray):
         return frame_bgr
@@ -4389,12 +4489,28 @@ def _annotate_webcam_fast(
                     color_name = None
 
             if show_conf and i < len(conf):
-                text = f"{display_name} {float(conf[i]):.2f}"
+                text = f"{display_name}"
             else:
                 text = str(display_name)
 
+            # Conditional display:
+            # - Always show: object_name
+            # - Show color only if available
+            # - Show OCR text only if available (no '-' placeholder)
+            parts = [text]
             if color_name:
-                text = f"{text} {str(color_name)}"
+                parts.append(str(color_name))
+
+            ocr_t = ""
+            if ocr_text_by_index:
+                try:
+                    ocr_t = (ocr_text_by_index.get(i) or "").strip()
+                except Exception:
+                    ocr_t = ""
+            if ocr_t:
+                parts.append(ocr_t[:28])
+
+            text = " | ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.5
@@ -4483,18 +4599,34 @@ def predict_webcam(
         models = model if isinstance(model, list) else [model]
 
         # Gradio webcam sends RGB, but Ultralytics YOLO expects BGR for OpenCV operations
-        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        orig_h, orig_w = frame_bgr.shape[:2]
+        orig_frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        orig_h, orig_w = orig_frame_bgr.shape[:2]
 
-        # Pre-resize to reduce overhead (YOLO will also letterbox internally)
+        # Run inference on a resized copy for speed, but ALWAYS render on original frame to keep clarity.
+        infer_frame_bgr = orig_frame_bgr
+        infer_scale_x = 1.0
+        infer_scale_y = 1.0
         try:
             target = int(imgsz) if imgsz is not None else 640
-            h, w = frame_bgr.shape[:2]
+            h, w = orig_frame_bgr.shape[:2]
             if max(h, w) > target and target >= 160:
                 scale = float(target) / float(max(h, w))
                 nw = max(2, int(round(w * scale)))
                 nh = max(2, int(round(h * scale)))
-                frame_bgr = cv2.resize(frame_bgr, (nw, nh), interpolation=cv2.INTER_AREA)
+                infer_frame_bgr = cv2.resize(orig_frame_bgr, (nw, nh), interpolation=cv2.INTER_AREA)
+                infer_scale_x = float(orig_w) / float(nw)
+                infer_scale_y = float(orig_h) / float(nh)
+        except Exception:
+            infer_frame_bgr = orig_frame_bgr
+            infer_scale_x = 1.0
+            infer_scale_y = 1.0
+
+        # Throttled debug logs for resolution (avoid spamming)
+        try:
+            if (_webcam_stream_state["frame_idx"] % 60) == 0:
+                ih, iw = infer_frame_bgr.shape[:2]
+                print(f"[DEBUG] Webcam frame orig={orig_w}x{orig_h} infer={iw}x{ih}")
+                print(f"[DEBUG] Aspect ratio orig={orig_w/orig_h:.3f} infer={iw/ih:.3f}")
         except Exception:
             pass
 
@@ -4502,7 +4634,7 @@ def predict_webcam(
         all_results = []
         for m in models:
             r = m.predict(
-                source=frame_bgr,
+                source=infer_frame_bgr,
                 conf=conf_threshold,
                 iou=iou_threshold,
                 imgsz=imgsz,
@@ -4517,9 +4649,11 @@ def predict_webcam(
             # Keep returning status + frame but do not wipe accumulated JSON/history
             return frame, "📹 **Status:** Live Detection Active - No objects detected"
 
-        annotated_bgr = frame_bgr
+        # Always annotate on original-resolution frame for maximum clarity
+        annotated_bgr = orig_frame_bgr.copy()
         ocr_results = []
         color_results = []
+        plate_results = []
 
         # Build per-frame detection list (for persistent JSON history)
         frame_detections = []
@@ -4532,6 +4666,14 @@ def predict_webcam(
                 names = res.names
                 for i in range(len(xyxy)):
                     x1, y1, x2, y2 = xyxy[i]
+                    # Scale bbox back to original frame coordinates if inference was resized
+                    try:
+                        x1 = float(x1) * float(infer_scale_x)
+                        x2 = float(x2) * float(infer_scale_x)
+                        y1 = float(y1) * float(infer_scale_y)
+                        y2 = float(y2) * float(infer_scale_y)
+                    except Exception:
+                        pass
                     class_id = int(clss[i]) if i < len(clss) else -1
                     class_name = names.get(class_id, f"class_{class_id}")
                     frame_detections.append(
@@ -4542,6 +4684,15 @@ def predict_webcam(
                             "bounding_box": (int(x1), int(y1), int(x2), int(y2)),
                         }
                     )
+        # Throttled debug logs for scale factors and example bboxes (every 60 frames)
+        try:
+            if (_webcam_stream_state["frame_idx"] % 60) == 0:
+                print(f"[DEBUG] Scale factors: x={infer_scale_x:.3f}, y={infer_scale_y:.3f}")
+                for idx, det in enumerate(frame_detections[:3]):
+                    x1, y1, x2, y2 = det["bounding_box"]
+                    print(f"[DEBUG]   bbox{idx} {det['class_name']}: ({x1},{y1},{x2},{y2})")
+        except Exception:
+            pass
         
         # Run OCR on webcam frame if enabled
         run_ocr_now = False
@@ -4581,21 +4732,86 @@ def predict_webcam(
                         }
                     )
                 
+                # OCR class filtering: skip person/animals/birds; run OCR only on text-likely objects.
+                ocr_skip = {
+                    "person",
+                    "bird",
+                    "cat",
+                    "dog",
+                    "horse",
+                    "sheep",
+                    "cow",
+                    "elephant",
+                    "bear",
+                    "zebra",
+                    "giraffe",
+                }
+                ocr_allow = {
+                    "cup",
+                    "bottle",
+                    "book",
+                    "laptop",
+                    "cell phone",
+                    "tv",
+                    "keyboard",
+                    "remote",
+                    "backpack",
+                    "handbag",
+                    "suitcase",
+                    "tie",
+                    "umbrella",
+                    "license plate",
+                }
+                ocr_vehicle = {"car", "truck", "bus", "motorcycle"}
+
+                objects_for_ocr = []
+                for o in objects:
+                    cn = str(o.get("class_name") or "").strip().lower()
+                    if cn in ocr_skip:
+                        continue
+                    if (cn in ocr_allow) or (cn in ocr_vehicle):
+                        objects_for_ocr.append(o)
+
                 # Run OCR and color extraction
                 try:
-                    ocr_results = wp._extract_text_for_objects(frame_bgr, objects)
+                    # Webcam preview is typically mirrored; flip crops before OCR for correct text direction.
+                    ocr_results = wp._extract_text_for_objects(orig_frame_bgr, objects_for_ocr, mirrored=True)
                 except Exception as e:
                     print(f"[DEBUG] OCR extraction failed: {e}")
                     ocr_results = []
                 try:
-                    color_results = wp._extract_colors_for_objects(frame_bgr, objects)
+                    color_results = wp._extract_colors_for_objects(orig_frame_bgr, objects)
                 except Exception as e:
                     print(f"[DEBUG] Color extraction failed: {e}")
                     color_results = []
+
+                # Vehicle -> license plate detection + OCR
+                try:
+                    vehicle_classes = {"car", "truck", "bus", "motorcycle"}
+                    vehicles = [o for o in objects if str(o.get("class_name", "")).strip().lower() in vehicle_classes]
+                    if vehicles:
+                        plate_results = wp._detect_and_read_license_plates(orig_frame_bgr, vehicles)
+                except Exception as e:
+                    print(f"[DEBUG] Plate extraction failed: {e}")
+                    plate_results = []
                 
                 # Draw OCR text on frame
                 for item in ocr_results:
                     text = (item.get('text') or '').strip()
+                    ocr_conf = float(item.get('confidence') or 0.0)
+                    cls_name = str(item.get('class_name') or '').strip().lower()
+                    try:
+                        text = re.sub(r"[^A-Z0-9]+", "", str(text).upper())
+                    except Exception:
+                        text = ''
+                    # If mixed letters+digits and low confidence for non-plate objects, drop digits
+                    try:
+                        is_plate_like = cls_name in {"license plate", "car", "truck", "bus", "motorcycle"}
+                        if (not is_plate_like) and text and any(c.isalpha() for c in text) and any(c.isdigit() for c in text):
+                            if ocr_conf < 0.65:
+                                text = re.sub(r"[^A-Z]+", "", text)
+                    except Exception:
+                        pass
                     if text:
                         x1, y1, x2, y2 = item.get('bounding_box', (0,0,0,0))
                         # Draw OCR text below bounding box
@@ -4606,6 +4822,21 @@ def predict_webcam(
                             oy = max(20, y1 - 30)
                         cv2.rectangle(annotated_bgr, (x1, oy - th - 6), (x1 + tw + 4, oy + 4), (0, 0, 0), -1)
                         cv2.putText(annotated_bgr, text_label, (x1 + 2, oy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
+
+                # Draw license plates on frame
+                for plate in (plate_results or [])[:5]:
+                    bbox = plate.get('bounding_box')
+                    if not bbox:
+                        continue
+                    px1, py1, px2, py2 = bbox
+                    cv2.rectangle(annotated_bgr, (int(px1), int(py1)), (int(px2), int(py2)), (0, 255, 0), 2)
+                    ptxt = (plate.get('text') or '').strip()
+                    if ptxt:
+                        label = f"🚗 {ptxt[:16]}"
+                        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                        ly = max(20, int(py1) - 8)
+                        cv2.rectangle(annotated_bgr, (int(px1), ly - th - 6), (int(px1) + tw + 6, ly + 4), (0, 0, 0), -1)
+                        cv2.putText(annotated_bgr, label, (int(px1) + 2, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
                         
                 print(f"[DEBUG] Webcam OCR found {len(ocr_results)} texts")
                 for item in ocr_results:
@@ -4614,20 +4845,54 @@ def predict_webcam(
             except Exception as e:
                 print(f"[DEBUG] Webcam OCR failed: {e}")
         
-        for res in all_results:
-            annotated_bgr = _annotate_webcam_fast(
-                annotated_bgr,
-                res,
-                show_labels=bool(show_labels),
-                show_conf=bool(show_conf),
-                max_boxes=int(max_boxes),
-                enable_color=bool(enable_color),
-            )
-        # Upscale back to original webcam resolution for bigger on-screen output
+        # Build OCR index map so the green label can include object text (same style as name/color)
+        ocr_text_by_index = {}
         try:
-            ah, aw = annotated_bgr.shape[:2]
-            if (aw != orig_w) or (ah != orig_h):
-                annotated_bgr = cv2.resize(annotated_bgr, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
+            for item in (ocr_results or []):
+                oid = str(item.get("object_id") or "")
+                if "_" in oid:
+                    idx_str = oid.rsplit("_", 1)[-1]
+                    idx = int(idx_str)
+                    t = (item.get("text") or "").strip()
+                    ocr_conf = float(item.get('confidence') or 0.0)
+                    cls_name = str(item.get('class_name') or '').strip().lower()
+                    try:
+                        t = re.sub(r"[^A-Z0-9]+", "", str(t).upper())
+                    except Exception:
+                        t = ""
+                    try:
+                        is_plate_like = cls_name in {"license plate", "car", "truck", "bus", "motorcycle"}
+                        if (not is_plate_like) and t and any(c.isalpha() for c in t) and any(c.isdigit() for c in t):
+                            if ocr_conf < 0.65:
+                                t = re.sub(r"[^A-Z]+", "", t)
+                    except Exception:
+                        pass
+                    if t:
+                        ocr_text_by_index[idx] = t
+        except Exception:
+            ocr_text_by_index = {}
+
+        # Annotate using already-scaled detections to ensure alignment on original frame
+        annotated_bgr = _annotate_webcam_fast_with_detections(
+            annotated_bgr,
+            frame_detections,
+            show_labels=bool(show_labels),
+            show_conf=bool(show_conf),
+            max_boxes=int(max_boxes),
+            enable_color=bool(enable_color),
+            ocr_text_by_index=ocr_text_by_index,
+        )
+        # Debug final output resolution (throttled) - ensure no resizing occurred
+        try:
+            if (_webcam_stream_state["frame_idx"] % 60) == 0:
+                ah, aw = annotated_bgr.shape[:2]
+                print(f"[DEBUG] Webcam output={aw}x{ah}")
+                print(f"[DEBUG] Output vs original: {aw}x{ah} vs {orig_w}x{orig_h}")
+                print(f"[DEBUG] Aspect ratio output vs orig: {aw/ah:.3f} vs {orig_w/orig_h:.3f}")
+                if (aw, ah) != (orig_w, orig_h):
+                    print("[WARNING] Output resolution differs from original!")
+                else:
+                    print("[OK] Output resolution matches original")
         except Exception:
             pass
 
@@ -4648,6 +4913,16 @@ def predict_webcam(
                 }
                 for item in (ocr_results or [])
                 if (item.get("text") or "").strip()
+            ],
+            "license_plates": [
+                {
+                    "text": (p.get("text") or "").strip(),
+                    "bounding_box": p.get("bounding_box"),
+                    "vehicle_class": p.get("vehicle_class"),
+                    "vehicle_object_id": p.get("vehicle_object_id"),
+                }
+                for p in (plate_results or [])
+                if (p.get("text") or "").strip()
             ],
             "colors": color_results or [],
         }
@@ -4741,17 +5016,7 @@ with gr.Blocks(
             </div>
             """
         )
-    else:
-        gr.Markdown(
-            """
-            <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #f59e0b 0%, #d97706 100%); 
-                 border-radius: 12px; margin-bottom: 20px; color: white;">
-                <h2 style="margin: 0; font-size: 24px;">⚠️ CPU Processing Mode</h2>
-                <p style="margin: 5px 0 0 0; opacity: 0.9;">Consider using GPU for better performance</p>
-            </div>
-            """
-        )
-    
+        
     # Enhanced main title
     gr.Markdown(
         """
@@ -4988,11 +5253,11 @@ with gr.Blocks(
                     gr.Markdown("#### 🎛️ Control Panel")
                     
                     with gr.Row():
-                        webcam_model = gr.Radio(choices=MODEL_CHOICES, label="🤖 AI Model", value="yolo26n")
+                        webcam_model = gr.Radio(choices=MODEL_CHOICES, label="🤖 AI Model", value="yolov8s")
                     
                     # Advanced settings (collapsible)
                     with gr.Accordion("⚙️ Advanced Settings", open=False):
-                        webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="🎯 Confidence Threshold")
+                        webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="🎯 Confidence Threshold")
                         webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="📏 IoU Threshold")
                         webcam_enable_color = gr.Checkbox(value=True, label="🎨 Enable Color Detection")
                         webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="📐 Image Size", value=320)

@@ -57,6 +57,6 @@ echo    - Smart memory management
 echo.
 
 REM Start the app
-python app.py
+python apps\app.py
 
 pause

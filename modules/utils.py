@@ -1095,6 +1095,7 @@ def _annotate_with_color(
                 key = f"{stream_key_prefix}:ocr:{i}"
 
             do_ocr = True
+            plate_text = None  # Initialize plate_text
             if stream_key_prefix:
                 _ocr_stream_state["frame_idx"] += 1
                 do_ocr = (_ocr_stream_state["frame_idx"] % ocr_every_n) == 0
@@ -1183,6 +1184,10 @@ def _annotate_with_color(
             if enable_resnet and resnet_label:
                 parts.append("|")
                 parts.append(str(resnet_label))
+            # Add license plate text at TOP with car label
+            if plate_text:
+                parts.append("|")
+                parts.append(f"PLATE:{plate_text}")
             text = " ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -1202,7 +1207,7 @@ def _annotate_with_color(
             bg_y2 = min(ih - 1, bg_y2)
             cv2.rectangle(annotated, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 255, 0), -1)
             cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
-
+            
             if enable_ocr and ocr_text:
                 ocr_disp = str(ocr_text).strip()
                 if ocr_disp:

@@ -29,9 +29,9 @@ if errorlevel 1 (
 )
 
 REM Check if model files exist
-if not exist "yolo26n.pt" (
+if not exist "models\yolo26n.pt" (
     echo ERROR: yolo26n.pt model file not found
-    echo Please ensure YOLO26 model files are in the current directory
+    echo Please ensure YOLO26 model files are in the models directory
     pause
     exit /b 1
 )
@@ -48,7 +48,7 @@ echo Press Ctrl+C to stop the server
 echo.
 
 REM Start the application
-python app.py
+python apps\app.py
 
 echo.
 echo Application stopped.

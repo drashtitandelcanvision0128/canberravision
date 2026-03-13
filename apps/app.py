@@ -13,6 +13,15 @@ import shutil
 from pathlib import Path
 from typing import List, Dict
 
+# Set working directory to project root
+script_dir = Path(__file__).parent
+project_root = script_dir.parent
+os.chdir(project_root)
+sys.path.insert(0, str(project_root))
+
+print(f"[INFO] Working directory set to: {os.getcwd()}")
+print(f"[INFO] Project root: {project_root}")
+
 try:
     import imageio_ffmpeg
 except Exception:
@@ -68,7 +77,7 @@ except ImportError:
 
 # Import LightOnOCR integration
 try:
-    from lighton_ocr_integration import get_lighton_ocr_processor, extract_text_with_lighton
+    from archive.lighton_ocr_integration import get_lighton_ocr_processor, extract_text_with_lighton
     LIGHTON_AVAILABLE = True
     print("[INFO] LightOnOCR integration loaded")
 except ImportError:
@@ -94,7 +103,7 @@ except ImportError as e:
 
 # Import enhanced detection for challenging images
 try:
-    from enhanced_detection import enhanced_license_plate_detection
+    from archive.enhanced_detection import enhanced_license_plate_detection
     ENHANCED_DETECTION_AVAILABLE = True
     print("[INFO] Enhanced detection for challenging images loaded")
 except ImportError:
@@ -103,7 +112,7 @@ except ImportError:
 
 # Import international license plate recognition
 try:
-    from international_license_plates import extract_international_license_plates, InternationalLicensePlateRecognizer
+    from tools.international_license_plates import extract_international_license_plates, InternationalLicensePlateRecognizer
     INTERNATIONAL_PLATES_AVAILABLE = True
     print("[INFO] International license plate recognition loaded")
 except ImportError:
@@ -406,12 +415,15 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                         except Exception as e:
                             print(f"[DEBUG] ❌ Color extraction failed: {e}")
                     
-                    # 🔥 GPU-ACCELERATED OCR processing
+                    # 🔥 GPU-ACCELERATED OCR processing - DISABLED for speed
+                    # Only run OCR every 30 frames to save time
                     ocr_results = []
                     frame_all_text = []  # Initialize frame_all_text
-                    if enable_ocr and (frame_idx % max(1, ocr_every_n) == 0):
+                    run_full_ocr = (frame_idx % 30 == 0) and enable_ocr  # Only every 30 frames
+                    
+                    if run_full_ocr and enable_ocr:
                         try:
-                            print(f"[DEBUG] 🔥 Running GPU OCR on frame {frame_idx}...")
+                            print(f"[DEBUG] 🔥 Running GPU OCR on frame {frame_idx} (every 30 frames)...")
                             
                             # Force GPU for PaddleOCR
                             try:
@@ -545,8 +557,8 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                             import traceback
                             traceback.print_exc()
                     
-                    # Fast annotation
-                    annotated_frame = _annotate_frame_fast_video(frame, result)
+                    # Fast annotation with license plate caching
+                    annotated_frame = _annotate_frame_fast_video(frame, result, skip_plate_ocr=True)
                 else:
                     annotated_frame = frame
                 
@@ -789,6 +801,9 @@ def _classify_object_with_category(class_name, class_id):
         'stop sign': ('Stop Sign', 'Traffic', (0, 0, 255)),  # Blue
         'parking meter': ('Parking Meter', 'Traffic', (0, 0, 255)),  # Blue
         'fire hydrant': ('Fire Hydrant', 'Traffic', (0, 0, 255)),  # Blue
+        
+        # License Plate - Special Category
+        'license_plate': ('🚗 License Plate', 'License Plate', (0, 255, 0)),  # Green
         
         # Animals - Enhanced Classification
         'bird': ('🐦 Bird', 'Bird', (255, 105, 180)),  # Pink - Light Pink for birds
@@ -1115,10 +1130,183 @@ def _get_detections_summary(boxes, names):
     return f"🎯 Detected: {' | '.join(summary_parts)}\n📋 Objects: {objects_str}"
 
 
-def _annotate_frame_fast_video(frame, result):
+# Global cache for license plate results to avoid re-detection on every frame
+_license_plate_cache = {}
+_frame_counter = 0
+
+
+def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarray:
     """
-    Enhanced fast frame annotation with object classification and advanced color shades detection
+    Detect license plate within a vehicle crop using contour analysis and aspect ratio.
+    
+    Args:
+        vehicle_crop: Cropped vehicle image in BGR format
+        
+    Returns:
+        License plate crop if found, None otherwise
     """
+    try:
+        if vehicle_crop is None or vehicle_crop.size == 0:
+            return None
+            
+        # Convert to grayscale
+        gray = cv2.cvtColor(vehicle_crop, cv2.COLOR_BGR2GRAY)
+        
+        # Apply bilateral filter to reduce noise
+        bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
+        
+        # Edge detection
+        edges = cv2.Canny(bilateral, 50, 200)
+        
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Filter contours based on license plate characteristics
+        plate_candidates = []
+        
+        for contour in contours:
+            # Get bounding rectangle
+            x, y, w, h = cv2.boundingRect(contour)
+            
+            # Skip very small or very large contours
+            if w < 40 or h < 10 or w > vehicle_crop.shape[1] * 0.8 or h > vehicle_crop.shape[0] * 0.3:
+                continue
+                
+            # License plate aspect ratio (typically 2:1 to 5:1)
+            aspect_ratio = w / h
+            if aspect_ratio < 1.5 or aspect_ratio > 6.0:
+                continue
+                
+            # Area filter
+            area = cv2.contourArea(contour)
+            if area < 500:
+                continue
+                
+            # Check if it has rectangular shape
+            peri = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+            
+            # Add to candidates if it has 4 corners (rectangle-like)
+            if len(approx) >= 4:
+                plate_candidates.append((x, y, w, h, area, aspect_ratio))
+        
+        # Sort by area (largest first)
+        plate_candidates.sort(key=lambda x: x[4], reverse=True)
+        
+        # Return the best candidate
+        if plate_candidates:
+            x, y, w, h, area, aspect_ratio = plate_candidates[0]
+            plate_crop = vehicle_crop[y:y+h, x:x+w]
+            print(f"[DEBUG] License plate candidate found: {w}x{h}, ratio: {aspect_ratio:.2f}, area: {area}")
+            return plate_crop
+            
+        return None
+        
+    except Exception as e:
+        print(f"[DEBUG] License plate detection in vehicle failed: {e}")
+        return None
+
+
+def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
+    """
+    Extract text from a detected license plate crop.
+    
+    Args:
+        plate_crop: License plate crop in BGR format
+        
+    Returns:
+        Extracted text string
+    """
+    try:
+        if plate_crop is None or plate_crop.size == 0:
+            return ""
+            
+        # Convert to grayscale
+        gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
+        
+        # Enhance contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        
+        # Multiple preprocessing methods
+        methods = []
+        
+        # Method 1: Binary threshold
+        _, binary1 = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        methods.append(binary1)
+        
+        # Method 2: Adaptive threshold
+        binary2 = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+        methods.append(binary2)
+        
+        # Method 3: Inverted
+        inverted = cv2.bitwise_not(enhanced)
+        _, binary3 = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        methods.append(binary3)
+        
+        # Try OCR with multiple configurations
+        configs = [
+            r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            r'--oem 3 --psm 8 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            r'--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+            r'--oem 3 --psm 7',
+            r'--oem 3 --psm 8'
+        ]
+        
+        best_text = ""
+        best_confidence = 0
+        
+        for i, processed_img in enumerate(methods):
+            for config in configs:
+                try:
+                    # Get detailed OCR data
+                    data = pytesseract.image_to_data(processed_img, config=config, output_type=pytesseract.Output.DICT)
+                    
+                    # Extract text with confidence
+                    text_parts = []
+                    total_conf = 0
+                    count = 0
+                    
+                    for j in range(len(data['text'])):
+                        text = data['text'][j].strip()
+                        conf = int(data['conf'][j])
+                        
+                        if text and conf > 30:  # Confidence threshold
+                            text_parts.append(text)
+                            total_conf += conf
+                            count += 1
+                    
+                    if text_parts:
+                        combined_text = ''.join(text_parts)
+                        avg_conf = total_conf / count if count > 0 else 0
+                        
+                        if len(combined_text) >= 4 and avg_conf > best_confidence:
+                            best_text = combined_text
+                            best_confidence = avg_conf
+                            print(f"[DEBUG] OCR Method {i+1} found: {combined_text} (conf: {avg_conf:.1f})")
+                            
+                except Exception as e:
+                    continue
+        
+        return best_text
+        
+    except Exception as e:
+        print(f"[DEBUG] Text extraction from plate crop failed: {e}")
+        return ""
+
+
+def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
+    """
+    Enhanced fast frame annotation with object classification, advanced color shades detection,
+    and license plate text extraction for vehicles.
+    
+    Args:
+        frame: Input frame
+        result: YOLO detection result
+        skip_plate_ocr: If True, skip expensive license plate OCR (use cached results)
+    """
+    global _license_plate_cache, _frame_counter
+    
     try:
         annotated = frame.copy()
         
@@ -1129,11 +1317,20 @@ def _annotate_frame_fast_video(frame, result):
         if len(boxes) == 0:
             return annotated
         
+        # Increment frame counter
+        _frame_counter += 1
+        
+        # Only run license plate OCR every 5 frames for speed
+        run_plate_ocr = (_frame_counter % 5 == 0) or not skip_plate_ocr
+        
         # Get detections
         xyxy = boxes.xyxy.cpu().numpy()
         conf = boxes.conf.cpu().numpy()
         cls = boxes.cls.cpu().numpy()
         names = result.names
+        
+        # Vehicle classes that need license plate detection
+        vehicle_classes = {'car', 'truck', 'bus', 'motorcycle'}
         
         # Draw detections with enhanced classification and advanced color detection
         for i in range(len(boxes)):
@@ -1146,14 +1343,16 @@ def _annotate_frame_fast_video(frame, result):
                 # Get enhanced classification
                 display_name, category, color = _classify_object_with_category(class_name, class_id)
                 
-                # Extract crop for advanced color detection and enhanced analysis
+                # Extract crop for advanced color detection and license plate extraction
                 crop = annotated[y1:y2, x1:x2]
                 color_info = {'name': 'unknown', 'hex': '#000000', 'confidence': 0.0}
+                license_plate_text = None
+                
+                # Create cache key based on position and class
+                cache_key = f"{class_name}_{x1}_{y1}_{x2}_{y2}"
                 
                 # Enhanced detection for specific categories
                 enhanced_label = display_name
-                
-                # Gender detection disabled
                 
                 # Charger detection for electronics
                 charger_detected = False
@@ -1166,6 +1365,102 @@ def _annotate_frame_fast_video(frame, result):
                     except Exception as e:
                         print(f"[DEBUG] Charger detection failed: {e}")
                 
+                # License plate detection for vehicles - RUN EVERY FRAME for better detection
+                if class_name.lower() in vehicle_classes and crop.size > 0:
+                    # Check cache first
+                    if cache_key in _license_plate_cache and skip_plate_ocr:
+                        license_plate_text = _license_plate_cache[cache_key]
+                        if license_plate_text:
+                            print(f"[DEBUG] Using cached license plate: {license_plate_text}")
+                    else:
+                        # ALWAYS run OCR for license plates (no more frame skipping)
+                        try:
+                            print(f"[DEBUG] Running license plate OCR on {class_name}...")
+                            
+                            # STEP 1: Try to find license plate within the vehicle crop
+                            plate_found = False
+                            plate_crop = _detect_license_plate_in_vehicle_crop(crop)
+                            
+                            if plate_crop is not None:
+                                print(f"[DEBUG] License plate region found in vehicle, extracting text...")
+                                # OCR on detected plate region
+                                plate_text = _extract_text_from_plate_crop(plate_crop)
+                                if plate_text and len(plate_text) >= 4:
+                                    cleaned = _clean_license_plate_text(plate_text)
+                                    if cleaned:
+                                        license_plate_text = cleaned
+                                        _license_plate_cache[cache_key] = license_plate_text
+                                        plate_found = True
+                                        print(f"[DEBUG] ✅ License plate detected on {class_name}: {license_plate_text}")
+                            
+                            # STEP 2: If no plate found, try OCR on entire vehicle crop
+                            if not plate_found:
+                                # Enhanced preprocessing for better OCR
+                                gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                                
+                                # Multiple preprocessing methods
+                                methods = []
+                                
+                                # Method 1: Basic threshold
+                                _, binary1 = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                                methods.append(binary1)
+                                
+                                # Method 2: Adaptive threshold
+                                binary2 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                                methods.append(binary2)
+                                
+                                # Method 3: Inverted
+                                inverted = cv2.bitwise_not(gray)
+                                _, binary3 = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                                methods.append(binary3)
+                                
+                                # Try OCR with multiple methods
+                                best_text = ""
+                                for i, processed_img in enumerate(methods):
+                                    try:
+                                        # Tesseract config for license plates
+                                        config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                                        plate_text = pytesseract.image_to_string(processed_img, config=config).strip()
+                                        
+                                        # Clean and validate
+                                        if plate_text and len(plate_text) >= 4:
+                                            cleaned = _clean_license_plate_text(plate_text)
+                                            if cleaned and len(cleaned) > len(best_text):
+                                                best_text = cleaned
+                                                print(f"[DEBUG] Method {i+1} found: {cleaned}")
+                                    except Exception as e:
+                                        print(f"[DEBUG] Method {i+1} failed: {e}")
+                                
+                                # Use the best result
+                                if best_text:
+                                    license_plate_text = best_text
+                                    _license_plate_cache[cache_key] = license_plate_text
+                                    print(f"[DEBUG] ✅ License plate detected on {class_name}: {license_plate_text}")
+                                else:
+                                    print(f"[DEBUG] ❌ No license plate text found on {class_name}")
+                                
+                        except Exception as e:
+                            print(f"[DEBUG] License plate extraction failed: {e}")
+                
+                # Special handling for license plate objects - extract text directly
+                if class_name.lower() == 'license_plate' and crop.size > 0:
+                    try:
+                        # Always extract text from license plate objects
+                        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+                        _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                        
+                        # Tesseract config for license plates
+                        config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+                        plate_text = pytesseract.image_to_string(binary, config=config).strip()
+                        
+                        if plate_text and len(plate_text) >= 4:
+                            cleaned = _clean_license_plate_text(plate_text)
+                            if cleaned:
+                                license_plate_text = cleaned
+                                print(f"[DEBUG] License plate object detected: {license_plate_text}")
+                    except Exception as e:
+                        print(f"[DEBUG] License plate OCR failed: {e}")
+                
                 if crop.size > 0:
                     try:
                         # Use advanced color shades detection
@@ -1177,7 +1472,6 @@ def _annotate_frame_fast_video(frame, result):
                         
                         if color_result and color_result.get('confidence', 0) > 0.3:
                             color_info = color_result
-                            print(f"[DEBUG] Advanced color detected: {color_info['name']} ({color_info['hex']}) - {color_info['confidence']:.3f}")
                         else:
                             # Fallback to basic color detection
                             from modules.utils import _classify_color_bgr
@@ -1190,7 +1484,6 @@ def _annotate_frame_fast_video(frame, result):
                             }
                             
                     except Exception as e:
-                        print(f"[DEBUG] Advanced color detection failed: {e}")
                         # Fallback to basic color detection
                         try:
                             from modules.utils import _classify_color_bgr
@@ -1207,11 +1500,22 @@ def _annotate_frame_fast_video(frame, result):
                 # Draw box with category-specific color
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
                 
-                # Enhanced label with category and advanced color
-                if color_info['confidence'] > 0.6:
-                    label = f"{display_name} ({category}) - {color_info['name']}: {confidence:.2f}"
-                else:
-                    label = f"{display_name} ({category}) - {color_info['name']}: {confidence:.2f}"
+                # Build enhanced label with object name, color, and license plate
+                label_parts = [display_name]
+                
+                # Add color info
+                if color_info['name'] and color_info['name'] != 'unknown':
+                    label_parts.append(color_info['name'])
+                
+                # Add license plate text for vehicles and license plate objects
+                if license_plate_text:
+                    label_parts.append(f"Plate: {license_plate_text}")
+                
+                # Add confidence
+                label_parts.append(f"{confidence:.2f}")
+                
+                # Join all parts with clear separator
+                label = " | ".join(label_parts)
                 
                 label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
                 
@@ -1224,7 +1528,7 @@ def _annotate_frame_fast_video(frame, result):
                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         
         # Add processing info and detection summary
-        cv2.putText(annotated, "ULTRA-FAST + ADVANCED COLOR SHADES", (10, 30), 
+        cv2.putText(annotated, "FAST MODE - GPU + LICENSE PLATE", (10, 30), 
                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
         # Add detection summary
@@ -3842,9 +4146,9 @@ def get_model(model_name):
     if model_name not in _model_cache:
         # Add .pt extension if not present
         if not model_name.endswith('.pt'):
-            model_path = f"{model_name}.pt"
+            model_path = f"models/{model_name}.pt"
         else:
-            model_path = model_name
+            model_path = f"models/{model_name}"
             
         print(f"[INFO] Loading model: {model_path}")
         model = YOLO(model_path)
@@ -4559,6 +4863,8 @@ def predict_webcam(
             "last_json": None,
             "history": [],
             "history_max": 1000,
+            "persistent_objects": {},
+            "persistent_ttl": 2, # seconds to keep objects visible
             "wp": None,
         }
 
@@ -4571,6 +4877,10 @@ def predict_webcam(
         _webcam_stream_state["last_json"] = None
     if "wp" not in _webcam_stream_state:
         _webcam_stream_state["wp"] = None
+    if "persistent_objects" not in _webcam_stream_state:
+        _webcam_stream_state["persistent_objects"] = {}
+    if "persistent_ttl" not in _webcam_stream_state:
+        _webcam_stream_state["persistent_ttl"] = 2
 
     try:
         _webcam_stream_state["frame_idx"] += 1
@@ -4694,6 +5004,58 @@ def predict_webcam(
         except Exception:
             pass
         
+        # Persistent object management: keep small objects visible for 2-3 seconds
+        current_time = time.time()
+        persistent_ttl = _webcam_stream_state.get("persistent_ttl", 2)
+        persistent_objects = _webcam_stream_state.get("persistent_objects", {})
+        
+        # Update persistent objects with current detections
+        current_object_keys = set()
+        for det in frame_detections:
+            class_name = det.get("class_name", "").lower()
+            # Only persist small objects (not persons, cars, etc.)
+            if class_name not in ["person", "car", "truck", "bus", "motorcycle", "bicycle", "chair", "couch", "bed"]:
+                obj_key = f"{class_name}_{det.get('bounding_box', (0,0,0,0))[:2]}"
+                current_object_keys.add(obj_key)
+                persistent_objects[obj_key] = {
+                    "detection": det,
+                    "timestamp": current_time,
+                    "frame_idx": _webcam_stream_state["frame_idx"]
+                }
+        
+        # Remove old persistent objects
+        expired_keys = []
+        for obj_key, obj_data in persistent_objects.items():
+            if current_time - obj_data["timestamp"] > persistent_ttl:
+                expired_keys.append(obj_key)
+        
+        for key in expired_keys:
+            del persistent_objects[key]
+        
+        # Merge persistent objects with current detections for display
+        combined_detections = frame_detections.copy()
+        for obj_key, obj_data in persistent_objects.items():
+            if obj_key not in current_object_keys:
+                # Add persistent object to display list
+                persistent_det = obj_data["detection"].copy()
+                # Reduce confidence for persistent objects to distinguish them
+                persistent_det["confidence"] = min(persistent_det.get("confidence", 0.5) * 0.8, 0.3)
+                persistent_det["is_persistent"] = True
+                combined_detections.append(persistent_det)
+        
+        # Update state
+        _webcam_stream_state["persistent_objects"] = persistent_objects
+        
+        # Debug logging for persistent objects
+        try:
+            if (_webcam_stream_state["frame_idx"] % 60) == 0 and persistent_objects:
+                print(f"[DEBUG] Persistent objects: {len(persistent_objects)} active")
+                for key, obj in list(persistent_objects.items())[:3]:
+                    age = current_time - obj["timestamp"]
+                    print(f"[DEBUG]   - {obj['detection'].get('class_name')} (age: {age:.1f}s)")
+        except Exception:
+            pass
+        
         # Run OCR on webcam frame if enabled
         run_ocr_now = False
         if enable_ocr and frame_detections:
@@ -4706,7 +5068,7 @@ def predict_webcam(
             priority = {"cup", "bottle", "book", "license plate", "cell phone"}
             has_priority = any(
                 str(d.get("class_name", "")).strip().lower() in priority
-                for d in frame_detections[:6]
+                for d in combined_detections[:6]
             )
             run_ocr_now = has_priority or ((_webcam_stream_state["frame_idx"] % ocr_every) == 0)
 
@@ -4720,7 +5082,7 @@ def predict_webcam(
                 
                 # Convert per-frame detections to object format expected by webcam_processor OCR
                 objects = []
-                for i, det in enumerate(frame_detections[: int(max(1, max_boxes))]):
+                for i, det in enumerate(combined_detections[: int(max(1, max_boxes))]):
                     class_name = det.get("class_name")
                     x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
                     objects.append(
@@ -4747,30 +5109,45 @@ def predict_webcam(
                     "giraffe",
                 }
                 ocr_allow = {
-                    "cup",
-                    "bottle",
-                    "book",
-                    "laptop",
-                    "cell phone",
-                    "tv",
-                    "keyboard",
-                    "remote",
-                    "backpack",
-                    "handbag",
-                    "suitcase",
-                    "tie",
-                    "umbrella",
-                    "license plate",
+                    "cup", "bottle", "book", "laptop", "cell phone", "tv", "keyboard", "remote",
+                    "backpack", "handbag", "suitcase", "tie", "umbrella", "license plate",
+                    "wallet", "purse", "tablet", "mouse", "monitor", "sign", "banner", "label",
+                    "package", "box", "card", "paper", "document", "notebook", "tablet",
+                    "cereal box", "food container", "medicine bottle", "cosmetics", "product"
                 }
                 ocr_vehicle = {"car", "truck", "bus", "motorcycle"}
 
                 objects_for_ocr = []
+                
+                # Enhanced logic: detect objects near persons (likely being held)
+                person_boxes = []
+                for o in objects:
+                    cn = str(o.get("class_name") or "").strip().lower()
+                    if cn == "person":
+                        person_boxes.append(o.get("bounding_box", (0, 0, 0, 0)))
+                
                 for o in objects:
                     cn = str(o.get("class_name") or "").strip().lower()
                     if cn in ocr_skip:
                         continue
+                    
+                    # Include if in allow list or vehicle
                     if (cn in ocr_allow) or (cn in ocr_vehicle):
                         objects_for_ocr.append(o)
+                    elif person_boxes:
+                        # Check if object is near a person (likely being held)
+                        obj_box = o.get("bounding_box", (0, 0, 0, 0))
+                        ox1, oy1, ox2, oy2 = obj_box
+                        obj_center_x = (ox1 + ox2) / 2
+                        obj_center_y = (oy1 + oy2) / 2
+                        
+                        for px1, py1, px2, py2 in person_boxes:
+                            # Check if object is in person's upper body area (where hands are)
+                            person_upper_y = py1 + (py2 - py1) * 0.6  # Upper 60% of person
+                            if (px1 - 50 <= obj_center_x <= px2 + 50 and 
+                                py1 <= obj_center_y <= person_upper_y):
+                                objects_for_ocr.append(o)
+                                break
 
                 # Run OCR and color extraction
                 try:
@@ -4872,10 +5249,43 @@ def predict_webcam(
         except Exception:
             ocr_text_by_index = {}
 
+        # Smart detection sorting: prioritize small objects when person is detected
+        try:
+            has_person = any(d.get("class_name", "").lower() == "person" for d in frame_detections)
+            if has_person and len(frame_detections) > int(max_boxes):
+                # Define priority classes (small objects likely to be held)
+                priority_classes = {
+                    "cell phone", "cup", "bottle", "book", "remote", "wallet", "keys", 
+                    "pen", "pencil", "knife", "fork", "spoon", "mouse", "keyboard",
+                    "laptop", "tablet", "handbag", "backpack", "purse", "umbrella"
+                }
+                
+                # Sort detections: priority objects first, then by confidence
+                def detection_priority(det):
+                    class_name = det.get("class_name", "").lower()
+                    is_priority = class_name in priority_classes
+                    confidence = det.get("confidence", 0.0)
+                    # Calculate bounding box area (smaller objects get higher priority when held)
+                    x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
+                    area = (x2 - x1) * (y2 - y1)
+                    
+                    # Priority score: priority objects first, then smaller area, then confidence
+                    return (0 if is_priority else 1, area, -confidence)
+                
+                frame_detections = sorted(frame_detections, key=detection_priority)
+                
+                # Debug logging for smart sorting
+                if (_webcam_stream_state["frame_idx"] % 60) == 0:
+                    print(f"[DEBUG] Smart sorting applied: {len([d for d in frame_detections if d.get('class_name', '').lower() in priority_classes])} priority objects found")
+                    for i, det in enumerate(frame_detections[:5]):
+                        print(f"[DEBUG]   {i}: {det.get('class_name')} (conf: {det.get('confidence', 0):.2f})")
+        except Exception as e:
+            print(f"[DEBUG] Smart sorting failed: {e}")
+
         # Annotate using already-scaled detections to ensure alignment on original frame
         annotated_bgr = _annotate_webcam_fast_with_detections(
             annotated_bgr,
-            frame_detections,
+            combined_detections,
             show_labels=bool(show_labels),
             show_conf=bool(show_conf),
             max_boxes=int(max_boxes),
@@ -5263,7 +5673,7 @@ with gr.Blocks(
                         webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="📐 Image Size", value=320)
                         webcam_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
                         webcam_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=3, step=1, label="📦 Max Boxes per Frame")
+                        webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="📦 Max Boxes per Frame")
                         webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
                         # Hidden controls (always enabled)

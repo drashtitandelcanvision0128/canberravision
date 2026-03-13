@@ -24,6 +24,6 @@ echo    - Smaller image size (320px) for faster processing
 echo.
 
 REM Start the optimized app
-python fast_video_app.py
+python apps\app_gpu.py
 
 pause

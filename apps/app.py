@@ -4708,6 +4708,7 @@ def _annotate_webcam_fast_with_detections(
             if ocr_t:
                 parts.append(ocr_t[:28])
 
+            # Format as "object | colour | text"
             text = " | ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -4814,6 +4815,7 @@ def _annotate_webcam_fast(
             if ocr_t:
                 parts.append(ocr_t[:28])
 
+            # Format as "object | colour | text"
             text = " | ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -5075,7 +5077,7 @@ def predict_webcam(
         if enable_ocr and run_ocr_now and all_results:
             try:
                 # Use webcam processor for consistent OCR
-                from webcam_processor import WebcamProcessor
+                from modules.webcam_processing import WebcamProcessor
                 if _webcam_stream_state.get("wp") is None:
                     _webcam_stream_state["wp"] = WebcamProcessor()
                 wp = _webcam_stream_state["wp"]
@@ -5233,20 +5235,26 @@ def predict_webcam(
                     t = (item.get("text") or "").strip()
                     ocr_conf = float(item.get('confidence') or 0.0)
                     cls_name = str(item.get('class_name') or '').strip().lower()
-                    try:
-                        t = re.sub(r"[^A-Z0-9]+", "", str(t).upper())
-                    except Exception:
-                        t = ""
-                    try:
-                        is_plate_like = cls_name in {"license plate", "car", "truck", "bus", "motorcycle"}
-                        if (not is_plate_like) and t and any(c.isalpha() for c in t) and any(c.isdigit() for c in t):
-                            if ocr_conf < 0.65:
-                                t = re.sub(r"[^A-Z]+", "", t)
-                    except Exception:
-                        pass
-                    if t:
-                        ocr_text_by_index[idx] = t
-        except Exception:
+                    
+                    # Clean text but keep readable for bottles and other objects
+                    if t and len(t) >= 2:
+                        # For bottles and general objects, keep spaces and readable text
+                        if cls_name in ['bottle', 'cup', 'book', 'cell phone']:
+                            # Keep original text for better readability
+                            cleaned_text = t.upper()
+                        else:
+                            # Clean for license plates
+                            try:
+                                cleaned_text = re.sub(r"[^A-Z0-9]+", "", str(t).upper())
+                            except Exception:
+                                cleaned_text = t.upper()
+                        
+                        # Only add if confidence is reasonable
+                        if ocr_conf > 0.3:
+                            ocr_text_by_index[idx] = cleaned_text
+                            print(f"[DEBUG] OCR Text for {cls_name}: {cleaned_text} (conf: {ocr_conf:.2f})")
+        except Exception as e:
+            print(f"[DEBUG] OCR text mapping failed: {e}")
             ocr_text_by_index = {}
 
         # Smart detection sorting: prioritize small objects when person is detected
@@ -5678,8 +5686,8 @@ with gr.Blocks(
                         
                         # Hidden controls (always enabled)
                         webcam_resnet = gr.Checkbox(value=False, visible=False)
-                        webcam_ocr = gr.Checkbox(value=True, visible=False)
-                        webcam_ocr_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, visible=False)
+                        webcam_enable_ocr = gr.Checkbox(value=True, label="🔤 Enable Text Detection")
+                        webcam_ocr_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⚡ OCR Speed (every N frames)")
                     
                     gr.Markdown("#### 📹 Webcam Feed")
                     webcam_input = gr.Image(
@@ -5724,7 +5732,7 @@ with gr.Blocks(
                     webcam_resnet,
                     webcam_max_boxes,
                     webcam_every_n,
-                    webcam_ocr,
+                    webcam_enable_ocr,
                     webcam_ocr_every_n,
                 ],
                 outputs=[webcam_output, webcam_info],

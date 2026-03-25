@@ -356,18 +356,41 @@ class VideoProcessor:
         try:
             annotated = frame.copy()
             
-            # Draw license plates
+            # Draw license plates - IMPROVED: Better formatting with yellow box
             for plate in frame_result.get('license_plates', []):
                 if 'bounding_box' in plate and plate['bounding_box']:
                     x1, y1, x2, y2 = plate['bounding_box']
                     
-                    # Green box for license plates
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    # Get plate text with validation
+                    plate_text = plate.get('plate_text', plate.get('text', 'Unknown')).strip()
+                    if not plate_text or len(plate_text) < 4:
+                        continue
                     
-                    # Add plate text
-                    plate_text = plate.get('plate_text', 'Unknown')
-                    cv2.putText(annotated, f"Plate: {plate_text}", 
-                               (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    # Yellow box for license plates (matching image style)
+                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)
+                    
+                    # Add plate text with "Plate: " prefix
+                    label = f"Plate: {plate_text[:20]}"
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.6
+                    thickness = 2
+                    
+                    (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+                    
+                    # Position label above the plate
+                    ly = y1 - 10
+                    if ly - text_height - baseline < 0:
+                        ly = y2 + text_height + 10
+                    
+                    # Draw yellow background for label
+                    cv2.rectangle(annotated, 
+                                 (x1, ly - text_height - baseline), 
+                                 (x1 + text_width + 8, ly + 4), 
+                                 (0, 255, 255), -1)
+                    
+                    # Draw label text in black
+                    cv2.putText(annotated, label, (x1 + 4, ly), 
+                               font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             
             # Draw objects with K-means color information
             objects = frame_result.get('objects', [])

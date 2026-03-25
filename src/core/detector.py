@@ -11,6 +11,7 @@ from ultralytics import YOLO
 
 from ..config.settings import get_config, PROJECT_ROOT
 from .exceptions import ModelNotFoundError, GPUError
+from .vehicle_classifier import VehicleClassifier
 
 
 class YOLODetector:
@@ -33,9 +34,11 @@ class YOLODetector:
         self.device = self._setup_device(device)
         self.model = None
         self._model_cache = {}
+        self.vehicle_classifier = VehicleClassifier()
         
         print(f"[INFO] YOLO Detector initialized with model: {self.model_name}")
         print(f"[INFO] Using device: {self.device}")
+        print(f"[INFO] Vehicle classifier enabled")
     
     def _setup_device(self, device: str = None) -> str:
         """Setup and return the best available device."""
@@ -162,8 +165,18 @@ class YOLODetector:
                         
                         detections.append(detection)
             
-            print(f"[INFO] Detected {len(detections)} objects")
-            return detections
+            # Enhance vehicle detections using the vehicle classifier
+            image_shape = image.shape[:2]  # (height, width)
+            enhanced_detections = self.vehicle_classifier.enhance_vehicle_detection(detections, image_shape)
+            
+            # Remove duplicate vehicle detections
+            enhanced_detections = self.vehicle_classifier.remove_duplicate_vehicles(enhanced_detections)
+            
+            # Filter low confidence vehicle detections
+            enhanced_detections = self.vehicle_classifier.filter_low_confidence_vehicles(enhanced_detections, min_confidence=0.3)
+            
+            print(f"[INFO] Detected {len(detections)} objects, enhanced to {len(enhanced_detections)} objects")
+            return enhanced_detections
             
         except Exception as e:
             raise RuntimeError(f"Object detection failed: {e}")

@@ -98,8 +98,18 @@ try:
 except ImportError as e:
     GENDER_MODEL_AVAILABLE = False
     gender_model = None
-    gender_transform = None
-    print(f"[WARNING] Gender detection model not available: {e}")
+
+# Import parking detection system
+try:
+    from modules.parking_detection import ParkingDetector
+    from modules.real_time_parking import ParkingDashboard
+    from modules.enhanced_parking_detection import EnhancedParkingDetector, ParkingAnalysis, SlotStatus, SlotCategory, ParkingType
+    PARKING_DETECTION_AVAILABLE = True
+    print("[INFO] Parking detection system loaded")
+    print("[INFO] Enhanced parking detection with classification available")
+except ImportError as e:
+    PARKING_DETECTION_AVAILABLE = False
+    print(f"[WARNING] Parking detection system not available: {e}")
 
 # Import enhanced detection for challenging images
 try:
@@ -268,25 +278,25 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         
         model = get_model(model_name)
         
-        # GPU-OPTIMIZED settings
+        # GPU-OPTIMIZED settings for RTX 4050
         if mode == "ultra_fast":
-            conf_threshold = 0.35
-            imgsz = 320
-            skip_frames = 2  # Reduced for better coverage
-            batch_size = 16  # Increased for GPU
-            print("[INFO] ⚡ ULTRA-FAST GPU MODE - 2-3 minutes expected")
+            conf_threshold = 0.4  # Slightly higher for speed
+            imgsz = 256  # Reduced from 320 for max speed
+            skip_frames = 3  # Skip more frames
+            batch_size = 32  # Max batch size for RTX 4050
+            print("[INFO] ⚡ ULTRA-FAST GPU MODE - 1-2 minutes expected")
         elif mode == "fast":
-            conf_threshold = 0.3
-            imgsz = 640
-            skip_frames = 1  # Process every frame for accuracy
-            batch_size = 12  # High batch size for GPU
-            print("[INFO] 🚀 FAST GPU MODE - 3-5 minutes expected")
+            conf_threshold = 0.35
+            imgsz = 416  # Balanced size
+            skip_frames = 2  # Skip every 2nd frame
+            batch_size = 24  # High batch size for GPU
+            print("[INFO] 🚀 FAST GPU MODE - 2-4 minutes expected")
         else:  # balanced
-            conf_threshold = 0.25
-            imgsz = 640
-            skip_frames = 1
-            batch_size = 8
-            print("[INFO] ⚖️ BALANCED GPU MODE - 5-8 minutes expected")
+            conf_threshold = 0.3
+            imgsz = 512  # Higher quality
+            skip_frames = 1  # Process every frame
+            batch_size = 16  # Moderate batch size
+            print("[INFO] ⚖️ BALANCED GPU MODE - 4-6 minutes expected")
         
         print(f"[INFO] 🔥 GPU Device: {device}, Image size: {imgsz}, Skip frames: {skip_frames}, Batch: {batch_size}")
         
@@ -294,6 +304,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         use_amp = device != "cpu"
         if use_amp:
             print("[INFO] 🔥 Mixed Precision (AMP) ENABLED for 2x speed boost!")
+            # Optimize GPU memory settings for RTX 4050
+            torch.cuda.empty_cache()
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.enabled = True
+            print("[INFO] 🔥 GPU Memory Optimized for RTX 4050")
         
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -530,7 +545,20 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                 
                                 # Background rectangle
                                 cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
+                                
+                                # Ensure text doesn't overlap
+                                (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                                
+                                # Check if text would go beyond frame height
+                                if y_offset + th > frame.shape[0] - 50:
+                                    y_offset = 30  # Reset to top
+                                    x_offset = 200  # Move to right side
+                                
+                                # Background rectangle for better visibility
+                                cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
                                 cv2.putText(frame, text_label, (12, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+                                
+                                y_offset += th + 10
                                 
                                 y_offset += th + 10
                                 if y_offset > frame.shape[0] - 80:
@@ -1295,10 +1323,103 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
         return ""
 
 
+def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
+    """
+    Direct license plate detection on full image when no vehicles are detected.
+    This handles close-up shots where car fills the entire frame.
+    
+    Args:
+        image: Full image in BGR format
+        
+    Returns:
+        Tuple of (plate_crop, plate_text) or (None, "") if not found
+    """
+    try:
+        if image is None or image.size == 0:
+            return None, ""
+        
+        h, w = image.shape[:2]
+        print(f"[DEBUG] Running direct license plate detection on image {w}x{h}")
+        
+        # Convert to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Apply bilateral filter to reduce noise
+        bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
+        
+        # Edge detection
+        edges = cv2.Canny(bilateral, 50, 200)
+        
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Filter contours based on license plate characteristics
+        plate_candidates = []
+        
+        for contour in contours:
+            # Get bounding rectangle
+            x, y, bw, bh = cv2.boundingRect(contour)
+            
+            # Skip very small or very large contours (relative to image size)
+            min_dim = min(w, h)
+            if bw < min_dim * 0.15 or bh < min_dim * 0.03:
+                continue
+            if bw > w * 0.9 or bh > h * 0.4:
+                continue
+                
+            # License plate aspect ratio (typically 2:1 to 6:1)
+            aspect_ratio = bw / bh if bh > 0 else 0
+            if aspect_ratio < 2.0 or aspect_ratio > 7.0:
+                continue
+            
+            # Area filter (relative to image)
+            area = cv2.contourArea(contour)
+            min_area = (min_dim * 0.15) * (min_dim * 0.03)
+            if area < min_area:
+                continue
+            
+            # Check if it has rectangular shape
+            peri = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+            
+            # Add to candidates if it has 4 corners (rectangle-like)
+            if len(approx) >= 4:
+                # Score based on aspect ratio closeness to typical plate (4.5:1)
+                score = 1.0 - abs(aspect_ratio - 4.5) / 4.5
+                plate_candidates.append((x, y, bw, bh, area, aspect_ratio, score))
+        
+        # Sort by score (best aspect ratio match first)
+        plate_candidates.sort(key=lambda x: x[6], reverse=True)
+        
+        # Try each candidate
+        for candidate in plate_candidates[:3]:  # Try top 3 candidates
+            x, y, bw, bh, area, aspect_ratio, score = candidate
+            plate_crop = image[y:y+bh, x:x+bw]
+            
+            if plate_crop.size == 0:
+                continue
+            
+            print(f"[DEBUG] Trying plate candidate: {bw}x{bh}, ratio: {aspect_ratio:.2f}, score: {score:.2f}")
+            
+            # Extract text from this crop
+            plate_text = _extract_text_from_plate_crop(plate_crop)
+            
+            if plate_text and len(plate_text) >= 4:
+                cleaned = _clean_license_plate_text(plate_text)
+                if cleaned:
+                    print(f"[DEBUG] ✅ Direct detection found license plate: {cleaned}")
+                    return plate_crop, cleaned
+        
+        return None, ""
+        
+    except Exception as e:
+        print(f"[DEBUG] Direct license plate detection failed: {e}")
+        return None, ""
+
+
 def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
     """
-    Enhanced fast frame annotation with object classification, advanced color shades detection,
-    and license plate text extraction for vehicles.
+    Enhanced fast frame annotation with professional non-overlapping labels.
     
     Args:
         frame: Input frame
@@ -1308,13 +1429,133 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
     global _license_plate_cache, _frame_counter
     
     try:
+        # Try to use professional annotator first
+        try:
+            # Add project root to path if not already there
+            import sys
+            import os
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
+            
+            from src.processors.professional_annotator import professional_annotator
+            
+            if result is None or not hasattr(result, 'boxes') or result.boxes is None:
+                return frame
+            
+            boxes = result.boxes
+            if not hasattr(boxes, '__len__') or len(boxes) == 0:
+                return frame
+            
+            # Convert to detections format
+            detections = []
+            xyxy = boxes.xyxy.cpu().numpy()
+            conf = boxes.conf.cpu().numpy()
+            cls = boxes.cls.cpu().numpy()
+            names = result.names
+            
+            for i in range(len(boxes)):
+                if conf[i] > 0.3:
+                    x1, y1, x2, y2 = map(int, xyxy[i])
+                    confidence = float(conf[i])
+                    class_id = int(cls[i])
+                    class_name = names.get(class_id, f"class_{class_id}")
+                    
+                    detection = {
+                        'bbox': [x1, y1, x2, y2],
+                        'confidence': confidence,
+                        'class_name': class_name,
+                        'class_id': class_id
+                    }
+                    
+                    # Add simple color detection
+                    try:
+                        crop = frame[y1:y2, x1:x2]
+                        if crop.size > 0:
+                            avg_color_per_row = np.average(crop, axis=0)
+                            avg_color = np.average(avg_color_per_row, axis=0)
+                            b, g, r = map(int, avg_color)
+                            
+                            # Simple color classification
+                            if r > 200 and g > 200 and b > 200:
+                                color = "white"
+                            elif r < 50 and g < 50 and b < 50:
+                                color = "black"
+                            elif r > g and r > b:
+                                color = "red" if r > 150 else "brown"
+                            elif g > r and g > b:
+                                color = "green" if g > 150 else "olive"
+                            elif b > r and b > g:
+                                color = "blue" if b > 150 else "navy"
+                            elif r > 150 and g > 150:
+                                color = "yellow"
+                            elif r > 150 and b > 150:
+                                color = "magenta"
+                            elif g > 150 and b > 150:
+                                color = "cyan"
+                            else:
+                                color = "gray"
+                            
+                            detection['color'] = color
+                    except Exception:
+                        detection['color'] = 'unknown'
+                    
+                    detections.append(detection)
+            
+            # Use professional annotator
+            if detections:
+                annotated = professional_annotator.annotate_detections(
+                    frame,
+                    detections,
+                    show_confidence=True,
+                    show_info_panel=False  # Skip info panel for video to reduce clutter
+                )
+            else:
+                annotated = frame
+            
+            # Add processing info
+            cv2.putText(annotated, "FAST MODE - PROFESSIONAL ANNOTATION", (10, 30), 
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            return annotated
+            
+        except ImportError:
+            print("[WARNING] Professional annotator not available for video, using fallback")
+            pass
+        except Exception as e:
+            print(f"[DEBUG] Professional video annotation failed: {e}")
+            pass
+        
+        # Fallback to original annotation method
         annotated = frame.copy()
         
         if result is None or not hasattr(result, 'boxes') or result.boxes is None:
             return annotated
         
         boxes = result.boxes
-        if len(boxes) == 0:
+        # Fix MockBoxes error
+        if not hasattr(boxes, '__len__') or len(boxes) == 0:
+            # NO OBJECTS DETECTED - Try direct license plate detection for close-up shots
+            print("[DEBUG] No objects detected. Trying direct license plate detection on full image...")
+            try:
+                plate_crop, plate_text = _detect_license_plate_direct(annotated)
+                if plate_text and len(plate_text) >= 4:
+                    print(f"[DEBUG] ✅ Direct detection found license plate: {plate_text}")
+                    # Draw the detected plate
+                    if plate_crop is not None and plate_crop.size > 0:
+                        # Find where the plate was detected (we need the coordinates)
+                        # For now, draw the text at the top of the image
+                        label = f"🚗 License Plate: {plate_text}"
+                        cv2.putText(annotated, label, (10, 90), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        
+                        # Add info text
+                        info_text = "Direct license plate detection (no vehicle detected)"
+                        cv2.putText(annotated, info_text, (10, 120), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            except Exception as e:
+                print(f"[DEBUG] Direct license plate detection failed: {e}")
+            
             return annotated
         
         # Increment frame counter
@@ -3173,7 +3414,8 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
         return "No objects detected"
     
     boxes = result.boxes
-    if len(boxes) == 0:
+    # Fix MockBoxes error
+    if not hasattr(boxes, '__len__') or len(boxes) == 0:
         return "No objects detected"
     
     names = getattr(result, "names", None)
@@ -3280,7 +3522,12 @@ def _annotate_with_color(
         return frame_bgr
 
     boxes = result.boxes
-    if len(boxes) == 0:
+    # Handle MockBoxes properly
+    if not hasattr(boxes, '__len__'):
+        return frame_bgr
+
+    # Fix MockBoxes error
+    if not hasattr(boxes, '__len__') or len(boxes) == 0:
         return frame_bgr
 
     names = getattr(result, "names", None)
@@ -3414,19 +3661,30 @@ def _annotate_with_color(
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
         if show_labels:
+            # Create the label in the requested format: car | color | numberplates
             parts = [str(class_name)]
-            if show_conf and i < len(conf):
-                parts.append(f"{float(conf[i]):.2f}")
+            parts.append("|")
             parts.append(str(color_name))
-            if boy_girl:
-                parts.append("|")
-                parts.append(str(boy_girl))
-            if enable_resnet and resnet_label:
-                parts.append("|")
-                parts.append(str(resnet_label))
+            
+            # Add license plate information for vehicles
             if enable_ocr and ocr_text:
+                # Extract just the plate number from OCR text like "Plate: MH20EE7602"
+                plate_number = ocr_text
+                if "Plate:" in ocr_text:
+                    plate_number = ocr_text.split("Plate:")[-1].strip()
+                elif "|" in ocr_text:
+                    # Handle format like "Plate: MH20EE7602 | Text: other"
+                    plate_number = ocr_text.split("|")[0].strip()
+                    if "Plate:" in plate_number:
+                        plate_number = plate_number.split("Plate:")[-1].strip()
+                
                 parts.append("|")
-                parts.append(str(ocr_text))
+                parts.append(f"numberplates: {plate_number}")
+            
+            # Add confidence if requested
+            if show_conf and i < len(conf):
+                parts.append(f"({float(conf[i]):.2f})")
+            
             text = " ".join(parts)
 
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -3453,6 +3711,7 @@ def _annotate_with_color(
 def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_labels: bool) -> np.ndarray:
     """
     Annotate the image with text extraction results from JSON data.
+    Updates the main object labels to include license plate information.
     
     Args:
         frame_bgr: Input image in BGR format
@@ -3468,18 +3727,147 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
     extraction = json_results["text_extraction"]
     annotated = frame_bgr.copy()
     
-    # Annotate license plates (including those found in full image text)
+    # Create a mapping of object_id to license plate text
+    # PRIORITY: Use license plates with bounding boxes (object_detection_crop method) first
+    object_plate_map = {}
+    
+    # First, find license plates with actual bounding boxes (these are the most accurate)
+    plates_with_bbox = []
+    plates_without_bbox = []
+    
     for plate_info in extraction["license_plates"]:
-        object_id = plate_info["object_id"]
+        if plate_info.get("bounding_box"):
+            plates_with_bbox.append(plate_info)
+        else:
+            plates_without_bbox.append(plate_info)
+    
+    # Prioritize plates with bounding boxes - these are from object_detection_crop
+    for plate_info in plates_with_bbox:
         plate_text = plate_info["plate_text"]
-        confidence = plate_info["confidence"]
+        plate_bbox = plate_info["bounding_box"]
         
-        if object_id == "full_image":
-            # License plate found in full image text - show at top of image
+        # Find the nearest vehicle to this license plate
+        best_match = None
+        min_distance = float('inf')
+        
+        for obj in extraction["all_objects"]:
+            if obj["class_name"].lower() in ['car', 'truck', 'bus', 'motorcycle']:
+                obj_bbox = obj["bounding_box"]
+                # Calculate distance between centers
+                plate_center_x = (plate_bbox["x1"] + plate_bbox["x2"]) / 2
+                plate_center_y = (plate_bbox["y1"] + plate_bbox["y2"]) / 2
+                obj_center_x = (obj_bbox["x1"] + obj_bbox["x2"]) / 2
+                obj_center_y = (obj_bbox["y1"] + obj_bbox["y2"]) / 2
+                
+                distance = ((plate_center_x - obj_center_x)**2 + (plate_center_y - obj_center_y)**2)**0.5
+                if distance < min_distance:
+                    min_distance = distance
+                    best_match = obj["object_id"]
+        
+        if best_match:
+            # Only use this plate if it's a valid format (not garbage like "1ARA")
+            if len(plate_text) >= 6 and any(c.isdigit() for c in plate_text):
+                object_plate_map[best_match] = {
+                    'text': plate_text,
+                    'bbox': plate_bbox,
+                    'confidence': plate_info.get('confidence', 0.9)
+                }
+                print(f"[DEBUG] Mapped license plate {plate_text} to vehicle {best_match}")
+    
+    # If no plates with bounding boxes were found, fall back to plates without bbox
+    if not object_plate_map:
+        for plate_info in plates_without_bbox:
+            object_id = plate_info["object_id"]
+            plate_text = plate_info["plate_text"]
+            
+            # Only use valid license plates
+            if len(plate_text) >= 6 and any(c.isdigit() for c in plate_text):
+                object_plate_map[object_id] = {
+                    'text': plate_text,
+                    'bbox': None,
+                    'confidence': plate_info.get('confidence', 0.9)
+                }
+    
+    # Update the main object labels to include license plate information
+    for obj in extraction["all_objects"]:
+        object_id = obj["object_id"]
+        class_name = obj["class_name"]
+        confidence = obj["confidence"]
+        color = obj.get("color", "unknown")
+        bbox = obj["bounding_box"]
+        
+        x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
+        
+        # Create the enhanced label in the requested format: car | color | numberplates
+        label_parts = [class_name, "|", color]
+        
+        # Add license plate if available for this object
+        plate_bbox_to_draw = None
+        plate_text_to_draw = None
+        
+        if object_id in object_plate_map:
+            plate_info = object_plate_map[object_id]
+            plate_text = plate_info['text']
+            plate_bbox_to_draw = plate_info.get('bbox')
+            plate_text_to_draw = plate_text
+            label_parts.extend(["|", f"numberplates: {plate_text}"])
+        
+        # Add confidence
+        label_parts.append(f"({confidence:.2f})")
+        
+        final_label = " ".join(label_parts)
+        
+        # Draw the object bounding box
+        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        
+        # Draw the updated label
+        if show_labels:
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.5
+            thickness = 1
+            
+            (tw, th), baseline = cv2.getTextSize(final_label, font, font_scale, thickness)
+            ty = y1 - 8
+            if ty - th - baseline < 0:
+                ty = y1 + th + baseline + 8
+            
+            # Background for label
+            bg_x1 = x1
+            bg_y1 = ty - th - baseline
+            bg_x2 = x1 + tw + 6
+            bg_y2 = ty + 4
+            
+            cv2.rectangle(annotated, (bg_x1, bg_y1), (bg_x2, bg_y2), (0, 255, 0), -1)
+            cv2.putText(annotated, final_label, (x1 + 3, ty), font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
+        
+        # Draw separate license plate bounding box if it exists and has valid text
+        if plate_bbox_to_draw and plate_text_to_draw:
+            px1, py1, px2, py2 = plate_bbox_to_draw["x1"], plate_bbox_to_draw["y1"], plate_bbox_to_draw["x2"], plate_bbox_to_draw["y2"]
+            
+            # Draw yellow box for license plate
+            cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 3)
+            
+            # Add license plate text near the plate
+            plate_label = f"🚗 {plate_text_to_draw}"
+            plate_font = cv2.FONT_HERSHEY_SIMPLEX
+            plate_font_scale = 0.6
+            plate_thickness = 2
+            
+            (ptw, pth), pbaseline = cv2.getTextSize(plate_label, plate_font, plate_font_scale, plate_thickness)
+            pty = py1 - 10
+            if pty - pth - pbaseline < 0:
+                pty = py1 + pth + pbaseline + 10
+            
+            cv2.rectangle(annotated, (px1, pty - pth - pbaseline), (px1 + ptw + 4, pty + 4), (0, 255, 255), -1)
+            cv2.putText(annotated, plate_label, (px1 + 2, pty), plate_font, plate_font_scale, (0, 0, 0), plate_thickness, cv2.LINE_AA)
+    
+    # Show full image license plates at the top
+    for plate_info in extraction["license_plates"]:
+        if plate_info["object_id"] == "full_image":
             h, w = annotated.shape[:2]
             
             # Create a banner at the top for license plate info
-            plate_label = f"🚗 License Plate: {plate_text} (confidence: {confidence:.2f})"
+            plate_label = f"🚗 License Plate: {plate_info['plate_text']} (confidence: {plate_info['confidence']:.2f})"
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.7
             thickness = 2
@@ -3493,62 +3881,7 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
             
             # Also draw a yellow border around the entire image to indicate license plate found
             cv2.rectangle(annotated, (5, 5), (w-5, h-5), (0, 255, 255), 3)
-            
-        else:
-            # Find the corresponding object for regular license plates
-            for obj in extraction["all_objects"]:
-                if obj["object_id"] == object_id:
-                    bbox = obj["bounding_box"]
-                    x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
-                    
-                    # Draw license plate bounding box in different color
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)  # Yellow box for plates
-                    
-                    # Add license plate text
-                    plate_label = f"Plate: {plate_text}"
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 0.6
-                    thickness = 2
-                    
-                    (tw, th), baseline = cv2.getTextSize(plate_label, font, font_scale, thickness)
-                    ty = y1 - 10
-                    if ty - th - baseline < 0:
-                        ty = y1 + th + baseline + 10
-                    
-                    # Background for text
-                    cv2.rectangle(annotated, (x1, ty - th - baseline), (x1 + tw + 4, ty + 4), (0, 255, 255), -1)
-                    cv2.putText(annotated, plate_label, (x1 + 2, ty), font, font_scale, (0, 0, 0), thickness)
-                    break
-    
-    # Annotate general text (excluding full image text to avoid clutter)
-    for text_info in extraction["general_text"]:
-        object_id = text_info["object_id"]
-        text = text_info["text"]
-        confidence = text_info["confidence"]
-        
-        # Skip full image general text to avoid clutter
-        if object_id == "full_image":
-            continue
-        
-        # Find the corresponding object
-        for obj in extraction["all_objects"]:
-            if obj["object_id"] == object_id:
-                bbox = obj["bounding_box"]
-                x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
-                
-                # Add general text annotation
-                text_label = f"Text: {text}"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.5
-                thickness = 1
-                
-                (tw, th), baseline = cv2.getTextSize(text_label, font, font_scale, thickness)
-                ty = y2 + 20  # Place text below the object
-                
-                # Background for text
-                cv2.rectangle(annotated, (x1, ty - th - baseline), (x1 + tw + 4, ty + 4), (255, 255, 0), -1)
-                cv2.putText(annotated, text_label, (x1 + 2, ty), font, font_scale, (0, 0, 0), thickness)
-                break
+            break
     
     return annotated
 
@@ -3565,38 +3898,115 @@ def predict_image(
     max_boxes,
     enable_ocr,
 ):
-    """Predicts objects in an image using a Ultralytics YOLO model with CUDA support and JSON-based text extraction."""
+    """Predicts objects in an image using enhanced YOLO detector with vehicle classification."""
     if img is None:
         return None, "Please upload an image first"
 
-    model = get_model(model_name)
-    device = _get_device()
+    # Use the enhanced YOLO detector with vehicle classification
+    try:
+        from src.core.detector import YOLODetector
+        detector = YOLODetector(model_name=model_name)
+        print("[INFO] Using enhanced YOLO detector with vehicle classification")
+    except Exception as e:
+        print(f"[WARNING] Enhanced detector not available, using fallback: {e}")
+        # Fallback to original method
+        model = get_model(model_name)
+        device = _get_device()
+        models = model if isinstance(model, list) else [model]
+        
+        # Processing Flow Optimization
+        if device != "cpu" and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
-    models = model if isinstance(model, list) else [model]
+        all_results = []
+        for m in models:
+            r = m.predict(
+                source=img,
+                conf=conf_threshold,
+                iou=iou_threshold,
+                imgsz=imgsz,
+                device=device,
+                verbose=False,
+                half=True if device != "cpu" else False,
+            )
+            if r:
+                all_results.append(r[0])
 
-    # Processing Flow Optimization
-    if device != "cpu" and torch.cuda.is_available():
-        # Clear GPU cache before processing for optimal performance
-        torch.cuda.empty_cache()
-        # Set optimal memory allocation
-        torch.cuda.synchronize()  # Ensure all operations are completed
+        if not all_results:
+            return img, "No objects detected"
+    else:
+        # Use enhanced detector
+        if hasattr(img, 'convert'):  # PIL Image
+            frame_bgr = np.array(img.convert('RGB'))
+            frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2BGR)
+        elif isinstance(img, np.ndarray):
+            if img.dtype != np.uint8:
+                img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                frame_bgr = img
+            else:
+                return img, "Invalid image format"
+        else:
+            return img, "Unsupported image format"
 
-    all_results = []
-    for m in models:
-        r = m.predict(
-            source=img,
-            conf=conf_threshold,
-            iou=iou_threshold,
-            imgsz=imgsz,
-            device=device,
-            verbose=False,
-            half=True if device != "cpu" else False,  # Use FP16 on CUDA for speed
-        )
-        if r:
-            all_results.append(r[0])
+        # Use enhanced detection with vehicle classification
+        try:
+            detections = detector.detect_objects(frame_bgr, conf_threshold, iou_threshold, imgsz)
+            print(f"[INFO] Enhanced detection found {len(detections)} objects")
+            
+            # Convert detections back to YOLO format for compatibility with existing code
+            if detections:
+                # Create a mock YOLO result for compatibility
+                class MockResult:
+                    def __init__(self, detections, names):
+                        self.boxes = self._create_mock_boxes(detections)
+                        self.names = names
+                    
+                    def _create_mock_boxes(self, detections):
+                        class MockBoxes:
+                            def __init__(self, detections):
+                                self.xyxy = torch.tensor([[d['bbox'][0], d['bbox'][1], d['bbox'][2], d['bbox'][3]] for d in detections])
+                                self.conf = torch.tensor([d['confidence'] for d in detections])
+                                self.cls = torch.tensor([d['class_id'] for d in detections])
+                        return MockBoxes(detections)
+                
+                # Get model names
+                model_obj = detector.model
+                names = model_obj.names if hasattr(model_obj, 'names') else {i: f"class_{i}" for i in range(80)}
+                
+                all_results = [MockResult(detections, names)]
+                print(f"[INFO] Created mock result with {len(detections)} detections")
+            else:
+                return img, "No objects detected"
+                
+        except Exception as e:
+            print(f"[ERROR] Enhanced detection failed: {e}")
+            # Fallback to original method
+            model = get_model(model_name)
+            device = _get_device()
+            models = model if isinstance(model, list) else [model]
+            
+            if device != "cpu" and torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
-    if not all_results:
-        return img, "No objects detected"
+            all_results = []
+            for m in models:
+                r = m.predict(
+                    source=img,
+                    conf=conf_threshold,
+                    iou=iou_threshold,
+                    imgsz=imgsz,
+                    device=device,
+                    verbose=False,
+                    half=True if device != "cpu" else False,
+                )
+                if r:
+                    all_results.append(r[0])
+
+            if not all_results:
+                return img, "No objects detected"
 
     # Convert to BGR for OpenCV operations with defensive checks
     if hasattr(img, 'convert'):  # PIL Image
@@ -3632,24 +4042,132 @@ def predict_image(
         json_text_results = extract_text_from_image_json(frame_bgr, image_id)
         print(f"[DEBUG] Text extraction completed for {image_id}")
     
-    annotated_bgr = frame_bgr
-    for idx, res in enumerate(all_results):
-        annotated_bgr = _annotate_with_color(
-            annotated_bgr,
-            res,
-            show_labels,
-            show_conf,
-            enable_resnet=bool(enable_resnet),
-            max_boxes=int(max_boxes),
-            resnet_every_n=1,
-            stream_key_prefix=None,
-            enable_ocr=False,  # Disable individual OCR since we're using JSON system
-            ocr_every_n=1,
-        )
-    
-    # If we have JSON text results, add text annotations from JSON
-    if json_text_results and enable_ocr:
-        annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
+    # Use professional annotation system to prevent overlapping labels
+    try:
+        # Add project root to path if not already there
+        import sys
+        import os
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from src.processors.professional_annotator import professional_annotator
+        
+        # Convert YOLO results to detection format for professional annotator
+        detections = []
+        for res in all_results:
+            if hasattr(res, 'boxes') and res.boxes is not None:
+                boxes = res.boxes
+                if hasattr(boxes, 'xyxy') and len(boxes) > 0:
+                    xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
+                    conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
+                    cls = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls)
+                    names = res.names
+                    
+                    for i in range(len(boxes)):
+                        if conf[i] > 0.3:  # Confidence threshold
+                            x1, y1, x2, y2 = map(int, xyxy[i])
+                            confidence = float(conf[i])
+                            class_id = int(cls[i])
+                            class_name = names.get(class_id, f"class_{class_id}")
+                            
+                            detection = {
+                                'bbox': [x1, y1, x2, y2],
+                                'confidence': confidence,
+                                'class_name': class_name,
+                                'class_id': class_id
+                            }
+                            
+                            # Add simple color detection
+                            try:
+                                crop = frame_bgr[y1:y2, x1:x2]
+                                if crop.size > 0:
+                                    avg_color_per_row = np.average(crop, axis=0)
+                                    avg_color = np.average(avg_color_per_row, axis=0)
+                                    b, g, r = map(int, avg_color)
+                                    
+                                    # Simple color classification
+                                    if r > 200 and g > 200 and b > 200:
+                                        color = "white"
+                                    elif r < 50 and g < 50 and b < 50:
+                                        color = "black"
+                                    elif r > g and r > b:
+                                        color = "red" if r > 150 else "brown"
+                                    elif g > r and g > b:
+                                        color = "green" if g > 150 else "olive"
+                                    elif b > r and b > g:
+                                        color = "blue" if b > 150 else "navy"
+                                    elif r > 150 and g > 150:
+                                        color = "yellow"
+                                    elif r > 150 and b > 150:
+                                        color = "magenta"
+                                    elif g > 150 and b > 150:
+                                        color = "cyan"
+                                    else:
+                                        color = "gray"
+                                    
+                                    detection['color'] = color
+                            except Exception:
+                                detection['color'] = 'unknown'
+                            
+                            detections.append(detection)
+        
+        # Extract license plates from JSON results if available
+        if json_text_results and enable_ocr:
+            try:
+                extraction = json_text_results.get("text_extraction", {})
+                license_plates = extraction.get("license_plates", [])
+                
+                # Create mapping of vehicles to license plates
+                for plate_info in license_plates:
+                    if plate_info.get("object_id") and plate_info.get("plate_text"):
+                        plate_text = plate_info["plate_text"]
+                        object_id = plate_info["object_id"]
+                        
+                        # Find corresponding detection
+                        for detection in detections:
+                            if str(detection.get('class_id')) == object_id.split('_')[-1]:
+                                detection['license_plate'] = plate_text
+                                break
+            except Exception as e:
+                print(f"[DEBUG] License plate mapping failed: {e}")
+        
+        # Use professional annotator
+        if detections:
+            annotated_bgr = professional_annotator.annotate_detections(
+                frame_bgr,
+                detections,
+                show_confidence=show_conf,
+                show_info_panel=True
+            )
+            
+            # Add JSON text annotations if available
+            if json_text_results and enable_ocr:
+                annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
+        else:
+            annotated_bgr = frame_bgr
+            
+    except Exception as e:
+        print(f"[WARNING] Professional annotator not available, using fallback: {e}")
+        # Fallback to original annotation method
+        annotated_bgr = frame_bgr
+        for idx, res in enumerate(all_results):
+            annotated_bgr = _annotate_with_color(
+                annotated_bgr,
+                res,
+                show_labels,
+                show_conf,
+                enable_resnet=bool(enable_resnet),
+                max_boxes=int(max_boxes),
+                resnet_every_n=1,
+                stream_key_prefix=None,
+                enable_ocr=False,
+                ocr_every_n=1,
+            )
+        
+        # If we have JSON text results, add text annotations from JSON
+        if json_text_results and enable_ocr:
+            annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
     
     # Generate detection summary
     summaries = [
@@ -4514,14 +5032,33 @@ def _clean_general_text(text: str) -> str:
 
 
 def _clean_license_plate_text(text: str) -> str:
-    """Clean and normalize OCR text for license plates."""
+    """Clean and normalize OCR text for license plates with brand name filtering."""
     if not text:
         return ""
     
     # Remove whitespace and convert to uppercase
     cleaned = text.strip().upper()
     
-    # Replace common OCR confusions
+    # Common brand names to immediately reject
+    brand_names = {
+        'FORD', 'TOYOTA', 'HONDA', 'BMW', 'MERCEDES', 'AUDI', 'VOLKSWAGEN',
+        'NISSAN', 'HYUNDAI', 'KIA', 'MAZDA', 'SUBARU', 'MITSUBISHI',
+        'JEEP', 'DODGE', 'CHEVROLET', 'CADILLAC', 'LINCOLN', 'TESLA',
+        'VOLVO', 'SAAB', 'MINI', 'SMART', 'FIAT', 'ALFA', 'JAGUAR',
+        'LAND ROVER', 'PORSCHE', 'FERRARI', 'LAMBORGHINI', 'MASERATI'
+    }
+    
+    # Check if it's a brand name (immediate rejection)
+    if cleaned in brand_names:
+        print(f"[DEBUG] ❌ Rejected brand name: {cleaned}")
+        return ""
+    
+    # Check if it's just letters without numbers (likely a brand name)
+    if cleaned.isalpha() and len(cleaned) >= 3:
+        print(f"[DEBUG] ❌ Rejected letters-only text: {cleaned}")
+        return ""
+    
+    # Replace common OCR confusions (more conservative for license plates)
     replacements = {
         'O': '0',  # Letter O to zero
         'I': '1',  # Letter I to one
@@ -4529,20 +5066,39 @@ def _clean_license_plate_text(text: str) -> str:
         'G': '6',  # Letter G to six
         'B': '8',  # Letter B to eight
         'Z': '2',  # Letter Z to two
-        ' ': '',   # Remove spaces
         '-': '',   # Remove hyphens
         '.': '',   # Remove periods
         ',': '',   # Remove commas
+        '|': '',   # Remove pipes
+        '/': '',   # Remove slashes
+        '\\': '',  # Remove backslashes
     }
     
-    # Apply replacements selectively for license plates
+    # Apply replacements but keep spaces for now (for validation)
     result = ""
     for char in cleaned:
         if char in replacements:
             result += replacements[char]
-        elif char.isalnum():
+        elif char.isalnum() or char.isspace():
             result += char
     
+    # Remove extra spaces
+    result = re.sub(r'\s+', ' ', result).strip()
+    
+    # Final validation - must have both letters and numbers for license plates
+    has_letters = bool(re.search(r'[A-Z]', result))
+    has_numbers = bool(re.search(r'\d', result))
+    
+    if not (has_letters and has_numbers):
+        print(f"[DEBUG] ❌ Rejected text without letters+numbers: {result}")
+        return ""
+    
+    # Must be reasonable length (4-8 characters for most plates)
+    if len(result) < 4 or len(result) > 10:
+        print(f"[DEBUG] ❌ Rejected text with invalid length: {result}")
+        return ""
+    
+    print(f"[DEBUG] ✅ Valid license plate text: {result}")
     return result
 
 
@@ -4655,12 +5211,108 @@ def _annotate_webcam_fast_with_detections(
     enable_color: bool,
     ocr_text_by_index: dict | None = None,
 ) -> np.ndarray:
-    """Draw bounding boxes and labels on original frame using pre-scaled coordinates."""
+    """Draw bounding boxes and labels with professional non-overlapping positioning."""
     if frame_bgr is None or not isinstance(frame_bgr, np.ndarray):
         return frame_bgr
     if not detections:
         return frame_bgr
 
+    try:
+        # Try to use professional annotator first
+        # Add project root to path if not already there
+        import sys
+        import os
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+        
+        from src.processors.professional_annotator import professional_annotator
+        
+        # Convert detections to professional format
+        professional_detections = []
+        for i, det in enumerate(detections[:int(max_boxes)]):
+            x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
+            class_name = det.get("class_name", "unknown")
+            confidence = det.get("confidence", 0.0)
+            
+            # Clamp to frame bounds
+            ih, iw = frame_bgr.shape[:2]
+            x1 = int(max(0, min(iw - 1, x1)))
+            y1 = int(max(0, min(ih - 1, y1)))
+            x2 = int(max(0, min(iw - 1, x2)))
+            y2 = int(max(0, min(ih - 1, y2)))
+            
+            if x2 <= x1 or y2 <= y1:
+                continue
+            
+            detection = {
+                'bbox': [x1, y1, x2, y2],
+                'confidence': confidence,
+                'class_name': class_name,
+                'class_id': det.get('class_id', 0)
+            }
+            
+            # Add color detection if enabled
+            if enable_color:
+                try:
+                    crop = frame_bgr[y1:y2, x1:x2]
+                    if crop.size > 0:
+                        avg_color_per_row = np.average(crop, axis=0)
+                        avg_color = np.average(avg_color_per_row, axis=0)
+                        b, g, r = map(int, avg_color)
+                        
+                        # Simple color classification
+                        if r > 200 and g > 200 and b > 200:
+                            color = "white"
+                        elif r < 50 and g < 50 and b < 50:
+                            color = "black"
+                        elif r > g and r > b:
+                            color = "red" if r > 150 else "brown"
+                        elif g > r and g > b:
+                            color = "green" if g > 150 else "olive"
+                        elif b > r and b > g:
+                            color = "blue" if b > 150 else "navy"
+                        elif r > 150 and g > 150:
+                            color = "yellow"
+                        elif r > 150 and b > 150:
+                            color = "magenta"
+                        elif g > 150 and b > 150:
+                            color = "cyan"
+                        else:
+                            color = "gray"
+                        
+                        detection['color'] = color
+                except Exception:
+                    detection['color'] = 'unknown'
+            
+            # Add OCR text if available
+            if ocr_text_by_index and i in ocr_text_by_index:
+                ocr_text = ocr_text_by_index[i]
+                if ocr_text and ocr_text.strip():
+                    detection['license_plate'] = ocr_text.strip()
+            
+            professional_detections.append(detection)
+        
+        # Use professional annotator
+        if professional_detections:
+            annotated = professional_annotator.annotate_detections(
+                frame_bgr,
+                professional_detections,
+                show_confidence=show_conf,
+                show_info_panel=False  # Skip info panel for webcam to reduce clutter
+            )
+            return annotated
+        else:
+            return frame_bgr
+            
+    except ImportError:
+        print("[WARNING] Professional annotator not available for webcam, using fallback")
+        pass
+    except Exception as e:
+        print(f"[DEBUG] Professional webcam annotation failed: {e}")
+        pass
+
+    # Fallback to original annotation method
     annotated = frame_bgr.copy()
     ih, iw = annotated.shape[:2]
 
@@ -4744,7 +5396,8 @@ def _annotate_webcam_fast(
         return frame_bgr
 
     boxes = result.boxes
-    if len(boxes) == 0:
+    # Fix MockBoxes error
+    if not hasattr(boxes, '__len__') or len(boxes) == 0:
         return frame_bgr
 
     names = getattr(result, "names", None)
@@ -5376,52 +6029,618 @@ def predict_webcam(
         return frame, f"❌ **Error:** {str(e)}"
 
 
+# Global parking detector instance to avoid repeated initialization
+_global_parking_detector = None
+
+def get_parking_detector():
+    """Get or create global parking detector instance"""
+    global _global_parking_detector
+    if _global_parking_detector is None:
+        _global_parking_detector = ParkingDetector("parking_dataset/config/parking_zones.yaml")
+        print("[INFO] Global parking detector initialized")
+    return _global_parking_detector
+
+def reset_parking_detector():
+    """Reset the global parking detector to reload configuration"""
+    global _global_parking_detector
+    _global_parking_detector = None
+    print("[INFO] Parking detector reset - will reload on next use")
+
+# ==================== PARKING DETECTION FUNCTION ====================
+def process_parking_detection(image, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True):
+    """
+    Process parking detection on uploaded image
+    """
+    try:
+        if not PARKING_DETECTION_AVAILABLE:
+            return image, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
+        
+        if image is None:
+            return None, "📸 **Please upload an image**\n\nUpload an image to start parking detection analysis."
+        
+        # Use global detector instance
+        detector = get_parking_detector()
+        
+        # Convert PIL to numpy if needed
+        if hasattr(image, 'convert'):
+            image_array = np.array(image.convert('RGB'))
+        else:
+            image_array = image
+            
+        # Convert BGR to RGB for processing
+        if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+            # Assume RGB input, convert to BGR for OpenCV processing
+            frame_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        else:
+            frame_bgr = image_array
+            
+        # Create mock camera input for single frame processing
+        frames = {'parking_cam': frame_bgr}
+        
+        # Process parking detection with comprehensive car detection
+        results = {}
+        
+        # Use comprehensive detection to find ALL spots (both occupied and empty) in the parking lot
+        try:
+            # Try to detect from all configured zones
+            all_detections = []
+            
+            # First try with "all" to get all zones
+            all_detections = detector.process_all_detections(frame_bgr, "main", "all")
+            
+            # If no detections, try individual zones
+            if not all_detections and detector.config.get('zones'):
+                for zone_id in detector.config['zones'].keys():
+                    zone_config = detector.config['zones'][zone_id]
+                    for camera_id in zone_config.get('camera_ids', []):
+                        try:
+                            zone_detections = detector.process_all_detections(frame_bgr, camera_id, zone_id)
+                            if zone_detections:
+                                all_detections.extend(zone_detections)
+                                break
+                        except Exception as e:
+                            continue
+                    if all_detections:
+                        break
+            
+            # Create a mock zone result for all detections
+            if all_detections:
+                from modules.parking_detection import ZoneResult
+                from datetime import datetime
+                
+                occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
+                empty_count = len([s for s in all_detections if s.status == "EMPTY"])
+                
+                zone_result = ZoneResult(
+                    zone_id="comprehensive",
+                    zone_name="Complete Parking Lot",
+                    total_spots=len(all_detections),
+                    occupied_spots=occupied_count,
+                    empty_spots=empty_count,
+                    occupancy_rate=(occupied_count / len(all_detections) * 100) if all_detections else 0,
+                    spot_details=all_detections,
+                    timestamp=datetime.now().isoformat()
+                )
+                results["comprehensive"] = zone_result
+                print(f"[INFO] Detection complete: {occupied_count} occupied, {empty_count} empty spots")
+                
+        except Exception as e:
+            print(f"[ERROR] Comprehensive detection failed: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        # Draw parking detection results on frame
+        output_frame = frame_bgr.copy()
+        
+        # Draw zone information
+        y_offset = 30
+        for zone_id, zone_result in results.items():
+            # Zone header
+            zone_text = f"Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)"
+            cv2.putText(output_frame, zone_text, (10, y_offset), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            y_offset += 30
+            
+            # Draw individual parking spots
+            for spot in zone_result.spot_details:
+                if spot.bounding_box:
+                    x1, y1, x2, y2 = spot.bounding_box
+                    
+                    # Color based on status (FIXED: Red for occupied, Green for empty)
+                    if spot.status == 'OCCUPIED':
+                        box_color = (0, 0, 255)  # Red for occupied box
+                        text_color = (0, 0, 255)  # Red text for occupied
+                    else:
+                        box_color = (0, 255, 0)  # Green for empty box
+                        text_color = (0, 255, 0)  # Green text for empty
+                    
+                    # For occupied spots, draw bounding box around the car/vehicle
+                    if spot.status == 'OCCUPIED':
+                        # Draw red bounding box directly around the detected vehicle
+                        cv2.rectangle(output_frame, (x1, y1), (x2, y2), box_color, 4)
+                        
+                        # Draw "OCCUPIED" label directly on top of the car in RED
+                        occupied_label = "OCCUPIED"
+                        font_scale = 0.9  # Larger font for occupied cars
+                        thickness = 3
+                        label_size = cv2.getTextSize(occupied_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+                        
+                        # Position label directly on top of the car
+                        label_x = x1 + 5
+                        label_y = y1 - 10
+                        if label_y < 25:
+                            label_y = y1 + label_size[1] + 10
+                        
+                        # Draw red background for occupied label
+                        cv2.rectangle(output_frame, 
+                                     (label_x - 2, label_y - label_size[1] - 2), 
+                                     (label_x + label_size[0] + 2, label_y + 2), 
+                                     box_color, -1)
+                        
+                        # Draw red "OCCUPIED" text on car
+                        cv2.putText(output_frame, occupied_label, (label_x, label_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+                        
+                        # Also draw spot ID in smaller text
+                        spot_label = f"{spot.spot_id}"
+                        if spot.vehicle_type:
+                            spot_label += f" ({spot.vehicle_type})"
+                        
+                        small_font = 0.6
+                        small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
+                        spot_label_y = label_y + label_size[1] + 15
+                        if spot_label_y > output_frame.shape[0] - 20:
+                            spot_label_y = y2 - 20
+                        
+                        cv2.putText(output_frame, spot_label, (x1 + 5, spot_label_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
+                               
+                    else:
+                        # For empty spots, draw prominent GREEN box and label
+                        box_padding = 30  # Increased padding for better visibility
+                        x1_padded = max(0, x1 - box_padding)
+                        y1_padded = max(0, y1 - box_padding)
+                        x2_padded = min(output_frame.shape[1], x2 + box_padding)
+                        y2_padded = min(output_frame.shape[0], y2 + box_padding)
+                            
+                        # Draw thick green bounding box for empty parking spot
+                        cv2.rectangle(output_frame, (x1_padded, y1_padded), (x2_padded, y2_padded), box_color, 8)
+                        
+                        # Draw prominent "EMPTY" label for empty spots (similar to occupied)
+                        empty_label = "EMPTY"
+                        font_scale = 1.0  # Larger font for empty spots
+                        thickness = 4      # Thicker text for better visibility
+                        label_size = cv2.getTextSize(empty_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+                        
+                        # Position label at the top of the empty spot (similar to occupied positioning)
+                        label_x = x1_padded + 5
+                        label_y = y1_padded - 10
+                        if label_y < 25:
+                            label_y = y1_padded + label_size[1] + 10
+                        
+                        # Draw prominent green background for empty label
+                        cv2.rectangle(output_frame, 
+                                     (label_x - 3, label_y - label_size[1] - 3), 
+                                     (label_x + label_size[0] + 3, label_y + 3), 
+                                     box_color, -1)
+                        
+                        # Draw green "EMPTY" text with white color for contrast
+                        cv2.putText(output_frame, empty_label, (label_x, label_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+                        
+                        # Also draw spot ID below the EMPTY label
+                        spot_label = f"{spot.spot_id}"
+                        if show_confidence:
+                            spot_label += f" ({spot.confidence:.2f})"
+                        
+                        small_font = 0.7
+                        small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
+                        spot_label_y = label_y + label_size[1] + 20
+                        if spot_label_y > output_frame.shape[0] - 20:
+                            spot_label_y = y2_padded - 20
+                        
+                        # Draw spot ID in green
+                        cv2.putText(output_frame, spot_label, (x1_padded + 5, spot_label_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
+                        
+                        # Add "UNOCCUPIED" text at the bottom for extra clarity
+                        unocc_label = "UNOCCUPIED"
+                        unocc_size = cv2.getTextSize(unocc_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                        unocc_x = (x1_padded + x2_padded) // 2 - (unocc_size[0] // 2)
+                        unocc_y = y2_padded - 10
+                        
+                        cv2.putText(output_frame, unocc_label, (unocc_x, unocc_y), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2)
+        
+        # Convert back to RGB for display
+        if len(output_frame.shape) == 3 and output_frame.shape[2] == 3:
+            output_rgb = cv2.cvtColor(output_frame, cv2.COLOR_BGR2RGB)
+        else:
+            output_rgb = output_frame
+        
+        # Generate summary information
+        total_spots = sum(zone.total_spots for zone in results.values())
+        occupied_spots = sum(zone.occupied_spots for zone in results.values())
+        empty_spots = sum(zone.empty_spots for zone in results.values())
+        overall_occupancy = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
+        
+        summary = f"""## 🅿️ Parking Detection Results
+
+### 📊 Overall Status
+- **Total Spots:** {total_spots}
+- **Occupied:** {occupied_spots} 🔴
+- **Empty:** {empty_spots} 🟢
+- **Occupancy Rate:** {overall_occupancy:.1f}%
+
+### 📍 Zone Details
+"""
+        
+        for zone_id, zone_result in results.items():
+            summary += f"""
+**Zone {zone_id}:**
+- Spots: {zone_result.occupied_spots}/{zone_result.total_spots}
+- Rate: {zone_result.occupancy_rate:.1f}%
+"""
+        
+        # Generate JSON output for slot counting
+        json_output = detector.get_json_output(results)
+        
+        summary += f"""
+### ⚙️ Settings
+- **Model:** {model_name}
+- **Confidence:** {confidence_threshold}
+- **Processing Time:** Real-time
+
+### 📋 JSON Output
+```json
+{json_output}
+```
+
+✅ **Detection completed successfully!**
+"""
+        
+        return output_rgb, summary
+        
+    except Exception as e:
+        print(f"[ERROR] Parking detection failed: {e}")
+        return image, f"❌ **Error:** {str(e)}\n\nPlease check the image and try again."
+
+
+def process_parking_video(video, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+    """Process parking detection in uploaded video"""
+    try:
+        if not PARKING_DETECTION_AVAILABLE:
+            return None, None, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
+        
+        if video is None:
+            return None, None, "📹 **Please upload a video**\n\nUpload a video to start parking space analysis."
+        
+        # Create temporary files in project directory to avoid permission issues
+        import tempfile
+        import os
+        import uuid
+        
+        # Use project's directory for output (not temp directory to avoid permission issues)
+        output_dir = os.getcwd()
+        unique_id = str(uuid.uuid4())[:8]
+        temp_input_path = os.path.join(output_dir, f"temp_input_{unique_id}.mp4")
+        temp_output_path = os.path.join(output_dir, f"parking_output_{unique_id}.avi")
+        
+        try:
+            # Save uploaded video to temp file with proper error handling
+            if hasattr(video, 'name'):
+                # File-like object from Gradio
+                try:
+                    with open(temp_input_path, 'wb') as f:
+                        video.seek(0)  # Reset file pointer
+                        f.write(video.read())
+                except PermissionError:
+                    # Try alternative location if permission denied
+                    temp_input_path = os.path.join(output_dir, f"input_{unique_id}.mp4")
+                    with open(temp_input_path, 'wb') as f:
+                        video.seek(0)
+                        f.write(video.read())
+            elif isinstance(video, str):
+                # Path string - copy to our temp directory
+                try:
+                    import shutil
+                    shutil.copy2(video, temp_input_path)
+                except PermissionError:
+                    # Use the original path if copy fails
+                    temp_input_path = video
+            else:
+                return None, None, "❌ **Error:** Invalid video format"
+            
+            print(f"[INFO] Video saved to: {temp_input_path}")
+            
+            # Verify file exists and is accessible
+            if not os.path.exists(temp_input_path):
+                return None, None, "❌ **Error:** Video file not found after saving"
+            
+            # Process video with parking detection
+            detector = get_parking_detector()
+            cap = cv2.VideoCapture(temp_input_path)
+            
+            if not cap.isOpened():
+                return None, None, "❌ **Error:** Cannot open video file"
+            
+            # Get video properties
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            print(f"[INFO] Video info: {total_frames} frames, {fps} FPS, {width}x{height}")
+            
+            # Setup video writer - save directly to output path in project directory
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')  # More compatible than mp4v
+            out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
+            
+            if not out.isOpened():
+                return None, None, "❌ **Error:** Cannot create output video file"
+            
+            frame_count = 0
+            processed_frames = 0
+            occupancy_data = []
+            total_spots_detected = 0
+            
+            print(f"[INFO] Starting video processing...")
+            
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                
+                frame_count += 1
+                
+                # Process every Nth frame to reduce processing time
+                if frame_count % every_n == 0:
+                    # Use the first available camera from zone configuration
+                    frames = {}
+                    
+                    # Try each zone and use the first camera
+                    for zone_id in detector.config['zones'].keys():
+                        zone_config = detector.config['zones'][zone_id]
+                        if zone_config.get('camera_ids'):
+                            # Use the first camera from this zone
+                            camera_id = zone_config['camera_ids'][0]
+                            frames[camera_id] = frame
+                            break
+                    
+                    if not frames:
+                        # Fallback to parking_cam if no zones configured
+                        frames = {'parking_cam': frame}
+                    
+                    # Process parking detection with comprehensive detection
+                    results = {}
+                    try:
+                        # Use comprehensive detection to find ALL spots (occupied + empty)
+                        all_detections = detector.process_all_detections(frame, "main", "all")
+                        
+                        # If no detections, try individual zones
+                        if not all_detections and detector.config.get('zones'):
+                            for zone_id in detector.config['zones'].keys():
+                                zone_config = detector.config['zones'][zone_id]
+                                for camera_id in zone_config.get('camera_ids', []):
+                                    try:
+                                        zone_detections = detector.process_all_detections(frame, camera_id, zone_id)
+                                        if zone_detections:
+                                            all_detections.extend(zone_detections)
+                                            break
+                                    except Exception as e:
+                                        continue
+                                if all_detections:
+                                    break
+                        
+                        # Create a mock zone result for all detections
+                        if all_detections:
+                            from modules.parking_detection import ZoneResult
+                            from datetime import datetime
+                            
+                            occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
+                            empty_count = len([s for s in all_detections if s.status == "EMPTY"])
+                            
+                            zone_result = ZoneResult(
+                                zone_id="comprehensive",
+                                zone_name="Complete Parking Lot",
+                                total_spots=len(all_detections),
+                                occupied_spots=occupied_count,
+                                empty_spots=empty_count,
+                                occupancy_rate=(occupied_count / len(all_detections) * 100) if all_detections else 0,
+                                spot_details=all_detections,
+                                timestamp=datetime.now().isoformat()
+                            )
+                            results["comprehensive"] = zone_result
+                            print(f"[INFO] Frame {frame_count}: {occupied_count} occupied, {empty_count} empty spots")
+                        
+                    except Exception as e:
+                        print(f"[ERROR] Frame {frame_count} comprehensive detection failed: {e}")
+                    
+                    # Draw results on frame
+                    all_spots = []
+                    for zone_result in results.values():
+                        all_spots.extend(zone_result.spot_details)
+                    
+                    if all_spots:
+                        annotated_frame = detector.draw_detections(frame, all_spots)
+                        total_spots_detected = len(all_spots)
+                        print(f"[INFO] Frame {frame_count}: Detected {total_spots_detected} spots")
+                    else:
+                        annotated_frame = frame.copy()
+                        # Add info text when no spots detected
+                        cv2.putText(annotated_frame, "Scanning for parking spots...", 
+                                  (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        total_spots_detected = 0
+                    
+                    # Calculate occupancy statistics
+                    total_spots = sum(zone.total_spots for zone in results.values())
+                    occupied_spots = sum(zone.occupied_spots for zone in results.values())
+                    occupancy_rate = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
+                    
+                    # Add frame info overlay
+                    info_text = f"Frame: {frame_count} | Spots: {occupied_spots}/{total_spots} ({occupancy_rate:.1f}%)"
+                    cv2.putText(annotated_frame, info_text, 
+                              (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    
+                    occupancy_data.append({
+                        'frame': frame_count,
+                        'occupied': occupied_spots,
+                        'empty': total_spots - occupied_spots,
+                        'rate': occupancy_rate
+                    })
+                    
+                    processed_frames += 1
+                    out.write(annotated_frame)
+                    
+                    # Add progress indicator
+                    if frame_count % 100 == 0:
+                        progress = (frame_count / total_frames) * 100
+                        print(f"[INFO] Progress: {progress:.1f}% ({frame_count}/{total_frames})")
+                else:
+                    # Write original frame
+                    out.write(frame)
+            
+            # Release resources
+            cap.release()
+            out.release()
+            
+            # Calculate overall statistics
+            if occupancy_data:
+                avg_occupancy = sum(d['rate'] for d in occupancy_data) / len(occupancy_data)
+                max_occupied = max(d['occupied'] for d in occupancy_data)
+                min_occupied = min(d['occupied'] for d in occupancy_data)
+            else:
+                avg_occupancy = max_occupied = min_occupied = 0
+            
+            summary = f"""## 🎥 Parking Video Analysis Complete
+
+### 📊 Processing Results:
+- **Total Frames:** {total_frames}
+- **Processed Frames:** {processed_frames} (every {every_n}th frame)
+- **Video FPS:** {fps}
+- **Resolution:** {width}x{height}
+
+### 🅿️ Occupancy Statistics:
+- **Average Occupancy:** {avg_occupancy:.1f}%
+- **Max Occupied Spots:** {max_occupied}
+- **Min Occupied Spots:** {min_occupied}
+
+### 🎯 Features Applied:
+✅ Frame-by-frame parking detection
+✅ Occupied spots shown in **RED**
+✅ Empty spots shown in **GREEN**
+✅ Spot IDs and confidence scores
+✅ Real-time statistics overlay
+
+**📹 Video processed successfully!**
+"""
+            
+            print(f"[INFO] Video processing complete: {temp_output_path}")
+            
+            # Verify output file exists and has content
+            if os.path.exists(temp_output_path) and os.path.getsize(temp_output_path) > 1000:
+                # Return the output file directly (already in project directory)
+                print(f"[INFO] Output ready: {temp_output_path}")
+                return temp_output_path, temp_output_path, summary
+            else:
+                return None, None, "❌ **Error:** Output video file was not created properly"
+            
+        except Exception as e:
+            print(f"[ERROR] Video processing error: {e}")
+            import traceback
+            traceback.print_exc()
+            return video, None, f"❌ **Error:** {str(e)}\n\nVideo processing failed."
+        finally:
+            # Cleanup temp files after some delay to allow Gradio to serve them
+            try:
+                import threading
+                import time
+                
+                def cleanup_files():
+                    time.sleep(60)  # Wait 60 seconds before cleanup (increased from 30)
+                    try:
+                        # Clean up input file
+                        if os.path.exists(temp_input_path):
+                            try:
+                                os.remove(temp_input_path)
+                            except PermissionError:
+                                print(f"[WARNING] Could not remove input file (in use): {temp_input_path}")
+                        
+                        # Clean up output file
+                        if os.path.exists(temp_output_path):
+                            try:
+                                os.remove(temp_output_path)
+                            except PermissionError:
+                                print(f"[WARNING] Could not remove output file (in use): {temp_output_path}")
+                        
+                        # Clean up safe output file
+                        safe_output_path = os.path.join(os.getcwd(), f"parking_result_{unique_id}.avi")
+                        if os.path.exists(safe_output_path):
+                            try:
+                                os.remove(safe_output_path)
+                            except PermissionError:
+                                print(f"[WARNING] Could not remove safe output file (in use): {safe_output_path}")
+                        
+                        print(f"[INFO] Cleanup completed for {unique_id}")
+                    except Exception as cleanup_error:
+                        print(f"[WARNING] Cleanup error: {cleanup_error}")
+                
+                # Start cleanup thread
+                cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
+                cleanup_thread.start()
+                
+            except Exception as e:
+                print(f"[WARNING] Cleanup setup failed: {e}")
+        
+    except Exception as e:
+        print(f"[ERROR] Parking video processing failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None, f"❌ **Error:** {str(e)}\n\nPlease check the video and try again."
+
+
+def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+    """Process parking detection in live webcam"""
+    try:
+        if not PARKING_DETECTION_AVAILABLE:
+            return frame, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
+        
+        if frame is None:
+            return frame, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera at a parking area to start detection."
+        
+        # Use the same logic as image detection but for webcam
+        result_frame, result_summary = process_parking_detection(
+            frame, confidence_threshold, model_name, show_labels, show_confidence
+        )
+        
+        # Add webcam-specific info
+        webcam_info = f"""📹 **Status:** Live Detection Active
+
+🅿️ **Real-time Parking Analysis:**
+{result_summary}
+
+**🎯 Instructions:**
+1. Point camera at parking area
+2. Ensure good lighting
+3. Adjust camera angle for best results
+4. Watch real-time detection!
+
+⚡ **Processing:** Live webcam feed
+🔄 **Updates:** Real-time
+"""
+        
+        return result_frame, webcam_info
+        
+    except Exception as e:
+        print(f"[ERROR] Parking webcam processing failed: {e}")
+        return frame, f"❌ **Error:** {str(e)}\n\nPlease check camera and try again."
+
+
 # Create the Gradio app with enhanced modern interface
 with gr.Blocks(
     title="YOLO26 AI Vision",
-    theme=gr.themes.Soft(),
-    css=""" 
-    .gradio-container {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .gr-button-primary {
-        background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
-    }
-    .gr-button-primary:hover {
-        background: linear-gradient(45deg, #5a6fd8 0%, #6a4190 100%);
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    .gr-box {
-        border-radius: 12px;
-        border: 1px solid #e5e7eb;
-    }
-    .gr-tab-nav {
-        border-bottom: 2px solid #e5e7eb;
-    }
-    .gr-tab-nav button {
-        font-weight: 600;
-        border-radius: 8px 8px 0 0;
-    }
-    .gr-tab-nav button.selected {
-        background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-        color: white;
-    }
-
-    #webcam_input, #webcam_output {
-        width: 100% !important;
-    }
-    #webcam_input img, #webcam_output img {
-        width: 100% !important;
-        height: auto !important;
-        max-height: 85vh;
-        object-fit: contain;
-    }
-    """
 ) as demo:
+    
     # Display device status with modern styling
     device = _get_device()
     if device != "cpu":
@@ -5435,21 +6654,6 @@ with gr.Blocks(
             """
         )
         
-    # Enhanced main title
-    gr.Markdown(
-        """
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="margin: 0; font-size: 48px; background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); 
-                   -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 700;">
-                YOLO26 AI Vision
-            </h1>
-            <p style="margin: 10px 0 0 0; font-size: 18px; color: #6b7280;">
-                Advanced Object Detection • License Plate Recognition • Real-time Processing
-            </p>
-        </div>
-        """
-    )
-
     with gr.Tabs():
         # Image Tab - Simplified
         with gr.TabItem("🖼️ Image Detection"):
@@ -5745,6 +6949,108 @@ with gr.Blocks(
             webcam_timer.tick(
                 update_webcam_info,
                 outputs=webcam_info
+            )
+
+        # Parking Detection Tab - Enhanced with Webcam & Video
+        with gr.TabItem("🅿️ Parking Detection"):
+            gr.Markdown("### 🅿️ Smart Parking Space Detection System")
+            gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
+            
+            with gr.Tabs():
+                # Image Upload Tab
+                with gr.TabItem("📁 Image Upload"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
+                            parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                                parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+                            
+                            parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
+                            
+                        with gr.Column(scale=2):
+                            parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
+                            parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
+
+                # Video Upload Tab  
+                with gr.TabItem("🎥 Video Upload"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            parking_video_input = gr.Video(label="🎥 Upload Parking Video")
+                            parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                                parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
+                                parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                            
+                            parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
+                            
+                        with gr.Column(scale=2):
+                            parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
+                            parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
+                            parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
+
+                # Live Webcam Tab
+                with gr.TabItem("📸 Live Webcam"):
+                    gr.Markdown("### 📸 Real-time Parking Detection with Webcam")
+                    
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("#### 🎛️ Control Panel")
+                            
+                            parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                                parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
+                                parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                            
+                            gr.Markdown("#### 📹 Webcam Feed")
+                            parking_webcam_input = gr.Image(
+                                sources=["webcam"],
+                                type="numpy",
+                                label="📸 Live Camera",
+                                streaming=True,
+                                height=420,
+                            )
+                            
+                        with gr.Column(scale=2):
+                            gr.Markdown("#### 🎯 Live Parking Detection")
+                            parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
+                            
+                            gr.Markdown("#### 📊 Live Statistics")
+                            parking_webcam_info = gr.Textbox(
+                                label="Detection Info", 
+                                interactive=False, 
+                                lines=8, 
+                                value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
+                            )
+
+            # Connect all components
+            parking_btn_img.click(
+                process_parking_detection,
+                inputs=[parking_input, parking_conf_img, parking_model_img, parking_labels_img, parking_conf_show_img],
+                outputs=[parking_output_img, parking_summary_img],
+            )
+            
+            parking_btn_vid.click(
+                process_parking_video,
+                inputs=[parking_video_input, parking_conf_vid, parking_model_vid, parking_labels_vid, parking_conf_show_vid, parking_every_n_vid],
+                outputs=[parking_video_output, parking_video_download, parking_summary_vid],
+            )
+            
+            parking_webcam_input.stream(
+                process_parking_webcam,
+                inputs=[parking_webcam_input, parking_conf_cam, parking_model_cam, parking_labels_cam, parking_conf_show_cam, parking_every_n_cam],
+                outputs=[parking_webcam_output, parking_webcam_info],
+                show_progress=False,
+                time_limit=30,
             )
 
     # Modern footer with system information

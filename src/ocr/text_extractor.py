@@ -9,9 +9,13 @@ import time
 import hashlib
 
 from .base_ocr import BaseOCR
-from .paddleocr_processor import PaddleOCRProcessor
+from .optimized_paddleocr_gpu import extract_text_optimized as PaddleOCRProcessor
 from ..config.settings import get_config
-from ...core.exceptions import OCRError
+
+# Try absolute import first, then fallback
+class OCRError(Exception):
+    """OCR related errors"""
+    pass
 
 
 class TextExtractor:
@@ -37,11 +41,10 @@ class TextExtractor:
     def _initialize_processors(self):
         """Initialize available OCR processors."""
         try:
-            # Primary: PaddleOCR GPU
-            paddle_processor = PaddleOCRProcessor(self.config)
-            if paddle_processor.initialize():
-                self.ocr_processors['paddleocr_gpu'] = paddle_processor
-                print("[INFO] PaddleOCR GPU initialized successfully")
+            # Primary: PaddleOCR GPU - use the function directly
+            from .optimized_paddleocr_gpu import extract_text_optimized
+            self.ocr_processors['paddleocr_gpu'] = extract_text_optimized
+            print("[INFO] PaddleOCR GPU initialized successfully")
         except Exception as e:
             print(f"[WARNING] Failed to initialize PaddleOCR GPU: {e}")
         
@@ -98,7 +101,12 @@ class TextExtractor:
                     print(f"[DEBUG] Trying OCR method: {method_name}")
                     
                     # Extract text
-                    ocr_result = processor.extract_text(image, **kwargs)
+                    if callable(processor):
+                        # Function-based processor
+                        ocr_result = processor(image, **kwargs)
+                    else:
+                        # Class-based processor
+                        ocr_result = processor.extract_text(image, **kwargs)
                     
                     if ocr_result and ocr_result.get('text'):
                         result['text_results'].append({
@@ -172,7 +180,7 @@ class TextExtractor:
         if region_id is None:
             region_id = f"region_{x1}_{y1}_{x2}_{y2}"
         
-        # Extract text
+        # Extract text with lower confidence threshold for license plates
         result = self.extract_text_comprehensive(region, region_id, **kwargs)
         
         # Add region information

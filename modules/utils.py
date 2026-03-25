@@ -1271,30 +1271,55 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
             cv2.rectangle(annotated, (5, 5), (w-5, h-5), (0, 255, 255), 3)
             
         else:
-            # Find the corresponding object for regular license plates
-            for obj in extraction["all_objects"]:
-                if obj["object_id"] == object_id:
-                    bbox = obj["bounding_box"]
-                    x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
-                    
-                    # Draw license plate bounding box in different color
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)  # Yellow box for plates
-                    
-                    # Add license plate text
-                    plate_label = f"Plate: {plate_text}"
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 0.6
-                    thickness = 2
-                    
-                    (tw, th), baseline = cv2.getTextSize(plate_label, font, font_scale, thickness)
-                    ty = y1 - 10
-                    if ty - th - baseline < 0:
-                        ty = y1 + th + baseline + 10
-                    
-                    # Background for text
-                    cv2.rectangle(annotated, (x1, ty - th - baseline), (x1 + tw + 4, ty + 4), (0, 255, 255), -1)
-                    cv2.putText(annotated, plate_label, (x1 + 2, ty), font, font_scale, (0, 0, 0), thickness)
-                    break
+            # Use the plate's own bounding box if available, otherwise find the object
+            plate_bbox = plate_info.get("bounding_box")
+            
+            if plate_bbox:
+                # Use the plate's own bounding box directly
+                x1, y1, x2, y2 = plate_bbox["x1"], plate_bbox["y1"], plate_bbox["x2"], plate_bbox["y2"]
+                
+                # Draw license plate bounding box in yellow
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)  # Yellow box for plates
+                
+                # Add license plate text
+                plate_label = f"Plate: {plate_text}"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                thickness = 2
+                
+                (tw, th), baseline = cv2.getTextSize(plate_label, font, font_scale, thickness)
+                ty = y1 - 10
+                if ty - th - baseline < 0:
+                    ty = y1 + th + baseline + 10
+                
+                # Background for text
+                cv2.rectangle(annotated, (x1, ty - th - baseline), (x1 + tw + 4, ty + 4), (0, 255, 255), -1)
+                cv2.putText(annotated, plate_label, (x1 + 2, ty), font, font_scale, (0, 0, 0), thickness)
+            else:
+                # Find the corresponding object for regular license plates
+                for obj in extraction["all_objects"]:
+                    if obj["object_id"] == object_id:
+                        bbox = obj["bounding_box"]
+                        x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
+                        
+                        # Draw license plate bounding box in different color
+                        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)  # Yellow box for plates
+                        
+                        # Add license plate text
+                        plate_label = f"Plate: {plate_text}"
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        font_scale = 0.6
+                        thickness = 2
+                        
+                        (tw, th), baseline = cv2.getTextSize(plate_label, font, font_scale, thickness)
+                        ty = y1 - 10
+                        if ty - th - baseline < 0:
+                            ty = y1 + th + baseline + 10
+                        
+                        # Background for text
+                        cv2.rectangle(annotated, (x1, ty - th - baseline), (x1 + tw + 4, ty + 4), (0, 255, 255), -1)
+                        cv2.putText(annotated, plate_label, (x1 + 2, ty), font, font_scale, (0, 0, 0), thickness)
+                        break
     
     # Annotate general text (excluding full image text to avoid clutter)
     for text_info in extraction["general_text"]:

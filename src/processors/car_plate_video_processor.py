@@ -408,27 +408,34 @@ class CarPlateVideoProcessor:
             cv2.putText(annotated, car_label, (x1, y1 - 10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
-            # Draw license plates
+            # Draw license plates - IMPROVED: Better formatting with yellow box
             for i, plate in enumerate(car['plates']):
                 plate_text = plate['text']
                 confidence = plate['confidence']
                 country = plate.get('country', '')
                 
-                # Position for plate text
+                # Get plate bbox if available
+                plate_bbox = plate.get('bbox')
+                if plate_bbox:
+                    px1, py1, px2, py2 = plate_bbox
+                    # Draw yellow box around license plate region
+                    cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 3)
+                
+                # Position for plate text label
                 plate_y = y1 - 30 - (i * 25)
                 
-                # Create plate label
+                # Create plate label with "Plate: " prefix
                 if country:
-                    plate_label = f"🚗 {plate_text} ({confidence:.2f}) [{country}]"
+                    plate_label = f"Plate: {plate_text} ({confidence:.2f}) [{country}]"
                 else:
-                    plate_label = f"🚗 {plate_text} ({confidence:.2f})"
+                    plate_label = f"Plate: {plate_text} ({confidence:.2f})"
                 
                 # Draw background rectangle for plate text
                 (text_width, text_height), _ = cv2.getTextSize(plate_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
                 cv2.rectangle(annotated, (x1, plate_y - text_height - 5), 
-                             (x1 + text_width + 5, plate_y + 5), (0, 0, 255), -1)
+                             (x1 + text_width + 5, plate_y + 5), (0, 255, 255), -1)
                 cv2.putText(annotated, plate_label, (x1, plate_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         
         # Add frame info
         frame_text = f"Frame: {frame_result['frame_number']} | Cars: {frame_result['cars_detected']} | Plates: {frame_result['plates_found']}"

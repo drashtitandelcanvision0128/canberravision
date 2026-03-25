@@ -1221,11 +1221,64 @@ class WebcamProcessor:
                     flipped_rot = cv2.flip(rotated, 1)  # horizontal flip of rotated
                     processed.append((flipped_rot, float(angle + 1000)))  # use angle+1000 to distinguish
 
-            # 4) For plates, also try a slight deskew using morphological operations
+            # 4) Enhanced license plate preprocessing
             if is_plate:
-                # Binarize
+                # Multiple preprocessing approaches for license plates
+                
+                # 4a) Adaptive threshold with different parameters
+                adaptive_thresh1 = cv2.adaptiveThreshold(base_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                adaptive_thresh1_bgr = cv2.cvtColor(adaptive_thresh1, cv2.COLOR_GRAY2BGR)
+                processed.append((adaptive_thresh1_bgr, 0.0))
+                
+                adaptive_thresh2 = cv2.adaptiveThreshold(base_gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 3)
+                adaptive_thresh2_bgr = cv2.cvtColor(adaptive_thresh2, cv2.COLOR_GRAY2BGR)
+                processed.append((adaptive_thresh2_bgr, 0.0))
+                
+                # 4b) Otsu thresholding with different preprocessing
+                blur_otsu = cv2.GaussianBlur(base_gray, (5, 5), 0)
+                _, otsu1 = cv2.threshold(blur_otsu, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                otsu1_bgr = cv2.cvtColor(otsu1, cv2.COLOR_GRAY2BGR)
+                processed.append((otsu1_bgr, 0.0))
+                
+                # 4c) Morphological operations for text enhancement
+                kernel_small = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+                kernel_medium = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
+                
+                # Remove small noise
+                cleaned1 = cv2.morphologyEx(base_gray, cv2.MORPH_OPEN, kernel_small)
+                cleaned1_bgr = cv2.cvtColor(cleaned1, cv2.COLOR_GRAY2BGR)
+                processed.append((cleaned1_bgr, 0.0))
+                
+                # Connect text components
+                cleaned2 = cv2.morphologyEx(base_gray, cv2.MORPH_CLOSE, kernel_medium)
+                cleaned2_bgr = cv2.cvtColor(cleaned2, cv2.COLOR_GRAY2BGR)
+                processed.append((cleaned2_bgr, 0.0))
+                
+                # 4d) Contrast stretching
+                contrast_stretched = cv2.normalize(base_gray, None, 0, 255, cv2.NORM_MINMAX)
+                contrast_stretched_bgr = cv2.cvtColor(contrast_stretched, cv2.COLOR_GRAY2BGR)
+                processed.append((contrast_stretched_bgr, 0.0))
+                
+                # 4e) Local contrast enhancement using CLAHE with different parameters
+                clahe_aggressive = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(4, 4))
+                clahe_result = clahe_aggressive.apply(base_gray)
+                clahe_result_bgr = cv2.cvtColor(clahe_result, cv2.COLOR_GRAY2BGR)
+                processed.append((clahe_result_bgr, 0.0))
+                
+                # 4f) Edge enhancement for better text boundaries
+                edges = cv2.Canny(base_gray, 100, 200)
+                edges_dilated = cv2.dilate(edges, np.ones((2,2), np.uint8), iterations=1)
+                edges_enhanced = cv2.addWeighted(base_gray, 0.8, edges_dilated, 0.2, 0)
+                edges_enhanced_bgr = cv2.cvtColor(edges_enhanced, cv2.COLOR_GRAY2BGR)
+                processed.append((edges_enhanced_bgr, 0.0))
+                
+                # 4g) Gamma correction for different lighting conditions
+                gamma_corrected = np.array(255 * (base_gray / 255) ** 0.7, dtype='uint8')
+                gamma_corrected_bgr = cv2.cvtColor(gamma_corrected, cv2.COLOR_GRAY2BGR)
+                processed.append((gamma_corrected_bgr, 0.0))
+                
+                # 4h) Original binarize method (kept for compatibility)
                 _, binary = cv2.threshold(base_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-                # Morph open to reduce noise
                 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3,3))
                 cleaned = cv2.morphologyEx(binary, cv2.MORPH_OPEN, kernel)
                 deskewed_bgr = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
@@ -1334,45 +1387,194 @@ class WebcamProcessor:
                 return []
 
             h, w = vehicle_crop.shape[:2]
+            
+            # Try multiple detection strategies
+            all_candidates = []
+            
+            # Strategy 1: Enhanced edge-based detection with position weighting
             gray = cv2.cvtColor(vehicle_crop, cv2.COLOR_BGR2GRAY)
-            gray = cv2.bilateralFilter(gray, 7, 50, 50)
-            edges = cv2.Canny(gray, 50, 150)
-
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 3))
-            edges = cv2.dilate(edges, kernel, iterations=1)
-            edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            candidates = []
+            gray = cv2.bilateralFilter(gray, 9, 75, 75)  # Increased filter size
+            
+            # Try multiple Canny thresholds for better edge detection
+            edges_list = []
+            for low_thresh in [30, 50, 70]:
+                edges = cv2.Canny(gray, low_thresh, low_thresh * 3)
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 2))
+                edges = cv2.dilate(edges, kernel, iterations=1)
+                edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+                edges_list.append(edges)
+            
+            # Combine all edge detections
+            combined_edges = np.zeros_like(edges_list[0])
+            for edges in edges_list:
+                combined_edges = cv2.bitwise_or(combined_edges, edges)
+            
+            contours, _ = cv2.findContours(combined_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
             for c in contours:
                 x, y, cw, ch = cv2.boundingRect(c)
                 if cw <= 0 or ch <= 0:
                     continue
+                    
                 area = cw * ch
-                if area < (w * h) * 0.01:
+                min_area = (w * h) * 0.002  # Reduced minimum area requirement
+                if area < min_area:
                     continue
-
+                
+                # Relaxed aspect ratio constraints (1.5 to 8.0)
                 ar = cw / float(ch)
-                if ar < 1.8 or ar > 7.5:
+                if ar < 1.5 or ar > 8.0:
                     continue
-
-                if y < int(0.25 * h):
+                
+                # IMPROVED: Position-based scoring to prefer lower regions (license plates are usually low)
+                position_score = 1.0
+                y_center = y + ch / 2
+                y_ratio = y_center / h
+                
+                # Strongly prefer lower 60% of the vehicle
+                if y_ratio < 0.4:  # Top 40% - unlikely for license plates
+                    position_score = 0.3
+                elif y_ratio < 0.6:  # 40-60% - less likely
+                    position_score = 0.6
+                elif y_ratio >= 0.6:  # Bottom 40% - most likely
+                    position_score = 1.2
+                
+                # Penalize regions that are too high up (likely grills/emblems)
+                if y < int(0.25 * h):  # Top quarter - very unlikely
                     continue
+                
+                # Add padding around the detected region
+                padding_x = int(cw * 0.1)
+                padding_y = int(ch * 0.1)
+                x1 = max(0, x - padding_x)
+                y1 = max(0, y - padding_y)
+                x2 = min(w, x + cw + padding_x)
+                y2 = min(h, y + ch + padding_y)
+                
+                # Apply position score to area for ranking
+                weighted_area = area * position_score
+                all_candidates.append((x1, y1, x2, y2, weighted_area))
+            
+            # Strategy 2: MSER detection for text-like regions with position filtering
+            try:
+                mser = cv2.MSER_create()
+                mser.set_delta(5)
+                mser.set_min_area(int((w * h) * 0.001))
+                mser.set_max_area(int((w * h) * 0.3))
+                
+                regions, _ = mser.detectRegions(gray)
+                for region in regions:
+                    x, y, cw, ch = cv2.boundingRect(region)
+                    
+                    # Skip regions in top half (more likely to be grills/emblems)
+                    y_center = y + ch / 2
+                    if y_center / h < 0.5:
+                        continue
+                    
+                    area = cw * ch
+                    if area < (w * h) * 0.001:
+                        continue
+                    
+                    ar = cw / float(ch)
+                    if ar < 1.0 or ar > 10.0:
+                        continue
+                    
+                    # Add padding
+                    padding_x = int(cw * 0.15)
+                    padding_y = int(ch * 0.15)
+                    x1 = max(0, x - padding_x)
+                    y1 = max(0, y - padding_y)
+                    x2 = min(w, x + cw + padding_x)
+                    y2 = min(h, y + ch + padding_y)
+                    
+                    # Higher score for lower regions
+                    position_score = 1.2 if (y_center / h) >= 0.6 else 0.8
+                    weighted_area = area * position_score
+                    all_candidates.append((x1, y1, x2, y2, weighted_area))
+            except Exception:
+                pass  # MSER not available, continue with edge detection
+            
+            # Strategy 3: Focused lower region search (license plates are typically in lower half)
+            lower_region_candidates = []
+            
+            # Focus on the lower 50% of the vehicle where license plates are most common
+            for y_start_ratio in [0.5, 0.6, 0.7, 0.8]:
+                y_start = int(h * y_start_ratio)
+                y_end = h
+                
+                # Split lower region into horizontal strips
+                strip_height = int((y_end - y_start) / 3)
+                for i in range(3):
+                    strip_y1 = y_start + (i * strip_height)
+                    strip_y2 = min(y_end, strip_y1 + strip_height)
+                    
+                    if strip_y2 > strip_y1:
+                        # Lower strips get higher scores
+                        strip_score = 1.0 + (i * 0.2)  # Lower strips = higher score
+                        weighted_area = (w * (strip_y2 - strip_y1)) * 0.5 * strip_score
+                        lower_region_candidates.append((0, strip_y1, w, strip_y2, weighted_area))
+            
+            all_candidates.extend(lower_region_candidates)
+            
+            # Remove duplicates and sort by weighted area
+            unique_candidates = []
+            seen = set()
+            
+            for x1, y1, x2, y2, area in all_candidates:
+                # Create a normalized key for deduplication
+                key = (x1//10, y1//10, x2//10, y2//10)
+                if key not in seen:
+                    seen.add(key)
+                    unique_candidates.append((x1, y1, x2, y2, area))
+            
+            # Sort by weighted area (largest first) and return top candidates
+            unique_candidates.sort(key=lambda t: t[4], reverse=True)
+            return [(x1, y1, x2, y2) for (x1, y1, x2, y2, _) in unique_candidates[:4]]  # Return up to 4 candidates
 
-                candidates.append((x, y, x + cw, y + ch, area))
-
-            candidates.sort(key=lambda t: t[4], reverse=True)
-            return [(x1, y1, x2, y2) for (x1, y1, x2, y2, _) in candidates[:2]]
-
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG] License plate region detection failed: {e}")
             return []
 
     def _normalize_plate_text(self, text: str) -> str:
+        """Enhanced license plate text normalization that preserves spaces and improves accuracy."""
         if not text:
             return ""
-        t = ''.join([c for c in text.upper() if c.isalnum()])
-        return t
+        
+        # Convert to uppercase and strip whitespace
+        text = text.upper().strip()
+        
+        # Remove common OCR artifacts but preserve spaces
+        # Remove special characters except spaces
+        cleaned = re.sub(r'[^\w\s]', '', text)
+        
+        # Fix common OCR confusions for license plates
+        replacements = {
+            '0': 'O',  # Replace 0 with O (common in plates like CZ17)
+            '1': 'I',  # Replace 1 with I
+            '8': 'B',  # Replace 8 with B
+            '5': 'S',  # Replace 5 with S
+            '2': 'Z',  # Replace 2 with Z
+        }
+        
+        # Only replace if it makes sense in context (for letters)
+        for old, new in replacements.items():
+            # Be more conservative - only replace if it's likely a letter position
+            if old in cleaned:
+                # Check if this character is likely in a letter position
+                # This is a heuristic - in practice, we might need more sophisticated logic
+                pass  # Skip automatic replacement for now
+        
+        # Normalize multiple spaces to single space
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        
+        # Remove leading/trailing spaces again
+        cleaned = cleaned.strip()
+        
+        # Ensure we have a reasonable length for license plates
+        if len(cleaned) < 4:
+            return ""
+        
+        return cleaned
 
     def _is_recent_plate(self, plate_text: str) -> bool:
         now = time.time()
@@ -1402,30 +1604,280 @@ class WebcamProcessor:
 
                 crop = frame[y1:y2, x1:x2]
                 regions = self._detect_license_plate_regions(crop)
+                
+                # Try each detected region with different OCR approaches
+                best_plate_text = ""
+                best_confidence = 0.0
+                best_bbox = None
+                
                 for (px1, py1, px2, py2) in regions:
                     plate_crop = crop[int(py1):int(py2), int(px1):int(px2)]
                     if plate_crop is None or plate_crop.size == 0:
                         continue
 
-                    raw = self._run_ocr_on_crop(plate_crop, confidence_threshold=0.25, is_plate=True)
-                    norm = self._normalize_plate_text(raw)
-                    if len(norm) < 6:
-                        continue
+                    # Try multiple OCR approaches with different confidence thresholds
+                    ocr_attempts = [
+                        (0.15, "low"),    # Very permissive
+                        (0.25, "medium"), # Original threshold
+                        (0.35, "high"),   # Strict
+                    ]
+                    
+                    for conf_thresh, desc in ocr_attempts:
+                        raw = self._run_ocr_on_crop(plate_crop, confidence_threshold=conf_thresh, is_plate=True)
+                        norm = self._normalize_plate_text(raw)
+                        
+                        # More lenient length check - allow 4+ characters
+                        if len(norm.replace(" ", "")) < 4:
+                            continue
+                        
+                        # Validate that this looks like a license plate
+                        if self._is_valid_license_plate_text(norm):
+                            # Use a simple confidence estimation based on text characteristics
+                            estimated_conf = self._estimate_plate_confidence(norm, raw)
+                            
+                            if estimated_conf > best_confidence and len(norm) > len(best_plate_text):
+                                best_plate_text = norm
+                                best_confidence = estimated_conf
+                                best_bbox = (x1 + int(px1), y1 + int(py1), x1 + int(px2), y1 + int(py2))
+                                
+                                print(f"[DEBUG] Better plate found: '{norm}' (conf: {estimated_conf:.2f}, method: {desc})")
 
-                    if self._is_recent_plate(norm):
-                        continue
-
-                    self._mark_plate_seen(norm)
+                # If we found a good plate, add it to results
+                if best_plate_text and not self._is_recent_plate(best_plate_text):
+                    self._mark_plate_seen(best_plate_text)
                     plates_out.append({
-                        'text': norm,
+                        'text': best_plate_text,
+                        'confidence': best_confidence,
                         'vehicle_object_id': v.get('object_id'),
                         'vehicle_class': v.get('class_name'),
-                        'bounding_box': (x1 + int(px1), y1 + int(py1), x1 + int(px2), y1 + int(py2)),
+                        'bounding_box': best_bbox,
                     })
 
             return plates_out
-        except Exception:
+        except Exception as e:
+            print(f"[DEBUG] License plate detection failed: {e}")
             return []
+    
+    def _is_valid_license_plate_text(self, text: str) -> bool:
+        """Check if text looks like a valid license plate with stricter validation."""
+        if not text or len(text.strip()) < 4:
+            return False
+        
+        # Remove spaces for validation but keep them for display
+        clean_text = text.replace(" ", "").upper()
+        
+        # Must contain at least one letter and one number
+        has_letters = any(c.isalpha() for c in clean_text)
+        has_numbers = any(c.isdigit() for c in clean_text)
+        
+        if not (has_letters and has_numbers):
+            return False
+        
+        # Reasonable length for license plates (4-10 characters)
+        if len(clean_text) < 4 or len(clean_text) > 10:
+            return False
+        
+        # Should be mostly alphanumeric
+        alnum_ratio = sum(c.isalnum() for c in clean_text) / len(clean_text)
+        if alnum_ratio < 0.8:
+            return False
+        
+        # NEW: Reject common grill/emblem text patterns that look like plates
+        # These are typical patterns found in car grills that get misdetected
+        grill_patterns = [
+            r'^[A-Z]+\d+[A-Z]+\d+$',  # Pattern like JA5E555 (alternating letters and numbers)
+        ]
+        
+        # Only reject if it's a very short alternating pattern (likely a model badge)
+        # Valid plates like IM4U555 should pass
+        is_alternating = False
+        if len(clean_text) <= 6:
+            alternating_count = 0
+            for i in range(len(clean_text) - 1):
+                if (clean_text[i].isalpha() and clean_text[i+1].isdigit()) or \
+                   (clean_text[i].isdigit() and clean_text[i+1].isalpha()):
+                    alternating_count += 1
+            # If most characters alternate and it's short, likely a grill badge
+            if alternating_count >= len(clean_text) * 0.7:
+                is_alternating = True
+        
+        if is_alternating:
+            print(f"[DEBUG] Rejected grill-like alternating pattern: {clean_text}")
+            return False
+        
+        # NEW: Prefer more realistic license plate formats
+        # Valid formats typically have better letter-number distribution
+        if not self._has_realistic_plate_format(clean_text):
+            print(f"[DEBUG] Rejected unrealistic plate format: {clean_text}")
+            return False
+        
+        return True
+    
+    def _has_grill_like_pattern(self, text: str) -> bool:
+        """Check if text has a pattern typical of grill/emblem text."""
+        # Pattern 1: Alternating letters and numbers (like JA5E555)
+        if len(text) >= 6:
+            alternating_count = 0
+            for i in range(len(text) - 1):
+                if (text[i].isalpha() and text[i+1].isdigit()) or (text[i].isdigit() and text[i+1].isalpha()):
+                    alternating_count += 1
+            
+            # If most transitions are alternating, it's likely grill text
+            if alternating_count >= len(text) * 0.6:
+                return True
+        
+        # Pattern 2: Repeated characters (common in emblems)
+        if any(text.count(char) >= 2 for char in set(text)):
+            # Check if repeated characters are in suspicious positions
+            for char in set(text):
+                if text.count(char) >= 2:
+                    indices = [i for i, c in enumerate(text) if c == char]
+                    # If same character appears in alternating pattern
+                    if len(indices) >= 2 and indices[1] - indices[0] == 2:
+                        return True
+        
+        return False
+    
+    def _has_realistic_plate_format(self, text: str) -> bool:
+        """Check if text follows realistic license plate format patterns."""
+        # Pattern 1: Letters (2-4) + Numbers (1-4) - most common
+        if re.match(r'^[A-Z]{2,4}\d{1,4}$', text):
+            return True
+        
+        # Pattern 2: Numbers (1-4) + Letters (2-4)
+        if re.match(r'^\d{1,4}[A-Z]{2,4}$', text):
+            return True
+        
+        # Pattern 3: Letters (2) + Numbers (2) + Letters (2) + Numbers (4) - Indian format
+        if re.match(r'^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$', text):
+            return True
+        
+        # Pattern 4: Letters (2-3) + Space + Numbers (1-4)
+        if re.match(r'^[A-Z]{2,3}\s\d{1,4}$', text):
+            return True
+        
+        # Pattern 5: Numbers (1-2) + Space + Letters (2-3) + Numbers (1-4)
+        if re.match(r'^\d{1,2}\s[A-Z]{2,3}\d{1,4}$', text):
+            return True
+        
+        # Pattern 6: Letters (2-4) + Numbers (2-4) + Letters (2-3) - European format
+        if re.match(r'^[A-Z]{2,4}\d{2,4}[A-Z]{2,3}$', text):
+            return True
+        
+        # Pattern 7: Numbers (2-3) + Letters (2-3) + Numbers (2-3) - Some European formats
+        if re.match(r'^\d{2,3}[A-Z]{2,3}\d{2,3}$', text):
+            return True
+        
+        # Pattern 8: Letters (3-6) + Numbers (1-4) - Many international formats
+        if re.match(r'^[A-Z]{3,6}\d{1,4}$', text):
+            return True
+        
+        # Pattern 9: Numbers (1-4) + Letters (3-6) - Some international formats
+        if re.match(r'^\d{1,4}[A-Z]{3,6}$', text):
+            return True
+        
+        # NEW Pattern 10: Mixed alphanumeric (4-8 chars) like IM4U555, B2228HM
+        # Allows letters and numbers mixed together (common in many countries)
+        if re.match(r'^[A-Z0-9]{4,8}$', text):
+            # Must have at least 2 letters and 2 numbers
+            letters = sum(c.isalpha() for c in text)
+            numbers = sum(c.isdigit() for c in text)
+            if letters >= 2 and numbers >= 2:
+                return True
+        
+        # NEW Pattern 11: Letters-Numbers-Letters-Numbers format like IM4U555
+        # Pattern: 2-4 letters, 1-4 numbers, 0-3 letters, 0-4 numbers
+        if re.match(r'^[A-Z]{2,4}\d{1,4}[A-Z]{0,3}\d{0,4}$', text):
+            # Must have at least one number section and reasonable total length
+            if len(text) >= 5 and len(text) <= 10:
+                return True
+        
+        # NEW Pattern 12: Bulgarian format - 1-2 letters + 4 numbers + 2 letters like B2228HM
+        if re.match(r'^[A-Z]{1,2}\d{4}[A-Z]{2}$', text):
+            return True
+        
+        # NEW Pattern 13: Malaysian/Singapore format like IM4U555 (letters with embedded numbers)
+        if re.match(r'^[A-Z]{1,3}\d{1,2}[A-Z]{1,3}\d{1,4}$', text):
+            return True
+        
+        # If none of the realistic patterns match, be more suspicious
+        return False
+    
+    def _estimate_plate_confidence(self, normalized_text: str, raw_text: str) -> float:
+        """Estimate confidence in the detected license plate text with improved validation."""
+        if not normalized_text:
+            return 0.0
+        
+        confidence = 0.5  # Base confidence
+        
+        # Bonus for reasonable length
+        clean_len = len(normalized_text.replace(" ", ""))
+        if 6 <= clean_len <= 8:
+            confidence += 0.1
+        
+        # Bonus for having both letters and numbers
+        has_letters = any(c.isalpha() for c in normalized_text)
+        has_numbers = any(c.isdigit() for c in normalized_text)
+        if has_letters and has_numbers:
+            confidence += 0.1
+        
+        # Bonus for space in reasonable position (like "CZ17 KOD")
+        if " " in normalized_text:
+            parts = normalized_text.split()
+            if len(parts) == 2:
+                # Check if it follows pattern like "AB12 CDE" or "CZ17 KOD"
+                if (len(parts[0]) >= 2 and len(parts[1]) >= 2):
+                    confidence += 0.15
+        
+        # NEW: Higher confidence for realistic plate formats
+        if self._has_realistic_plate_format(normalized_text.replace(" ", "")):
+            confidence += 0.2
+        
+        # NEW: Penalty for grill-like patterns
+        if self._has_grill_like_pattern(normalized_text.replace(" ", "")):
+            confidence -= 0.3
+        
+        # NEW: Bonus for proper letter-number balance
+        letter_count = sum(c.isalpha() for c in normalized_text.replace(" ", ""))
+        number_count = sum(c.isdigit() for c in normalized_text.replace(" ", ""))
+        
+        if letter_count > 0 and number_count > 0:
+            ratio = max(letter_count, number_count) / min(letter_count, number_count)
+            # Prefer balanced letter-number ratios (not too skewed)
+            if ratio <= 3:
+                confidence += 0.1
+            elif ratio > 6:
+                confidence -= 0.2  # Penalty for very skewed ratios
+        
+        # NEW: Penalty for patterns that look like brand models
+        if self._looks_like_brand_model(normalized_text):
+            confidence -= 0.4
+        
+        # Ensure confidence stays within bounds
+        return max(0.1, min(0.95, confidence))
+    
+    def _looks_like_brand_model(self, text: str) -> bool:
+        """Check if text looks like a car brand/model rather than a license plate."""
+        text = text.upper().replace(" ", "")
+        
+        # Common brand model patterns that get confused with plates
+        brand_model_patterns = [
+            r'^[A-Z]{2,4}\d{2,4}$',  # Like JA55, BMW320, etc.
+            r'^\d{3,4}[A-Z]{1,3}$',  # Like 328I, 750LI
+        ]
+        
+        # Check if it matches brand model patterns
+        for pattern in brand_model_patterns:
+            if re.match(pattern, text):
+                # Additional heuristics to distinguish from actual plates
+                if self._has_grill_like_pattern(text):
+                    return True
+                
+                # If it's short and looks like a model code
+                if len(text) <= 5:
+                    return True
+        
+        return False
     
     def _detect_object_colors(self, frame: np.ndarray, objects: List[Dict]) -> List[Dict]:
         """Detect colors for detected objects using advanced color detection"""
@@ -1562,20 +2014,43 @@ class WebcamProcessor:
             cv2.putText(annotated, fps_text, 
                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            # Draw license plates (if found)
+            # Draw license plates (if found) - IMPROVED: Better formatting like image processing
             for plate in (result.get('license_plates', []) or [])[:5]:
                 bbox = plate.get('bounding_box')
                 if not bbox:
                     continue
                 x1, y1, x2, y2 = bbox
-                cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                
+                # Validate plate text
                 plate_text = (plate.get('text') or '').strip()
-                if plate_text:
-                    label = plate_text[:16]
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                    ly = max(20, int(y1) - 8)
-                    cv2.rectangle(annotated, (int(x1), ly - label_size[1] - 8), (int(x1) + label_size[0] + 8, ly + 4), (0, 0, 0), -1)
-                    cv2.putText(annotated, label, (int(x1) + 4, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
+                if not plate_text or len(plate_text) < 4:
+                    continue
+                
+                # Draw yellow box for license plates (matching image processing style)
+                cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 3)
+                
+                # Create enhanced label with "Plate: " prefix
+                label = f"Plate: {plate_text[:16]}"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.6
+                thickness = 2
+                
+                (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+                
+                # Position label above the plate
+                ly = int(y1) - 10
+                if ly - text_height - baseline < 0:
+                    ly = int(y2) + text_height + 10
+                
+                # Draw yellow background for label
+                cv2.rectangle(annotated, 
+                             (int(x1), ly - text_height - baseline), 
+                             (int(x1) + text_width + 8, ly + 4), 
+                             (0, 255, 255), -1)
+                
+                # Draw label text in black
+                cv2.putText(annotated, label, (int(x1) + 4, ly), 
+                           font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
 
             # Draw objects with multi-level fallback color information
             objects = result.get('objects', [])
@@ -1799,20 +2274,43 @@ class WebcamProcessor:
                     cv2.putText(annotated, label, 
                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             
-            # Draw license plates (only if any)
+            # Draw license plates (only if any) - IMPROVED: Better formatting with yellow box
             plates = result.get('license_plates', [])
             if plates and len(plates) > 0:
                 for i, plate in enumerate(plates[:3]):  # Max 3 plates
                     if 'bounding_box' in plate and plate['bounding_box']:
                         x1, y1, x2, y2 = plate['bounding_box']
                         
-                        # Green box for license plates
-                        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                        # Get plate text with validation
+                        plate_text = plate.get('plate_text', plate.get('text', 'Unknown')).strip()
+                        if not plate_text or len(plate_text) < 4:
+                            continue
                         
-                        # Add plate text
-                        plate_text = plate.get('plate_text', 'Unknown')
-                        cv2.putText(annotated, f"📗 {plate_text}", 
-                                   (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                        # Yellow box for license plates (matching image style)
+                        cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)
+                        
+                        # Add plate text with "Plate: " prefix
+                        label = f"Plate: {plate_text[:16]}"
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        font_scale = 0.6
+                        thickness = 2
+                        
+                        (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+                        
+                        # Position label above the plate
+                        ly = y1 - 10
+                        if ly - text_height - baseline < 0:
+                            ly = y2 + text_height + 10
+                        
+                        # Draw yellow background for label
+                        cv2.rectangle(annotated, 
+                                     (x1, ly - text_height - baseline), 
+                                     (x1 + text_width + 8, ly + 4), 
+                                     (0, 255, 255), -1)
+                        
+                        # Draw label text in black
+                        cv2.putText(annotated, label, (x1 + 4, ly), 
+                                   font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             
             # Simple stats display
             stats_y = 90
@@ -1906,19 +2404,42 @@ class WebcamProcessor:
                     cv2.putText(annotated, label, 
                                (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
             
-            # Draw license plates
+            # Draw license plates - IMPROVED: Better formatting with yellow box
             plates = result.get('license_plates', [])
             for i, plate in enumerate(plates):
                 if 'bounding_box' in plate and plate['bounding_box']:
                     x1, y1, x2, y2 = plate['bounding_box']
                     
-                    # Green box for license plates
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                    # Get plate text with validation
+                    plate_text = plate.get('plate_text', plate.get('text', 'Unknown')).strip()
+                    if not plate_text or len(plate_text) < 4:
+                        continue
                     
-                    # Add plate text
-                    plate_text = plate.get('plate_text', 'Unknown')
-                    cv2.putText(annotated, f"Plate: {plate_text}", 
-                               (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    # Yellow box for license plates (matching image style)
+                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)
+                    
+                    # Add plate text with "Plate: " prefix
+                    label = f"Plate: {plate_text[:20]}"
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.6
+                    thickness = 2
+                    
+                    (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+                    
+                    # Position label above the plate
+                    ly = y1 - 10
+                    if ly - text_height - baseline < 0:
+                        ly = y2 + text_height + 10
+                    
+                    # Draw yellow background for label
+                    cv2.rectangle(annotated, 
+                                 (x1, ly - text_height - baseline), 
+                                 (x1 + text_width + 8, ly + 4), 
+                                 (0, 255, 255), -1)
+                    
+                    # Draw label text in black
+                    cv2.putText(annotated, label, (x1 + 4, ly), 
+                               font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             
             # Add detection statistics
             stats_y = 90

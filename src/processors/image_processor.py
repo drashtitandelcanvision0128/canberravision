@@ -135,6 +135,9 @@ class ImageProcessor(BaseImageProcessor):
         """
         annotated = image.copy()
         
+        # Get license plates from text results
+        license_plates = text_results.get('license_plates', []) if text_results else []
+        
         # Draw object detections
         for detection in detections:
             bbox = detection['bbox']
@@ -147,31 +150,66 @@ class ImageProcessor(BaseImageProcessor):
             # Draw bounding box
             cv2.rectangle(annotated, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
             
-            # Draw label
-            if self.show_labels:
-                label = f"{class_name}"
-                if self.show_confidence:
-                    label += f" {confidence:.2f}"
-                
-                # Calculate text position
-                text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                text_x = bbox[0]
-                text_y = bbox[1] - 10 if bbox[1] > 30 else bbox[1] + text_size[1] + 10
-                
-                # Draw background for text
-                cv2.rectangle(annotated, 
-                            (text_x, text_y - text_size[1] - 5),
-                            (text_x + text_size[0], text_y + 5),
-                            color, -1)
-                
-                # Draw text
-                cv2.putText(annotated, label, (text_x, text_y),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            # Build label with color and license plate
+            label_parts = [class_name]
+            
+            # Add color if available
+            if color_results and 'object_colors' in color_results:
+                obj_color = color_results['object_colors'].get(class_name, {}).get('color', '')
+                if obj_color:
+                    label_parts.append(obj_color)
+            
+            # Add license plate for vehicles
+            if class_name.lower() in ['car', 'truck', 'bus', 'motorcycle', 'van']:
+                # Look for license plates that might belong to this vehicle
+                for plate in license_plates:
+                    plate_text = plate.get('text', '')
+                    if plate_text:
+                        label_parts.append(f"🚗 {plate_text}")
+                        break  # Only show first plate
+            
+            # Add confidence
+            if self.show_confidence:
+                label_parts.append(f"{confidence:.2f}")
+            
+            # Join label parts
+            label = " | ".join(label_parts) if len(label_parts) > 1 else label_parts[0]
+            
+            # Calculate text position
+            text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+            text_x = bbox[0]
+            text_y = bbox[1] - 10 if bbox[1] > 30 else bbox[1] + text_size[1] + 10
+            
+            # Draw background for text
+            cv2.rectangle(annotated, 
+                        (text_x, text_y - text_size[1] - 5),
+                        (text_x + text_size[0], text_y + 5),
+                        color, -1)
+            
+            # Draw text
+            cv2.putText(annotated, label, (text_x, text_y),
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         
-        # Add text annotations
-        if text_results and text_results.get('general_text'):
+        # Add license plate summary at the top
+        if license_plates:
             y_offset = 30
-            for text_item in text_results['general_text'][:5]:  # Show top 5
+            cv2.putText(annotated, "License Plates Detected:", (10, y_offset),
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            y_offset += 25
+            
+            for plate in license_plates[:3]:  # Show top 3 plates
+                plate_text = plate.get('text', '')
+                plate_conf = plate.get('confidence', 0.0)
+                plate_label = f"🚗 {plate_text} ({plate_conf:.2f})"
+                
+                cv2.putText(annotated, plate_label, (10, y_offset),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                y_offset += 20
+        
+        # Add text annotations for general text
+        if text_results and text_results.get('general_text'):
+            y_offset = max(y_offset, 30) if 'y_offset' in locals() else 30
+            for text_item in text_results['general_text'][:3]:  # Show top 3
                 text = text_item['text']
                 confidence = text_item['confidence']
                 method = text_item['method']
@@ -198,24 +236,6 @@ class ImageProcessor(BaseImageProcessor):
                 y_offset += 25
                 if y_offset > annotated.shape[0] - 50:
                     break
-        
-        # Add color annotations
-        if color_results and color_results.get('dominant_colors'):
-            color_x = annotated.shape[1] - 200
-            color_y = 30
-            
-            cv2.putText(annotated, "Colors:", (color_x, color_y),
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            color_y += 20
-            
-            for i, color_info in enumerate(color_results['dominant_colors'][:5]):
-                color_name = color_info['color']
-                percentage = color_info['percentage']
-                color_label = f"{color_name} ({percentage:.0f}%)"
-                
-                cv2.putText(annotated, color_label, (color_x, color_y),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                color_y += 15
         
         # Convert to PIL Image
         annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)

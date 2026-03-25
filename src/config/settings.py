@@ -31,7 +31,7 @@ YOLO_CONFIG = {
     "available_models": ["yolo26n", "yolo26s", "yolo26m"],
     "default_model": "yolo26n",
     "model_extensions": [".pt"],
-    "confidence_threshold": 0.25,
+    "confidence_threshold": 0.4,
     "iou_threshold": 0.5,
     "image_sizes": [320, 640, 1024],
     "default_image_size": 640

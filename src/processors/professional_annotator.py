@@ -202,8 +202,8 @@ class ProfessionalAnnotator:
         
         # Get label size
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        thickness = 1
+        font_scale = 2.5  # SUPER BIG for video visibility
+        thickness = 4
         (label_width, label_height), baseline = cv2.getTextSize(label_text, font, font_scale, thickness)
         
         # Calculate optimal label position
@@ -232,7 +232,7 @@ class ProfessionalAnnotator:
         # Draw border
         cv2.rectangle(annotated, (bg_x1, bg_y1), (bg_x2, bg_y2), color, 1)
         
-        # Draw text with shadow effect
+        # Draw text with shadow effect - BIGGER FONT
         shadow_color = (0, 0, 0)
         cv2.putText(annotated, label_text, (label_x + 1, label_y + 1), 
                    font, font_scale, shadow_color, thickness + 1)
@@ -261,10 +261,10 @@ class ProfessionalAnnotator:
         """
         annotated = image.copy()
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
-        thickness = 1
-        line_height = 20
-        padding = 10
+        font_scale = 1.0  # BIGGER for info panel
+        thickness = 2
+        line_height = 35  # Increased for bigger text
+        padding = 15
         
         # Calculate panel size
         max_line_width = 0

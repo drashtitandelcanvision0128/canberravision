@@ -2006,13 +2006,13 @@ class WebcamProcessor:
             timestamp = result.get('timestamp', datetime.now().isoformat())
             time_str = timestamp.split('T')[1][:8]
             
-            cv2.putText(annotated, f"⚡ MAX SPEED + FALLBACK - {time_str}", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(annotated, f"MAX SPEED + FALLBACK - {time_str}", 
+                       (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
             
-            # FPS counter
-            fps_text = f"🔥 {self.stats['fps']:.0f} FPS"
+            # FPS counter - SUPER BIG
+            fps_text = f"{self.stats['fps']:.0f} FPS"
             cv2.putText(annotated, fps_text, 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                       (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 5)
             
             # Draw license plates (if found) - IMPROVED: Better formatting like image processing
             for plate in (result.get('license_plates', []) or [])[:5]:
@@ -2029,11 +2029,11 @@ class WebcamProcessor:
                 # Draw yellow box for license plates (matching image processing style)
                 cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 255), 3)
                 
-                # Create enhanced label with "Plate: " prefix
+                # Create enhanced label with "Plate: " prefix - SUPER BIG FONT
                 label = f"Plate: {plate_text[:16]}"
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 0.6
-                thickness = 2
+                font_scale = 2.5  # SUPER BIG
+                thickness = 5
                 
                 (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
                 
@@ -2102,41 +2102,41 @@ class WebcamProcessor:
                     else:
                         label = f"{display_name[:15]} {method_indicator}"
                     
-                    # Fast label background and text
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 2)[0]
-                    cv2.rectangle(annotated, (x1, y1 - 20), (x1 + label_size[0], y1), box_color, -1)
+                    # Fast label background and text - SUPER BIG FONT
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 5)[0]
+                    cv2.rectangle(annotated, (x1, y1 - 55), (x1 + label_size[0], y1), box_color, -1)
                     cv2.putText(annotated, label, 
-                               (x1, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 2)
+                               (x1, y1 - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0), 5)
 
-                    # OCR text (if available)
+                    # OCR text (if available) - SUPER BIG
                     ocr_item = ocr_by_object.get(obj.get('object_id'))
                     if ocr_item:
                         ocr_text = (ocr_item.get('text') or '').strip()
                         if ocr_text:
                             ocr_text = ocr_text[:28]
-                            ocr_size = cv2.getTextSize(ocr_text, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0]
-                            oy = y2 + 18
+                            ocr_size = cv2.getTextSize(ocr_text, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)[0]
+                            oy = y2 + 45
                             if oy + 8 > annotated.shape[0]:
-                                oy = max(20, y1 - 26)
-                            cv2.rectangle(annotated, (x1, oy - 16), (x1 + ocr_size[0] + 6, oy + 4), (0, 0, 0), -1)
-                            cv2.putText(annotated, ocr_text, (x1 + 3, oy), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1, cv2.LINE_AA)
+                                oy = max(20, y1 - 55)
+                            cv2.rectangle(annotated, (x1, oy - 30), (x1 + ocr_size[0] + 10, oy + 6), (0, 0, 0), -1)
+                            cv2.putText(annotated, ocr_text, (x1 + 5, oy), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 255, 255), 4, cv2.LINE_AA)
             
-            # Enhanced stats with fallback information
-            obj_text = f"🎯 Objects: {len(objects)}"
+            # Enhanced stats with fallback information - SUPER BIG FONT
+            obj_text = f"Objects: {len(objects)}"
             cv2.putText(annotated, obj_text, 
-                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                       (10, 300), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
 
             lp_count = len(result.get('license_plates', []) or [])
             if lp_count:
-                lp_text = f"🚗 Plates: {lp_count} (unique: {len(self.stats['unique_plates'])})"
-                cv2.putText(annotated, lp_text, (10, 195), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                lp_text = f"Plates: {lp_count} (unique: {len(self.stats['unique_plates'])})"
+                cv2.putText(annotated, lp_text, (10, 550), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 255, 0), 4)
 
             if self.enable_ocr:
-                ocr_text = f"🔤 OCR: {len(ocr_results)} (unique: {len(self.stats['unique_texts'])})"
+                ocr_text = f"OCR: {len(ocr_results)} (unique: {len(self.stats['unique_texts'])})"
                 cv2.putText(annotated, ocr_text,
-                           (10, 165), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                           (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 255, 255), 4)
             
-            # Add color detection stats with fallback breakdown
+            # Add color detection stats with fallback breakdown - SUPER BIG
             color_summary = result.get('color_processing_summary', {})
             if color_summary:
                 total_processed = color_summary.get('total_objects', 0)
@@ -2145,28 +2145,28 @@ class WebcamProcessor:
                 simple_count = color_summary.get('simple_processed', 0)
                 success_rate = color_summary.get('success_rate', 0)
                 
-                color_text = f"🛡️ Colors: {total_processed} (✨{enhanced_count} 🔄{fallback_count} 🔧{simple_count})"
+                color_text = f"Colors: {total_processed} ({enhanced_count} enhanced)"
                 cv2.putText(annotated, color_text, 
-                           (10, 115), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+                           (10, 380), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 255), 4)
                 
                 # Success rate
-                success_text = f"📊 Success: {success_rate:.1%}"
+                success_text = f"Success: {success_rate:.1%}"
                 cv2.putText(annotated, success_text, 
-                           (10, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                           (10, 650), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 255, 0), 4)
             
-            # Fallback system status
+            # Fallback system status - SUPER BIG
             if self.fallback_detector:
                 fallback_status = get_fallback_status()
                 current_level = fallback_status.get('current_level', 0)
                 if current_level >= 1:
-                    method_text = "🚀 GPU + ResNet-18 + K-means + Fallback | ROBUST"
+                    method_text = "GPU + ResNet-18 + K-means + Fallback"
                 else:
-                    method_text = "🚀 GPU + K-means + Fallback | ROBUST"
+                    method_text = "GPU + K-means + Fallback"
             else:
-                method_text = "🚀 GPU + Basic Detection | FALLBACK"
+                method_text = "GPU + Basic Detection | FALLBACK"
             
             cv2.putText(annotated, method_text, 
-                       (10, annotated.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                       (10, annotated.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
             
             return annotated
             
@@ -2184,13 +2184,13 @@ class WebcamProcessor:
             gpu_enabled = result.get('frame_info', {}).get('gpu_enabled', False)
             gpu_status = "🚀 GPU" if gpu_enabled else "💻 CPU"
             
-            cv2.putText(annotated, f"⚡ YOLO26 ULTRA FAST - {time_str}", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(annotated, f"YOLO26 ULTRA FAST - {time_str}", 
+                       (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
             
-            # Add FPS and GPU status
-            fps_text = f"🔥 {self.stats['fps']:.1f} FPS | {gpu_status}"
+            # Add FPS and GPU status - SUPER BIG
+            fps_text = f"{self.stats['fps']:.1f} FPS | {gpu_status}"
             cv2.putText(annotated, fps_text, 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                       (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 5)
             
             # Draw objects with minimal processing
             objects = result.get('objects', [])
@@ -2209,22 +2209,22 @@ class WebcamProcessor:
                     # Simple label (no confidence for speed)
                     label = display_name
                     
-                    # Fast label drawing
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                    cv2.rectangle(annotated, (x1, y1 - 22), (x1 + label_size[0], y1), box_color, -1)
+                    # Fast label drawing - SUPER BIG FONT
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 5)[0]
+                    cv2.rectangle(annotated, (x1, y1 - 55), (x1 + label_size[0], y1), box_color, -1)
                     cv2.putText(annotated, label, 
-                               (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                               (x1, y1 - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0), 5)
             
-            # Minimal stats
-            stats_y = 90
-            obj_text = f"🎯 Objects: {len(objects)}"
+            # Minimal stats - SUPER BIG FONT
+            stats_y = 300
+            obj_text = f"Objects: {len(objects)}"
             cv2.putText(annotated, obj_text, 
-                       (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                       (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
             
-            # Performance indicator
-            perf_text = f"⚡ {mode.upper()} | Smooth Mode"
+            # Performance indicator - SUPER BIG
+            perf_text = f"{mode.upper()} | Smooth Mode"
             cv2.putText(annotated, perf_text, 
-                       (10, annotated.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                       (10, annotated.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
             
             return annotated
             
@@ -2238,13 +2238,13 @@ class WebcamProcessor:
             # Add timestamp and FPS
             timestamp = result.get('timestamp', datetime.now().isoformat())
             time_str = timestamp.split('T')[1][:8]  # HH:MM:SS
-            cv2.putText(annotated, f"🚀 YOLO26 FAST Live - {time_str}", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.putText(annotated, f"YOLO26 FAST Live - {time_str}", 
+                       (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
             
-            # Add FPS
-            fps_text = f"FPS: {self.stats['fps']:.1f} ⚡"
+            # Add FPS - SUPER BIG
+            fps_text = f"FPS: {self.stats['fps']:.1f}"
             cv2.putText(annotated, fps_text, 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                       (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 5)
             
             # Draw detected objects quickly
             objects = result.get('objects', [])
@@ -2266,15 +2266,15 @@ class WebcamProcessor:
                     if category != 'Unknown' and category != class_name:
                         label = f"{display_name}"
                     
-                    # Draw label background
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                    cv2.rectangle(annotated, (x1, y1 - 25), (x1 + label_size[0], y1), box_color, -1)
+                    # Draw label background - SUPER BIG FONT
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 5)[0]
+                    cv2.rectangle(annotated, (x1, y1 - 55), (x1 + label_size[0], y1), box_color, -1)
                     
-                    # Draw label text
+                    # Draw label text - SUPER BIG
                     cv2.putText(annotated, label, 
-                               (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                               (x1, y1 - 20), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (0, 0, 0), 5)
             
-            # Draw license plates (only if any) - IMPROVED: Better formatting with yellow box
+            # Draw license plates (only if any) - IMPROVED: Better formatting with yellow box and SUPER BIG FONT
             plates = result.get('license_plates', [])
             if plates and len(plates) > 0:
                 for i, plate in enumerate(plates[:3]):  # Max 3 plates
@@ -2289,46 +2289,46 @@ class WebcamProcessor:
                         # Yellow box for license plates (matching image style)
                         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)
                         
-                        # Add plate text with "Plate: " prefix
+                        # Add plate text with "Plate: " prefix - SUPER BIG FONT
                         label = f"Plate: {plate_text[:16]}"
                         font = cv2.FONT_HERSHEY_SIMPLEX
-                        font_scale = 0.6
-                        thickness = 2
+                        font_scale = 2.5  # SUPER BIG
+                        thickness = 5
                         
                         (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
                         
                         # Position label above the plate
-                        ly = y1 - 10
+                        ly = y1 - 25
                         if ly - text_height - baseline < 0:
-                            ly = y2 + text_height + 10
+                            ly = y2 + text_height + 25
                         
                         # Draw yellow background for label
                         cv2.rectangle(annotated, 
                                      (x1, ly - text_height - baseline), 
-                                     (x1 + text_width + 8, ly + 4), 
+                                     (x1 + text_width + 20, ly + 10), 
                                      (0, 255, 255), -1)
                         
-                        # Draw label text in black
-                        cv2.putText(annotated, label, (x1 + 4, ly), 
+                        # Draw label text in black - SUPER BIG
+                        cv2.putText(annotated, label, (x1 + 10, ly), 
                                    font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             
-            # Simple stats display
-            stats_y = 90
-            detection_text = f"🎯 Objects: {len(objects)}"
+            # Simple stats display - SUPER BIG FONT
+            stats_y = 300
+            detection_text = f"Objects: {len(objects)}"
             cv2.putText(annotated, detection_text, 
-                       (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                       (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
             
             if plates:
-                stats_y += 30
-                plate_text = f"📗 Plates: {len(plates)}"
+                stats_y += 80
+                plate_text = f"Plates: {len(plates)}"
                 cv2.putText(annotated, plate_text, 
-                           (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                           (10, stats_y), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
             
-            # Add performance indicator
+            # Add performance indicator - SUPER BIG
             mode = result.get('processing_mode', 'fast')
-            perf_text = f"⚡ {mode.upper()} | Smooth Mode"
+            perf_text = f"{mode.upper()} | Smooth Mode"
             cv2.putText(annotated, perf_text, 
-                       (10, annotated.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+                       (10, annotated.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
             
             return annotated
             

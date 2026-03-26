@@ -111,6 +111,16 @@ except ImportError as e:
     PARKING_DETECTION_AVAILABLE = False
     print(f"[WARNING] Parking detection system not available: {e}")
 
+# Import PPE (Personal Protective Equipment) detection system
+try:
+    from modules.ppe_detection import PPEDetector, get_ppe_detector, reset_ppe_detector
+    from src.processors.ppe_processor import PPEProcessor, get_ppe_processor
+    PPE_DETECTION_AVAILABLE = True
+    print("[INFO] PPE detection system loaded")
+except ImportError as e:
+    PPE_DETECTION_AVAILABLE = False
+    print(f"[WARNING] PPE detection system not available: {e}")
+
 # Import enhanced detection for challenging images
 try:
     from archive.enhanced_detection import enhanced_license_plate_detection
@@ -541,13 +551,13 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                     prefix = "💻"
                                 
                                 text_label = f"{prefix} {text} ({confidence:.2f}) [{device}]"
-                                (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                                (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
                                 
                                 # Background rectangle
                                 cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
                                 
                                 # Ensure text doesn't overlap
-                                (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                                (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
                                 
                                 # Check if text would go beyond frame height
                                 if y_offset + th > frame.shape[0] - 50:
@@ -556,7 +566,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                 
                                 # Background rectangle for better visibility
                                 cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
-                                cv2.putText(frame, text_label, (12, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+                                cv2.putText(frame, text_label, (12, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 2.0, color, 4, cv2.LINE_AA)
                                 
                                 y_offset += th + 10
                                 
@@ -566,17 +576,17 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                             
                             # Draw colors on frame
                             if frame_colors:
-                                color_x = frame.shape[1] - 150
-                                color_y = 30
-                                cv2.putText(frame, "Colors:", (color_x, color_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                                color_y += 20
+                                color_x = frame.shape[1] - 250
+                                color_y = 50
+                                cv2.putText(frame, "Colors:", (color_x, color_y), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                                color_y += 40
                                 
                                 for i, color_info in enumerate(frame_colors[:5]):
                                     color_name = color_info['color']
                                     percentage = color_info['percentage']
                                     color_label = f"{color_name} ({percentage:.0f}%)"
-                                    cv2.putText(frame, color_label, (color_x, color_y), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                                    color_y += 15
+                                    cv2.putText(frame, color_label, (color_x, color_y), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                                    color_y += 35
                             
                             print(f"[DEBUG] Frame {frame_idx}: Found {len(frame_all_text)} text items, {len(frame_colors)} colors")
                                     
@@ -1513,9 +1523,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
             else:
                 annotated = frame
             
-            # Add processing info
-            cv2.putText(annotated, "FAST MODE - PROFESSIONAL ANNOTATION", (10, 30), 
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            # Add processing info - SUPER BIG FONT
+            cv2.putText(annotated, "FAST MODE - PROFESSIONAL ANNOTATION", (10, 100), 
+                      cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
             
             return annotated
             
@@ -1545,14 +1555,14 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                     if plate_crop is not None and plate_crop.size > 0:
                         # Find where the plate was detected (we need the coordinates)
                         # For now, draw the text at the top of the image
-                        label = f"🚗 License Plate: {plate_text}"
-                        cv2.putText(annotated, label, (10, 90), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        label = f"License Plate: {plate_text}"
+                        cv2.putText(annotated, label, (10, 200), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
                         
-                        # Add info text
+                        # Add info text - SUPER BIG
                         info_text = "Direct license plate detection (no vehicle detected)"
-                        cv2.putText(annotated, info_text, (10, 120), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                        cv2.putText(annotated, info_text, (10, 300), 
+                                  cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
             except Exception as e:
                 print(f"[DEBUG] Direct license plate detection failed: {e}")
             
@@ -1758,28 +1768,28 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                 # Join all parts with clear separator
                 label = " | ".join(label_parts)
                 
-                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+                label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)[0]
                 
                 # Background for label
-                cv2.rectangle(annotated, (x1, y1 - label_size[1] - 10), 
+                cv2.rectangle(annotated, (x1, y1 - label_size[1] - 25), 
                             (x1 + label_size[0], y1), color, -1)
                 
-                # Text
-                cv2.putText(annotated, label, (x1, y1 - 5), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                # Text - SUPER BIG FONT
+                cv2.putText(annotated, label, (x1, y1 - 15), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
         
-        # Add processing info and detection summary
-        cv2.putText(annotated, "FAST MODE - GPU + LICENSE PLATE", (10, 30), 
-                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        # Add processing info and detection summary - SUPER BIG FONT
+        cv2.putText(annotated, "FAST MODE - GPU + LICENSE PLATE", (10, 100), 
+                  cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
         
-        # Add detection summary
+        # Add detection summary - SUPER BIG FONT
         summary = _get_detections_summary(boxes, names)
         if summary != "No objects detected":
             # Split summary into lines
             lines = summary.split('\n')
             for i, line in enumerate(lines[:2]):  # Show first 2 lines
-                cv2.putText(annotated, line[:50], (10, 60 + i*20), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                cv2.putText(annotated, line[:50], (10, 180 + i*80), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
         
         return annotated
         
@@ -6636,6 +6646,412 @@ def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n
         return frame, f"❌ **Error:** {str(e)}\n\nPlease check camera and try again."
 
 
+# ==================== PPE DETECTION FUNCTIONS ====================
+
+def _get_ppe_detector_safe(model_name="yolov8n", debug=False):
+    """
+    Safely get PPE detector with automatic fallback
+    NEVER returns None - always provides a working detector
+    """
+    try:
+        # Try to get the PPE detector with auto-recovery enabled
+        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True)
+        return detector, True
+    except Exception as e:
+        print(f"[PPE-WARNING] Failed to get PPE detector: {e}")
+        print("[PPE] Creating emergency detector...")
+        try:
+            # Create a fresh detector as emergency fallback
+            from modules.ppe_detection import PPEDetector
+            emergency_detector = PPEDetector(model_path=model_name, debug=debug, auto_recovery=True)
+            return emergency_detector, False
+        except Exception as e2:
+            print(f"[PPE-ERROR] Emergency detector also failed: {e2}")
+            return None, False
+
+
+def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True):
+    """
+    Process PPE detection on uploaded image
+    ALWAYS returns results - never fails
+    """
+    try:
+        if image is None:
+            return None, "📸 **Upload an image to start PPE detection**"
+        
+        print(f"[INFO] Starting PPE detection on image...")
+        
+        # Reset detector to ensure new settings are applied
+        from modules.ppe_detection import reset_ppe_detector
+        reset_ppe_detector()
+        
+        # Get PPE detector with fallback - ENABLE DEBUG to see details
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
+        
+        # Force enable debug mode on the detector
+        if detector:
+            detector.debug = True
+            print(f"[DEBUG] PPE Detector debug mode: {detector.debug}")
+        
+        if detector is None:
+            # Ultimate fallback - return original image with message
+            print("[PPE-CRITICAL] All PPE detection methods failed")
+            return image, "⚠️ **PPE Detection in Fallback Mode**\n\nSystem is running in limited mode. Please check model installation."
+        
+        # Convert PIL to numpy if needed
+        if isinstance(image, Image.Image):
+            image_np = np.array(image)
+            # Convert RGB to BGR for OpenCV
+            if len(image_np.shape) == 3 and image_np.shape[2] == 3:
+                image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+        else:
+            image_np = image
+        
+        # Perform detection with the robust detector - ENABLE DEBUG to see details
+        result = detector.detect(image_np, debug=True)
+        
+        # Create annotated image
+        annotated_image = detector.visualize(image_np, result, show_labels=show_labels, show_head_region=False)
+        
+        # Convert back to RGB for display
+        annotated_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
+        output_image = Image.fromarray(annotated_rgb)
+        
+        # Generate summary with system status
+        status_emoji = "✅" if result.model_loaded else "⚠️"
+        fallback_notice = "\n\n⚠️ **Note:** Using fallback detection mode" if result.fallback_used else ""
+        
+        summary_lines = [
+            f"## {status_emoji} PPE Detection Results",
+            "",
+            f"**System Status:**",
+            f"- Model Loaded: **{'Yes' if result.model_loaded else 'Fallback Mode'}**",
+            f"- Fallback Used: **{'Yes' if result.fallback_used else 'No'}**",
+            "",
+        ]
+        
+        # Count vehicle types to show relevant summary
+        two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
+        four_wheelers = sum(1 for p in result.persons if p.vehicle_type == "4-wheeler")
+        unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
+        
+        summary_lines.extend([
+            f"**Detection Summary:**",
+            f"- Total Persons: **{result.total_persons}**",
+            f"- 2-Wheelers: **{two_wheelers}**",
+            f"- 4-Wheelers: **{four_wheelers}**",
+            f"- Unknown: **{unknown_vehicles}**",
+            "",
+        ])
+        
+        # Show relevant PPE counts based on vehicle types detected
+        if two_wheelers > 0:
+            summary_lines.extend([
+                f"**2-Wheeler Safety:**",
+                f"- Helmets Detected: **{result.helmet_detected}**",
+                f"- No Helmets: **{result.no_helmet}**",
+                "",
+            ])
+        
+        if four_wheelers > 0:
+            summary_lines.extend([
+                f"**4-Wheeler Safety:**",
+                f"- Seatbelts Detected: **{result.seatbelt_detected}**",
+                f"- No Seatbelts: **{result.no_seatbelt}**",
+                "",
+            ])
+        
+        if unknown_vehicles > 0:
+            summary_lines.extend([
+                f"**Unknown Vehicle Safety:**",
+                f"- Any Safety Equipment: **{result.helmet_detected + result.seatbelt_detected}**",
+                "",
+            ])
+        
+        summary_lines.extend([
+            f"**Processing:**",
+            f"- Time: **{result.processing_time:.2f}s**",
+            "",
+            "**Person Details:**",
+        ])
+        
+        for person in result.persons:
+            # Determine emoji based on vehicle type and compliance
+            if person.vehicle_type == "2-wheeler":
+                status_emoji = "🟩" if person.helmet.present else "🟥"
+            elif person.vehicle_type == "4-wheeler":
+                status_emoji = "🟩" if person.seatbelt.present else "🟥"
+            else:
+                status_emoji = "🟩" if (person.helmet.present or person.seatbelt.present) else "🟥"
+            
+            summary_lines.append(f"\n**Person {person.person_id}** {status_emoji}")
+            summary_lines.append(f"  - Vehicle Type: **{person.vehicle_type.upper()}**")
+            
+            # Show only relevant PPE information based on vehicle type
+            if person.vehicle_type == "2-wheeler":
+                # Only show helmet for 2-wheelers
+                if person.helmet.present:
+                    summary_lines.append(f"  - 🪖 Helmet: **✅ Present** (conf: {person.helmet.confidence:.2f})")
+                else:
+                    summary_lines.append(f"  - 🪖 Helmet: **❌ Missing** (conf: {person.helmet.confidence:.2f})")
+                summary_lines.append(f"  - 🚗 Seatbelt: **Not Applicable (2-wheeler)**")
+            elif person.vehicle_type == "4-wheeler":
+                # Only show seatbelt for 4-wheelers
+                if person.seatbelt.present:
+                    summary_lines.append(f"  - 🚗 Seatbelt: **✅ Present** (conf: {person.seatbelt.confidence:.2f})")
+                else:
+                    summary_lines.append(f"  - 🚗 Seatbelt: **❌ Missing** (conf: {person.seatbelt.confidence:.2f})")
+                summary_lines.append(f"  - 🪖 Helmet: **Not Applicable (4-wheeler)**")
+            else:
+                # Unknown vehicle type - show both
+                if person.helmet.present:
+                    summary_lines.append(f"  - 🪖 Helmet: **✅ Present** (conf: {person.helmet.confidence:.2f})")
+                else:
+                    summary_lines.append(f"  - 🪖 Helmet: **❌ Missing** (conf: {person.helmet.confidence:.2f})")
+                
+                if person.seatbelt.present:
+                    summary_lines.append(f"  - 🚗 Seatbelt: **✅ Present** (conf: {person.seatbelt.confidence:.2f})")
+                else:
+                    summary_lines.append(f"  - 🚗 Seatbelt: **❌ Missing** (conf: {person.seatbelt.confidence:.2f})")
+            
+            # Show which one matters for compliance
+            if person.vehicle_type == "2-wheeler":
+                summary_lines.append(f"  - 🎯 **Compliance based on: HELMET**")
+            elif person.vehicle_type == "4-wheeler":
+                summary_lines.append(f"  - 🎯 **Compliance based on: SEATBELT**")
+            else:
+                summary_lines.append(f"  - 🎯 **Compliance based on: EITHER**")
+            
+            # Add detection methods
+            summary_lines.append(f"  - 🔍 Helmet Method: `{person.helmet.detection_method}`")
+            summary_lines.append(f"  - 🔍 Seatbelt Method: `{person.seatbelt.detection_method}`")
+            
+            if person.vest.present:
+                summary_lines.append(f"  - Vest: ✅ ({person.vest.confidence:.2f})")
+        
+        if result.error_message:
+            summary_lines.append(f"\n⚠️ **Warning:** {result.error_message}")
+        
+        summary_lines.append(fallback_notice)
+        
+        summary = "\n".join(summary_lines)
+        
+        print(f"[INFO] PPE detection completed: {result.total_persons} persons ({two_wheelers} 2-wheelers, {four_wheelers} 4-wheelers, {unknown_vehicles} unknown)")
+        if two_wheelers > 0:
+            print(f"[INFO] 2-Wheeler safety: {result.helmet_detected} helmets, {result.no_helmet} no helmets")
+        if four_wheelers > 0:
+            print(f"[INFO] 4-Wheeler safety: {result.seatbelt_detected} seatbelts, {result.no_seatbelt} no seatbelts")
+        
+        return output_image, summary
+        
+    except Exception as e:
+        print(f"[ERROR] PPE detection failed: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return original image with error info instead of failing
+        return image, f"⚠️ **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image."
+
+
+def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+    """Process PPE detection in uploaded video with fallback"""
+    try:
+        if video is None:
+            return None, None, "🎥 **Upload a video to start PPE detection**"
+        
+        video_path = _extract_video_path(video)
+        if not video_path or not os.path.exists(video_path):
+            return None, None, "❌ **Error:** Could not process video file"
+        
+        # Wait for file to be fully released by upload process
+        import time
+        max_wait = 5  # seconds
+        wait_interval = 0.5
+        waited = 0
+        while waited < max_wait:
+            try:
+                # Try to open file to check if it's accessible
+                with open(video_path, 'rb') as f:
+                    f.read(1)  # Try to read a byte
+                break  # File is accessible
+            except PermissionError:
+                print(f"[INFO] Waiting for video file to be released... ({waited}s)")
+                time.sleep(wait_interval)
+                waited += wait_interval
+        
+        print(f"[INFO] Starting PPE video processing: {video_path}")
+        
+        # Get PPE detector with fallback
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
+        
+        if detector is None:
+            return None, None, "⚠️ **PPE Detection Unavailable**\n\nSystem could not initialize PPE detector. Please check model files."
+        
+        # Open video
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return None, None, "❌ **Error:** Cannot open video file"
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        # Setup output
+        timestamp = int(time.time())
+        output_path = f"ppe_outputs/ppe_video_{timestamp}.mp4"
+        os.makedirs("ppe_outputs", exist_ok=True)
+        
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
+        
+        frame_count = 0
+        processed_count = 0
+        total_helmets = 0
+        total_no_helmets = 0
+        total_seatbelts = 0
+        total_no_seatbelts = 0
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            frame_count += 1
+            if frame_count % every_n != 0:
+                continue
+            
+            # Detect PPE
+            result = detector.detect(frame, debug=False)
+            total_helmets += result.helmet_detected
+            total_no_helmets += result.no_helmet
+            total_seatbelts += result.seatbelt_detected
+            total_no_seatbelts += result.no_seatbelt
+            
+            # Annotate
+            annotated = detector.visualize(frame, result, show_labels=show_labels)
+            out.write(annotated)
+            processed_count += 1
+        
+        cap.release()
+        out.release()
+        
+        # Priority-based summary
+        summary_md = f"""## 🦺 PPE Video Analysis Results
+
+**System Status:**
+- Model Loaded: **{'Yes' if result.model_loaded else 'Fallback Mode'}**
+- Fallback Used: **{'Yes' if result.fallback_used else 'No'}**
+
+**Priority-Based Detection Summary:**
+- Total Frames Processed: **{processed_count}**
+- 🪖 Helmets Detected: **{total_helmets}** (Priority: Highest)
+- 🚗 Seatbelts Detected: **{total_seatbelts}** (Only if no helmet in 4-wheeler)
+- ❌ No PPE: **{total_no_helmets + total_no_seatbelts}**
+
+**Video Info:**
+- Resolution: {width}x{height}
+- FPS: {fps:.1f}
+- Processed Every: {every_n} frames
+"""
+        
+        return output_path, output_path, summary_md
+        
+    except Exception as e:
+        print(f"[ERROR] PPE video processing failed: {e}")
+        return None, None, f"⚠️ **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again."
+
+
+def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+    """Process PPE detection in live webcam with fallback"""
+    try:
+        if frame is None:
+            return frame, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera at workers to start PPE detection."
+        
+        # Get PPE detector with fallback
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
+        
+        if detector is None:
+            # Return original frame with error overlay
+            error_frame = frame.copy()
+            cv2.putText(error_frame, "PPE: System Initializing...", (50, 50),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            return error_frame, "⚠️ **PPE Detector Initializing**\n\nPlease wait while the system loads..."
+        
+        # Convert RGB to BGR if needed (Gradio provides RGB)
+        if len(frame.shape) == 3 and frame.shape[2] == 3:
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        else:
+            frame_bgr = frame
+        
+        # Detect PPE
+        result = detector.detect(frame_bgr, debug=False)
+        
+        # Create annotated frame
+        annotated_frame = detector.visualize(frame_bgr, result, show_labels=show_labels)
+        
+        # Convert back to RGB for display
+        annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+        
+        # Generate info text
+        status_emoji = "✅" if result.model_loaded else "⚠️"
+        fallback_note = " (FB)" if result.fallback_used else ""
+        
+        two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
+        four_wheelers = sum(1 for p in result.persons if p.vehicle_type == "4-wheeler")
+        unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
+        
+        info_lines = [
+            f"{status_emoji} PPE Detection - Live{fallback_note}",
+            f"👥 Persons: {result.total_persons}",
+        ]
+        
+        # Show relevant PPE counts based on vehicle types detected
+        if two_wheelers > 0:
+            info_lines.append(f"🪖 Helmets: {result.helmet_detected}")
+        
+        if four_wheelers > 0:
+            info_lines.append(f"🚗 Seatbelts: {result.seatbelt_detected}")
+        
+        if unknown_vehicles > 0:
+            info_lines.append(f"⚡ Any Safety: {result.helmet_detected + result.seatbelt_detected}")
+        
+        info_lines.extend([
+            f"✅ Compliant: {sum(1 for p in result.persons if p.status == 'compliant')}",
+            f"❌ Violations: {sum(1 for p in result.persons if p.status == 'violation')}",
+            f"⏱️ Processing: {result.processing_time*1000:.1f}ms",
+        ])
+        
+        # Add person details with strict priority-based single label
+        for person in result.persons:
+            status = "✅" if person.status == 'compliant' else "❌"
+            vehicle = person.vehicle_type.upper()[:3] if person.vehicle_type != "unknown" else "???"
+            
+            # STRICT PRIORITY: Only ONE label - Helmet > Seatbelt > None
+            if person.helmet.present:
+                ppe_label = "HELMET"
+            elif person.seatbelt.present:
+                ppe_label = "SEATBELT"
+            else:
+                ppe_label = "NO PPE"
+            
+            info_lines.append(f"  P{person.person_id[1:]} [{vehicle}]: {status} [{ppe_label}]")
+        
+        if result.error_message:
+            info_lines.append(f"⚠️ {result.error_message[:50]}")
+        
+        info_text = "\n".join(info_lines)
+        
+        return annotated_rgb, info_text
+        
+    except Exception as e:
+        print(f"[ERROR] PPE webcam processing failed: {e}")
+        # Return original frame with error info
+        error_frame = frame.copy() if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(error_frame, f"PPE Error: {str(e)[:50]}", (50, 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+        return error_frame, f"⚠️ **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
+
+
 # Create the Gradio app with enhanced modern interface
 with gr.Blocks(
     title="YOLO26 AI Vision",
@@ -7053,6 +7469,108 @@ with gr.Blocks(
                 time_limit=30,
             )
 
+        # PPE Detection Tab - Similar structure to Parking Detection
+        with gr.TabItem("🦺 PPE Detection"):
+            gr.Markdown("### 🦺 PPE (Personal Protective Equipment) Detection System")
+            gr.Markdown("Detect safety equipment compliance on workers in images, videos, or live webcam feeds.")
+            
+            with gr.Tabs():
+                # Image Upload Tab
+                with gr.TabItem("📁 Image Upload"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            ppe_input = gr.Image(type="pil", label="📁 Upload Image")
+                            ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                                ppe_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                ppe_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+                            
+                            ppe_btn_img = gr.Button("🦺 Detect PPE", variant="primary")
+                            
+                        with gr.Column(scale=2):
+                            ppe_output_img = gr.Image(type="pil", label="🦺 PPE Analysis", height=400)
+                            ppe_summary_img = gr.Markdown("## 📸 Upload an image to start PPE detection")
+
+                # Video Upload Tab  
+                with gr.TabItem("🎥 Video Upload"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            ppe_video_input = gr.Video(label="🎥 Upload Video")
+                            ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                                ppe_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                ppe_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
+                                ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                            
+                            ppe_btn_vid = gr.Button("🦺 Analyze Video", variant="primary")
+                            
+                        with gr.Column(scale=2):
+                            ppe_video_output = gr.Video(label="🦺 Video Analysis", height=400)
+                            ppe_video_download = gr.File(label="📥 Download Processed Video", visible=False)
+                            ppe_summary_vid = gr.Markdown("## 🎥 Upload a video to start PPE detection")
+
+                # Live Webcam Tab
+                with gr.TabItem("📸 Live Webcam"):
+                    gr.Markdown("### 📸 Real-time PPE Detection with Webcam")
+                    
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("#### 🎛️ Control Panel")
+                            
+                            ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Settings", open=False):
+                                ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                                ppe_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                                ppe_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
+                                ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                            
+                            gr.Markdown("#### 📹 Webcam Feed")
+                            ppe_webcam_input = gr.Image(
+                                sources=["webcam"],
+                                type="numpy",
+                                label="📸 Live Camera",
+                                streaming=True,
+                                height=420,
+                            )
+                            
+                        with gr.Column(scale=2):
+                            gr.Markdown("#### 🎯 Live PPE Detection")
+                            ppe_webcam_output = gr.Image(type="numpy", label="🦺 Real-time Results", height=420)
+                            
+                            gr.Markdown("#### 📊 Live Statistics")
+                            ppe_webcam_info = gr.Textbox(
+                                label="Detection Info", 
+                                interactive=False, 
+                                lines=8, 
+                                value="📹 **Status:** Ready to start\n\n🦺 Point camera at workers for PPE detection!"
+                            )
+
+            # Connect all PPE components
+            ppe_btn_img.click(
+                process_ppe_detection,
+                inputs=[ppe_input, ppe_conf_img, ppe_model_img, ppe_labels_img, ppe_conf_show_img],
+                outputs=[ppe_output_img, ppe_summary_img],
+            )
+            
+            ppe_btn_vid.click(
+                process_ppe_video,
+                inputs=[ppe_video_input, ppe_conf_vid, ppe_model_vid, ppe_labels_vid, ppe_conf_show_vid, ppe_every_n_vid],
+                outputs=[ppe_video_output, ppe_video_download, ppe_summary_vid],
+            )
+            
+            ppe_webcam_input.stream(
+                process_ppe_webcam,
+                inputs=[ppe_webcam_input, ppe_conf_cam, ppe_model_cam, ppe_labels_cam, ppe_conf_show_cam, ppe_every_n_cam],
+                outputs=[ppe_webcam_output, ppe_webcam_info],
+                show_progress=False,
+                time_limit=30,
+            )
+
     # Modern footer with system information
     gr.Markdown(
         """
@@ -7078,7 +7596,7 @@ with gr.Blocks(
                 <div style="text-align: center;">
                     <div style="font-size: 24px; margin-bottom: 5px;">📊</div>
                     <div style="font-weight: 600; color: #0891b2;">Multi-Task</div>
-                    <div style="font-size: 14px; color: #6b7280;">Detection + OCR</div>
+                    <div style="font-size: 14px; color: #6b7280;">Detection + OCR + PPE</div>
                 </div>
             </div>
             <p style="margin: 20px 0 0 0; font-size: 14px; color: #6b7280;">

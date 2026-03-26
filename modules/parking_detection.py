@@ -16,6 +16,9 @@ import time
 import threading
 from collections import defaultdict
 
+# Import parking line detector for slot-based detection
+from modules.parking_line_detector import ParkingLineDetector, DetectedParkingSlot
+
 @dataclass
 class ParkingSpot:
     """Represents a single parking spot detection result"""
@@ -51,7 +54,10 @@ class ParkingDetector:
         self.device = self._get_device()
         self.detection_cache = {}
         self.last_detection_time = defaultdict(float)
-        self.processing_interval = self.config.get('detection_config', {}).get('processing_interval', 1)  # Changed from 30 to 1 for continuous display
+        self.processing_interval = self.config.get('detection_config', {}).get('processing_interval', 1)
+        
+        # Initialize parking line detector for dynamic slot detection
+        self.line_detector = ParkingLineDetector()
         
         # Performance metrics
         self.detection_times = []
@@ -101,8 +107,8 @@ class ParkingDetector:
             print(f"[ERROR] Failed to load model: {e}")
             raise
             
-    def detect_vehicles(self, frame: np.ndarray, confidence_threshold: float = 0.5) -> List[Dict]:
-        """Detect vehicles in frame using YOLO"""
+    def detect_vehicles(self, frame: np.ndarray, confidence_threshold: float = 0.3) -> List[Dict]:
+        """Detect vehicles in frame using YOLO - LOWER threshold for high recall"""
         if self.model is None:
             self.load_model()
             
@@ -110,7 +116,7 @@ class ParkingDetector:
             results = self.model(
                 frame, 
                 conf=confidence_threshold,
-                iou=0.45,
+                iou=0.3,  # Lower IOU for more detections
                 device=self.device,
                 verbose=False
             )
@@ -132,7 +138,9 @@ class ParkingDetector:
                                 'confidence': conf,
                                 'class': class_name
                             })
+                            print(f"[VEHICLE] Detected {class_name} at ({int(x1)},{int(y1)},{int(x2)},{int(y2)}) conf={conf:.2f}")
                             
+            print(f"[DETECT] Total vehicles found: {len(vehicles)}")
             return vehicles
             
         except Exception as e:
@@ -141,19 +149,70 @@ class ParkingDetector:
             
     def check_parking_spot_occupancy(self, spot_coords: Tuple[int, int, int, int], 
                                    vehicles: List[Dict], 
-                                   overlap_threshold: float = 0.3) -> Tuple[bool, Optional[Dict]]:
-        """Check if a parking spot is occupied by any detected vehicle"""
+                                   overlap_threshold: float = 0.2) -> Tuple[bool, Optional[Dict], float]:
+        """Check if a parking spot is occupied - RELAXED matching for HIGH sensitivity"""
         best_vehicle = None
         max_overlap = 0.0
         
+        # Expand slot boundaries by 15% for relaxed matching
+        x1_s, y1_s, x2_s, y2_s = spot_coords
+        w_s = x2_s - x1_s
+        h_s = y2_s - y1_s
+        
+        # Expanded slot (15% larger)
+        expand_x = int(w_s * 0.15)
+        expand_y = int(h_s * 0.15)
+        expanded_slot = (
+            x1_s - expand_x,
+            y1_s - expand_y,
+            x2_s + expand_x,
+            y2_s + expand_y
+        )
+        
         for vehicle in vehicles:
-            overlap = self._calculate_overlap_ratio(spot_coords, vehicle['bbox'])
-            if overlap > max_overlap:
+            x1_v, y1_v, x2_v, y2_v = vehicle['bbox']
+            
+            # Condition 1: Overlap ratio (20% threshold)
+            overlap = self._calculate_overlap_ratio(expanded_slot, vehicle['bbox'])
+            
+            # Condition 2: Center point inside slot
+            center_x = (x1_v + x2_v) // 2
+            center_y = (y1_v + y2_v) // 2
+            center_inside = (x1_s <= center_x <= x2_s) and (y1_s <= center_y <= y2_s)
+            
+            # Condition 3: Any touch/intersection
+            touches = self._boxes_intersect(expanded_slot, vehicle['bbox'])
+            
+            # RELAXED: Mark as match if ANY condition met
+            is_match = overlap >= overlap_threshold or center_inside or touches
+            
+            if is_match and overlap > max_overlap:
                 max_overlap = overlap
                 best_vehicle = vehicle
                 
-        is_occupied = max_overlap >= overlap_threshold
-        return is_occupied, best_vehicle if is_occupied else None
+            # Debug output
+            if overlap > 0.05 or center_inside or touches:
+                print(f"[MATCH-CHECK] Spot {spot_coords} vs {vehicle['class']} at {vehicle['bbox']}")
+                print(f"              Overlap: {overlap:.1%}, Center inside: {center_inside}, Touches: {touches}")
+                if is_match:
+                    print(f"              ✓ MATCH FOUND!")
+        
+        is_occupied = max_overlap >= overlap_threshold or best_vehicle is not None
+        
+        if is_occupied and best_vehicle:
+            print(f"[OCCUPIED] Spot occupied with {max_overlap:.1%} overlap by {best_vehicle['class']}")
+        elif is_occupied:
+            print(f"[OCCUPIED] Spot occupied (relaxed match)")
+            
+        return is_occupied, best_vehicle if is_occupied else None, max_overlap
+        
+    def _boxes_intersect(self, box1: Tuple[int, int, int, int], 
+                        box2: Tuple[int, int, int, int]) -> bool:
+        """Check if two boxes intersect/touch"""
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
+        
+        return not (x2_1 < x1_2 or x1_1 > x2_2 or y2_1 < y1_2 or y1_1 > y2_2)
         
     def _calculate_overlap_ratio(self, spot_bbox: Tuple[int, int, int, int], 
                                vehicle_bbox: Tuple[int, int, int, int]) -> float:
@@ -213,15 +272,15 @@ class ParkingDetector:
             print(f"[ERROR] Failed to detect all cars: {e}")
             return []
 
-    def process_camera_frame(self, frame: np.ndarray, camera_id: str, zone_id: str) -> List[ParkingSpot]:
-        """Process a single camera frame and detect parking spot occupancy"""
+    def process_camera_frame(self, frame: np.ndarray, camera_id: str, zone_id: str, force_refresh: bool = True) -> List[ParkingSpot]:
+        """Process a single camera frame and detect parking spot occupancy - DISABLED CACHE for debugging"""
         start_time = time.time()
         
-        # Check if we should process this frame (rate limiting)
         current_time = time.time()
         camera_key = f"{zone_id}_{camera_id}"
         
-        if current_time - self.last_detection_time[camera_key] < self.processing_interval:
+        # DISABLED: Check cache only if not forcing refresh
+        if not force_refresh and current_time - self.last_detection_time[camera_key] < self.processing_interval:
             cached = self.detection_cache.get(camera_key, [])
             occupied = len([s for s in cached if s.status == "OCCUPIED"])
             empty = len([s for s in cached if s.status == "EMPTY"])
@@ -280,7 +339,13 @@ class ParkingDetector:
                     int(y2 * scale_y)
                 )
                 
-                is_occupied, vehicle = self.check_parking_spot_occupancy(scaled_coords, vehicles)
+                is_occupied, vehicle, overlap_pct = self.check_parking_spot_occupancy(scaled_coords, vehicles)
+                
+                # Debug: Print overlap info for first few spots
+                if int(spot_id.split('-')[1]) <= 5:  # First 5 spots
+                    print(f"[DEBUG] Spot {spot_id}: coords={scaled_coords}, occupied={is_occupied}, overlap={overlap_pct:.1%}, vehicles={len(vehicles)}")
+                    if vehicle:
+                        print(f"[DEBUG]   -> Vehicle matched: {vehicle['class']} at {vehicle['bbox']}")
                 
                 spot = ParkingSpot(
                     spot_id=spot_id,
@@ -396,6 +461,92 @@ class ParkingDetector:
             traceback.print_exc()
             # Fallback to dynamic car detection only
             return self.detect_all_cars_in_frame(frame)
+    
+    def detect_slots_from_lines(self, frame: np.ndarray, 
+                                overlap_threshold: float = 0.4) -> List[ParkingSpot]:
+        """
+        Detect parking slots from white/yellow line markings.
+        Only valid parking slots with clear boundaries are detected.
+        Roads and non-parking areas are ignored.
+        
+        Args:
+            frame: Input video frame
+            overlap_threshold: Minimum overlap (40%) for vehicle to count as occupied
+            
+        Returns:
+            List of ParkingSpot objects with status
+        """
+        try:
+            print("[LINE-DETECT] Detecting parking slots from line markings...")
+            
+            # Step 1: Detect parking slots from lines
+            detected_slots = self.line_detector.detect_parking_slots(frame)
+            
+            if not detected_slots:
+                print("[LINE-DETECT] No parking slots detected from lines")
+                return []
+            
+            print(f"[LINE-DETECT] Found {len(detected_slots)} valid parking slots")
+            
+            # Step 2: Detect vehicles
+            vehicles = self.detect_vehicles(frame)
+            print(f"[LINE-DETECT] Found {len(vehicles)} vehicles in frame")
+            
+            # Step 3: Check occupancy for each slot using 40% overlap
+            parking_spots = []
+            occupied_count = 0
+            empty_count = 0
+            
+            for slot in detected_slots:
+                is_occupied = False
+                best_vehicle = None
+                max_overlap = 0.0
+                
+                # Check if any vehicle overlaps this slot by at least 40%
+                for vehicle in vehicles:
+                    overlap = self.line_detector.check_vehicle_in_slot(
+                        vehicle['bbox'], slot, overlap_threshold
+                    )
+                    
+                    # Calculate actual overlap ratio for confidence
+                    actual_overlap = self.line_detector._calculate_overlap(
+                        vehicle['bbox'], slot.bounding_box
+                    )
+                    
+                    if actual_overlap > max_overlap:
+                        max_overlap = actual_overlap
+                        if overlap:  # Meets 40% threshold
+                            is_occupied = True
+                            best_vehicle = vehicle
+                
+                # Create ParkingSpot result
+                spot = ParkingSpot(
+                    spot_id=slot.slot_id,
+                    zone_id="line_detected",
+                    camera_id="auto",
+                    status="OCCUPIED" if is_occupied else "EMPTY",
+                    confidence=max_overlap if is_occupied else (1.0 - max_overlap),
+                    vehicle_type=best_vehicle['class'] if best_vehicle else None,
+                    bounding_box=slot.bounding_box,
+                    timestamp=datetime.now().isoformat()
+                )
+                
+                parking_spots.append(spot)
+                
+                if is_occupied:
+                    occupied_count += 1
+                else:
+                    empty_count += 1
+            
+            print(f"[LINE-DETECT] Results: {occupied_count} occupied, {empty_count} empty out of {len(parking_spots)} slots")
+            
+            return parking_spots
+            
+        except Exception as e:
+            print(f"[ERROR] Line-based detection failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
             
     def process_zone(self, frames: Dict[str, np.ndarray], zone_id: str) -> ZoneResult:
         """Process all cameras for a specific zone"""

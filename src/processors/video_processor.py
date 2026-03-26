@@ -367,29 +367,29 @@ class VideoProcessor:
                         continue
                     
                     # Yellow box for license plates (matching image style)
-                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 3)
+                    cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 255), 4)
                     
-                    # Add plate text with "Plate: " prefix
+                    # Add plate text with "Plate: " prefix - BIGGER FONT
                     label = f"Plate: {plate_text[:20]}"
                     font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 0.6
-                    thickness = 2
+                    font_scale = 1.0
+                    thickness = 3
                     
                     (text_width, text_height), baseline = cv2.getTextSize(label, font, font_scale, thickness)
                     
                     # Position label above the plate
-                    ly = y1 - 10
+                    ly = y1 - 15
                     if ly - text_height - baseline < 0:
-                        ly = y2 + text_height + 10
+                        ly = y2 + text_height + 15
                     
-                    # Draw yellow background for label
+                    # Draw yellow background for label - BIGGER
                     cv2.rectangle(annotated, 
                                  (x1, ly - text_height - baseline), 
-                                 (x1 + text_width + 8, ly + 4), 
+                                 (x1 + text_width + 12, ly + 6), 
                                  (0, 255, 255), -1)
                     
-                    # Draw label text in black
-                    cv2.putText(annotated, label, (x1 + 4, ly), 
+                    # Draw label text in black - BIGGER
+                    cv2.putText(annotated, label, (x1 + 6, ly), 
                                font, font_scale, (0, 0, 0), thickness, cv2.LINE_AA)
             
             # Draw objects with K-means color information
@@ -414,55 +414,55 @@ class VideoProcessor:
                     box_color = (0, 255, 255)  # Yellow for objects
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), box_color, 2)
                     
-                    # Create enhanced label
+                    # Create enhanced label - BIGGER FONT
                     if color_family != 'Unknown':
-                        label = f"{display_name[:12]} 🎨{color_shade[:6]}"
+                        label = f"{display_name[:12]} {color_shade[:6]}"
                     else:
                         label = f"{display_name[:15]} {confidence:.2f}"
                     
-                    # Draw label background
-                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-                    cv2.rectangle(annotated, (x1, y1 - 25), (x1 + label_size[0], y1), box_color, -1)
+                    # Draw label background - BIGGER
+                    label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 3)[0]
+                    cv2.rectangle(annotated, (x1, y1 - 35), (x1 + label_size[0] + 10, y1), box_color, -1)
                     
-                    # Draw label text
+                    # Draw label text - BIGGER
                     cv2.putText(annotated, label, 
-                               (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                               (x1 + 5, y1 - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 3)
             
-            # Add frame number
+            # Add frame number - BIGGER
             frame_text = f"Frame: {frame_result.get('frame_number', 0)}"
             cv2.putText(annotated, frame_text, 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                       (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
             
-            # Add detection status
+            # Add detection status - BIGGER
             if frame_result.get('has_detections', False):
                 status_text = f"Plates: {len(frame_result.get('license_plates', []))}"
                 cv2.putText(annotated, status_text, 
-                           (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                           (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             
-            # Add object count
+            # Add object count - BIGGER
             obj_text = f"Objects: {len(objects)}"
             cv2.putText(annotated, obj_text, 
-                       (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                       (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
             
-            # Add color analysis status
+            # Add color analysis status - BIGGER
             if frame_result.get('has_color_analysis', False):
                 kmeans_colors = frame_result.get('kmeans_colors', [])
                 color_count = len([c for c in kmeans_colors if c.get('success')])
                 color_text = f"Colors: {color_count}"
                 cv2.putText(annotated, color_text, 
-                           (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+                           (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 255), 2)
                 
-                # Add scene theme if available
+                # Add scene theme if available - BIGGER
                 scene_analysis = frame_result.get('scene_analysis', {})
                 if scene_analysis.get('dominant_theme'):
                     theme = scene_analysis['dominant_theme'][:25]
                     theme_text = f"Theme: {theme}"
                     cv2.putText(annotated, theme_text, 
-                               (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+                               (10, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 0), 2)
             
-            # Add processing indicator
-            cv2.putText(annotated, "🎬 K-MEANS VIDEO PROCESSING", 
-                       (10, annotated.shape[0] - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+            # Add processing indicator - BIGGER
+            cv2.putText(annotated, "K-MEANS VIDEO PROCESSING", 
+                       (10, annotated.shape[0] - 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
             
             return annotated
             

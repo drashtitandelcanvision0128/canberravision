@@ -646,7 +646,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
 def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
     """
     Extract text from a cropped license plate region using optimized methods.
-    Now includes Tesseract as a reliable fallback for Indian license plates.
+    Now includes multi-angle support for angled license plates.
     
     Args:
         plate_crop: Cropped license plate image in BGR format
@@ -657,7 +657,17 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
     try:
         print(f"[DEBUG] Extracting text from license plate crop: {plate_crop.shape}")
         
-        # Try Tesseract first - it's most reliable for Indian license plates
+        if plate_crop is None or plate_crop.size == 0:
+            return ""
+        
+        # FIRST: Try multi-angle extraction for angled plates
+        print("[DEBUG] Trying multi-angle extraction for angled plates...")
+        multi_angle_result = _try_multi_angle_ocr(plate_crop)
+        if multi_angle_result:
+            print(f"[DEBUG] ✅ Multi-angle extraction found: {multi_angle_result}")
+            return multi_angle_result
+        
+        # Try Tesseract with standard preprocessing
         try:
             import pytesseract
             if pytesseract:
@@ -748,22 +758,194 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
             except Exception as e:
                 continue
         
-        # Last resort: Return a generic plate text if we can detect character-like regions
-        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        char_contours = [c for c in contours if 50 < cv2.contourArea(c) < 2000]
-        
-        if len(char_contours) >= 6:
-            print(f"[DEBUG] Found {len(char_contours)} character-like regions - but OCR failed to read actual text")
-            # Instead of generating fake plate text, return empty to avoid false positives
-            print("[DEBUG] ❌ Cannot generate reliable plate text without OCR confirmation")
-            return ""
-        
         print("[DEBUG] ❌ All OCR methods failed")
         return ""
         
     except Exception as e:
         print(f"[DEBUG] Error in license plate OCR: {e}")
         return ""
+
+
+def _try_multi_angle_ocr(plate_crop: np.ndarray) -> Optional[str]:
+    """
+    Try OCR at multiple rotation angles to handle angled license plates.
+    This handles plates that are rotated or at odd angles.
+    
+    Args:
+        plate_crop: Cropped license plate image in BGR format
+        
+    Returns:
+        Extracted text if found, None otherwise
+    """
+    try:
+        import pytesseract
+        
+        # Angles to try: negative and positive rotations
+        angles = [0, -5, 5, -10, 10, -15, 15, -20, 20, -30, 30, -45, 45]
+        
+        h, w = plate_crop.shape[:2]
+        center = (w // 2, h // 2)
+        
+        for angle in angles:
+            try:
+                # Get rotation matrix
+                M = cv2.getRotationMatrix2D(center, angle, 1.0)
+                
+                # Calculate new bounding box
+                cos = np.abs(M[0, 0])
+                sin = np.abs(M[0, 1])
+                new_w = int((h * sin) + (w * cos))
+                new_h = int((h * cos) + (w * sin))
+                
+                # Adjust rotation matrix for new center
+                M[0, 2] += (new_w / 2) - center[0]
+                M[1, 2] += (new_h / 2) - center[1]
+                
+                # Rotate image with black background
+                rotated = cv2.warpAffine(plate_crop, M, (new_w, new_h),
+                                        borderMode=cv2.BORDER_CONSTANT,
+                                        borderValue=(0, 0, 0))
+                
+                if rotated.size == 0:
+                    continue
+                
+                # Preprocess rotated image
+                gray = cv2.cvtColor(rotated, cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+                enhanced = clahe.apply(gray)
+                _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                # Try OCR with multiple configs
+                configs = [
+                    r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                    r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                    r'--oem 3 --psm 7',
+                    r'--oem 3 --psm 8',
+                ]
+                
+                for config in configs:
+                    text = pytesseract.image_to_string(binary, config=config)
+                    cleaned = _clean_license_plate_text(text.strip())
+                    
+                    # Validate as license plate
+                    if cleaned and len(cleaned) >= 4:
+                        has_letters = sum(c.isalpha() for c in cleaned) >= 1
+                        has_numbers = sum(c.isdigit() for c in cleaned) >= 1
+                        
+                        if has_letters and has_numbers:
+                            print(f"[DEBUG] ✅ Multi-angle OCR found at {angle}°: {cleaned}")
+                            return cleaned
+                            
+            except Exception as e:
+                continue
+        
+        # Also try perspective correction
+        warped = _try_perspective_correction(plate_crop)
+        if warped is not None:
+            try:
+                gray = cv2.cvtColor(warped, cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+                enhanced = clahe.apply(gray)
+                _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                text = pytesseract.image_to_string(binary, 
+                    config=r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')
+                cleaned = _clean_license_plate_text(text.strip())
+                
+                if cleaned and len(cleaned) >= 4:
+                    has_letters = sum(c.isalpha() for c in cleaned) >= 1
+                    has_numbers = sum(c.isdigit() for c in cleaned) >= 1
+                    
+                    if has_letters and has_numbers:
+                        print(f"[DEBUG] ✅ Perspective correction found: {cleaned}")
+                        return cleaned
+            except Exception as e:
+                pass
+        
+        return None
+        
+    except Exception as e:
+        print(f"[DEBUG] Multi-angle OCR failed: {e}")
+        return None
+
+
+def _try_perspective_correction(image: np.ndarray) -> Optional[np.ndarray]:
+    """
+    Try to detect and correct perspective distortion in license plates.
+    
+    Args:
+        image: Input image in BGR format
+        
+    Returns:
+        Perspective-corrected image or None if correction fails
+    """
+    try:
+        # Convert to grayscale
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+        
+        # Apply bilateral filter to reduce noise
+        blurred = cv2.bilateralFilter(gray, 9, 75, 75)
+        
+        # Edge detection
+        edges = cv2.Canny(blurred, 50, 150)
+        
+        # Find contours
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # Look for rectangular contours
+        for contour in contours:
+            # Approximate contour
+            peri = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+            
+            # If 4 corners found, try perspective correction
+            if len(approx) == 4:
+                pts = approx.reshape(4, 2)
+                rect = np.zeros((4, 2), dtype="float32")
+                
+                # Order points
+                s = pts.sum(axis=1)
+                rect[0] = pts[np.argmin(s)]  # Top-left
+                rect[2] = pts[np.argmax(s)]  # Bottom-right
+                
+                diff = np.diff(pts, axis=1)
+                rect[1] = pts[np.argmin(diff)]  # Top-right
+                rect[3] = pts[np.argmax(diff)]  # Bottom-left
+                
+                # Calculate width and height
+                widthA = np.sqrt(((rect[2][0] - rect[3][0]) ** 2) + ((rect[2][1] - rect[3][1]) ** 2))
+                widthB = np.sqrt(((rect[1][0] - rect[0][0]) ** 2) + ((rect[1][1] - rect[0][1]) ** 2))
+                maxWidth = max(int(widthA), int(widthB))
+                
+                heightA = np.sqrt(((rect[1][0] - rect[2][0]) ** 2) + ((rect[1][1] - rect[2][1]) ** 2))
+                heightB = np.sqrt(((rect[0][0] - rect[3][0]) ** 2) + ((rect[0][1] - rect[3][1]) ** 2))
+                maxHeight = max(int(heightA), int(heightB))
+                
+                # Aspect ratio check for plates
+                if maxWidth > 0 and maxHeight > 0:
+                    aspect_ratio = maxWidth / maxHeight
+                    if 2.0 <= aspect_ratio <= 6.0 and maxWidth > 50 and maxHeight > 15:
+                        # Destination points
+                        dst = np.array([
+                            [0, 0],
+                            [maxWidth - 1, 0],
+                            [maxWidth - 1, maxHeight - 1],
+                            [0, maxHeight - 1]], dtype="float32")
+                        
+                        # Perspective transform
+                        M = cv2.getPerspectiveTransform(rect, dst)
+                        warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+                        
+                        return warped
+        
+        return None
+        
+    except Exception as e:
+        print(f"[DEBUG] Perspective correction failed: {e}")
+        return None
 
 
 def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:

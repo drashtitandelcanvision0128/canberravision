@@ -70,6 +70,12 @@ class CarPlateVideoProcessor:
             'processing_time': 0
         }
         
+        # Plate tracking for stable detection across frames
+        self.plate_trackers = {}
+        self.tracked_plates = {}
+        self.next_plate_id = 1
+        self.tracking_timeout = 30  # frames to keep plate without seeing it
+        
         # Initialize components
         self._initialize_model()
         self._initialize_plate_recognizer()
@@ -253,6 +259,8 @@ class CarPlateVideoProcessor:
                 if hasattr(detection, 'boxes') and detection.boxes is not None:
                     boxes = detection.boxes
                     
+                    print(f"[DEBUG] Frame {frame_number}: Found {len(boxes)} detections")
+                    
                     # Process each detection
                     for i in range(len(boxes)):
                         # Get bounding box
@@ -263,6 +271,8 @@ class CarPlateVideoProcessor:
                         
                         # Check if it's a vehicle
                         if self._is_vehicle(class_name):
+                            print(f"[DEBUG] Processing vehicle: {class_name} at ({int(x1)}, {int(y1)}, {int(x2)}, {int(y2)})")
+                            
                             car_info = {
                                 'bbox': [int(x1), int(y1), int(x2), int(y2)],
                                 'confidence': confidence,
@@ -272,7 +282,12 @@ class CarPlateVideoProcessor:
                             
                             # Extract license plates from car region
                             plates = self._extract_plates_from_region(frame, [int(x1), int(y1), int(x2), int(y2)])
-                            car_info['plates'] = plates
+                            
+                            print(f"[DEBUG] Found {len(plates)} plates for this vehicle")
+                            
+                            # Track plates for stable detection
+                            stable_plates = self._track_plates(plates, [int(x1), int(y1), int(x2), int(y2)], frame_number)
+                            car_info['plates'] = stable_plates
                             
                             result['cars'].append(car_info)
                             result['cars_detected'] += 1
@@ -284,11 +299,25 @@ class CarPlateVideoProcessor:
                             
                             for plate in plates:
                                 self.stats['unique_plates'].add(plate['text'])
+                                print(f"[DEBUG] Added plate to stats: '{plate['text']}'")
+                        else:
+                            if i < 5:  # Only print first 5 non-vehicle detections
+                                print(f"[DEBUG] Skipping non-vehicle: {class_name}")
+                else:
+                    print(f"[DEBUG] Frame {frame_number}: No boxes found in detection")
+            else:
+                print(f"[DEBUG] Frame {frame_number}: No detections")
         
         except Exception as e:
             print(f"[ERROR] Frame {frame_number} processing failed: {e}")
+            import traceback
+            traceback.print_exc()
         
         result['processing_time'] = time.time() - start_time
+        
+        if result['plates_found'] > 0:
+            print(f"[DEBUG] Frame {frame_number} result: {result['cars_detected']} cars, {result['plates_found']} plates")
+        
         return result
     
     def _is_vehicle(self, class_name: str) -> bool:
@@ -301,7 +330,10 @@ class CarPlateVideoProcessor:
         return class_name.lower() in vehicle_classes
     
     def _extract_plates_from_region(self, frame: np.ndarray, bbox: List[int]) -> List[Dict]:
-        """Extract license plates from a specific region"""
+        """
+        Extract license plates from a specific region with multi-angle support.
+        Handles plates at various angles by trying multiple rotations.
+        """
         plates = []
         
         if not PADDLEOCR_AVAILABLE:
@@ -316,55 +348,398 @@ class CarPlateVideoProcessor:
             return plates
         
         try:
-            # Use PaddleOCR to extract text
-            ocr_result = extract_text_optimized(
-                region,
-                confidence_threshold=0.3,
-                lang='en',
-                use_gpu=self.use_gpu,
-                use_cache=False,
-                preprocess=True
-            )
+            # First attempt: Try OCR on original region
+            plate = self._try_ocr_on_region(region, bbox)
+            if plate:
+                plates.append(plate)
+                return plates
             
-            if ocr_result and ocr_result.get('text'):
-                text = ocr_result['text'].strip()
-                confidence = ocr_result.get('confidence', 0.0)
+            # Second attempt: Try multiple angles for rotated plates
+            angles = [-45, -30, -20, -15, -10, -5, 0, 5, 10, 15, 20, 30, 45, 60, -60]
+            print(f"[DEBUG] Trying {len(angles)} rotation angles...")
+            for angle in angles:
+                rotated_region = self._rotate_image(region, angle)
+                if rotated_region is None or rotated_region.size == 0:
+                    continue
                 
-                # Check if it looks like a license plate
-                if self._is_license_plate(text):
+                plate = self._try_ocr_on_region(rotated_region, bbox, angle_hint=angle)
+                if plate:
+                    plate['angle'] = angle
+                    plates.append(plate)
+                    print(f"[DEBUG] ✅ Found plate at angle {angle}: '{plate['text']}'")
+                    return plates
+            
+            # Third attempt: Try perspective correction if plate appears skewed
+            # Look for rectangular contours that might be plates
+            warped_regions = self._find_plate_candidates(region)
+            for i, warped in enumerate(warped_regions):
+                if warped is None or warped.size == 0:
+                    continue
+                plate = self._try_ocr_on_region(warped, bbox, method='perspective')
+                if plate:
+                    plate['method'] = 'perspective_correction'
+                    plates.append(plate)
+                    return plates
+            
+            # Fourth attempt: Try different preprocessing on original
+            preprocessed_variants = self._create_preprocessing_variants(region)
+            for variant_name, variant_img in preprocessed_variants.items():
+                if variant_img is None or variant_img.size == 0:
+                    continue
+                plate = self._try_ocr_on_region(variant_img, bbox, method=variant_name)
+                if plate:
+                    plate['method'] = f'preprocessing_{variant_name}'
+                    plates.append(plate)
+                    return plates
+                    
+        except Exception as e:
+            print(f"[DEBUG] Multi-angle plate extraction failed: {e}")
+        
+        return plates
+    
+    def _try_ocr_on_region(self, region: np.ndarray, bbox: List[int], 
+                          angle_hint: int = 0, method: str = 'direct') -> Optional[Dict]:
+        """Try OCR on a region and validate if it's a license plate."""
+        try:
+            # Try multiple OCR methods
+            text = None
+            confidence = 0.0
+            device = 'CPU'
+            
+            # Method 1: Try Tesseract first (more reliable for angled plates)
+            try:
+                import pytesseract
+                
+                # Preprocess for Tesseract
+                if len(region.shape) == 3:
+                    gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+                else:
+                    gray = region
+                
+                # Enhance contrast
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+                enhanced = clahe.apply(gray)
+                
+                # Apply threshold
+                _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                # Try multiple Tesseract configs
+                configs = [
+                    r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                    r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+                    r'--oem 3 --psm 7',
+                    r'--oem 3 --psm 8',
+                    r'--oem 3 --psm 6',
+                ]
+                
+                for config in configs:
+                    tess_text = pytesseract.image_to_string(binary, config=config)
+                    tess_clean = tess_text.strip().upper()
+                    
+                    if tess_clean and len(tess_clean) >= 3:
+                        # Validate it looks like a plate
+                        has_letters = sum(c.isalpha() for c in tess_clean) >= 1
+                        has_numbers = sum(c.isdigit() for c in tess_clean) >= 1
+                        
+                        if has_letters and has_numbers:
+                            text = tess_clean
+                            confidence = 0.85
+                            device = 'Tesseract'
+                            print(f"[DEBUG] ✅ Tesseract found plate: '{text}' (config: {config})")
+                            break
+                
+                if text:
                     plate_info = {
                         'text': text,
                         'confidence': confidence,
                         'bbox': bbox,
-                        'method': 'paddleocr',
-                        'device': 'GPU' if self.use_gpu else 'CPU'
+                        'method': f'tesseract_{method}',
+                        'device': device,
+                        'angle_hint': angle_hint
                     }
                     
-                    # Try to identify country if international recognizer is available
+                    # Try to identify country
                     if self.plate_recognizer:
                         country = self._identify_plate_country(text)
                         if country:
                             plate_info['country'] = country
                     
-                    plates.append(plate_info)
-        
+                    print(f"[DEBUG] ✅ License plate detected: '{text}' (method: {method}, angle: {angle_hint})")
+                    return plate_info
+                    
+            except Exception as e:
+                print(f"[DEBUG] Tesseract failed: {e}")
+            
+            # Method 2: Use PaddleOCR as fallback
+            if PADDLEOCR_AVAILABLE and text is None:
+                ocr_result = extract_text_optimized(
+                    region,
+                    confidence_threshold=0.15,  # Very low threshold for difficult plates
+                    lang='en',
+                    use_gpu=self.use_gpu,
+                    use_cache=False,
+                    preprocess=True
+                )
+                
+                if ocr_result and ocr_result.get('text'):
+                    paddle_text = ocr_result['text'].strip()
+                    paddle_conf = ocr_result.get('confidence', 0.0)
+                    
+                    # Check if it looks like a license plate (relaxed validation)
+                    if self._is_license_plate_relaxed(paddle_text):
+                        plate_info = {
+                            'text': paddle_text,
+                            'confidence': paddle_conf,
+                            'bbox': bbox,
+                            'method': f'paddleocr_{method}',
+                            'device': 'GPU' if self.use_gpu else 'CPU',
+                            'angle_hint': angle_hint
+                        }
+                        
+                        # Try to identify country
+                        if self.plate_recognizer:
+                            country = self._identify_plate_country(paddle_text)
+                            if country:
+                                plate_info['country'] = country
+                        
+                        print(f"[DEBUG] ✅ License plate detected: '{paddle_text}' (method: {method}, angle: {angle_hint})")
+                        return plate_info
+                    else:
+                        print(f"[DEBUG] ❌ PaddleOCR text rejected: '{paddle_text}' - not a valid plate format")
+                        
         except Exception as e:
-            print(f"[DEBUG] OCR extraction failed: {e}")
+            print(f"[DEBUG] OCR attempt failed: {e}")
+            import traceback
+            traceback.print_exc()
         
-        return plates
+        return None
     
-    def _is_license_plate(self, text: str) -> bool:
-        """Check if text looks like a license plate"""
-        # Remove spaces and special characters
-        clean_text = re.sub(r'[^A-Za-z0-9]', '', text.upper())
-        
-        # License plates typically have 5-10 characters
-        if len(clean_text) < 4 or len(clean_text) > 12:
+    def _is_license_plate_relaxed(self, text: str) -> bool:
+        """
+        Relaxed license plate validation for angled/partial detections.
+        Very lenient to catch more plates.
+        """
+        if not text or not isinstance(text, str):
             return False
         
-        # Check if it has both letters and numbers (common for plates)
-        has_letters = bool(re.search(r'[A-Z]', clean_text))
-        has_numbers = bool(re.search(r'[0-9]', clean_text))
+        # Clean text
+        clean_text = re.sub(r'[^A-Za-z0-9]', '', text.upper())
+        
+        print(f"[DEBUG] Validating plate text: '{clean_text}' (original: '{text}')")
+        
+        # Relaxed length check (2-12 chars)
+        if len(clean_text) < 2 or len(clean_text) > 12:
+            print(f"[DEBUG] ❌ Text length {len(clean_text)} not in range [2, 12]")
+            return False
+        
+        # Must have at least 1 letter OR 1 number (very relaxed)
+        has_letters = sum(c.isalpha() for c in clean_text) >= 1
+        has_numbers = sum(c.isdigit() for c in clean_text) >= 1
+        
+        print(f"[DEBUG] Has letters: {has_letters}, Has numbers: {has_numbers}")
+        
+        # Accept if has at least one letter AND one number
+        if has_letters and has_numbers:
+            print(f"[DEBUG] ✅ Accepted as plate: '{clean_text}'")
+            return True
+        
+        # Also accept pure alphanumeric that looks like a plate (e.g., "ABC123")
+        if clean_text.isalnum() and len(clean_text) >= 4:
+            print(f"[DEBUG] ✅ Accepted alphanumeric as plate: '{clean_text}'")
+            return True
+        
+        print(f"[DEBUG] ❌ Rejected: '{clean_text}'")
+        return False
+    
+    def _rotate_image(self, image: np.ndarray, angle: float) -> np.ndarray:
+        """
+        Rotate image by given angle.
+        """
+        if image is None or image.size == 0:
+            return image
+        
+        h, w = image.shape[:2]
+        center = (w // 2, h // 2)
+        
+        # Get rotation matrix
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        
+        # Calculate new bounding box
+        cos = np.abs(M[0, 0])
+        sin = np.abs(M[0, 1])
+        new_w = int((h * sin) + (w * cos))
+        new_h = int((h * cos) + (w * sin))
+        
+        # Adjust rotation matrix for new center
+        M[0, 2] += (new_w / 2) - center[0]
+        M[1, 2] += (new_h / 2) - center[1]
+        
+        # Rotate with black background
+        rotated = cv2.warpAffine(image, M, (new_w, new_h), 
+                                borderMode=cv2.BORDER_CONSTANT,
+                                borderValue=(0, 0, 0))
+        
+        return rotated
+    
+    def _find_plate_candidates(self, region: np.ndarray) -> List[np.ndarray]:
+        """
+        Find potential license plate regions by looking for rectangular contours.
+        Returns list of warped (perspective-corrected) regions.
+        """
+        warped_regions = []
+        
+        try:
+            # Convert to grayscale
+            if len(region.shape) == 3:
+                gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = region
+            
+            # Apply Gaussian blur
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            
+            # Edge detection
+            edges = cv2.Canny(blurred, 50, 150)
+            
+            # Find contours
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # Filter contours that look like plates
+            for contour in contours:
+                # Approximate contour
+                peri = cv2.arcLength(contour, True)
+                approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+                
+                # Look for rectangles (4 corners)
+                if len(approx) == 4:
+                    x, y, w, h = cv2.boundingRect(approx)
+                    
+                    # Aspect ratio check (plates are typically 2-5 times wider than tall)
+                    aspect_ratio = float(w) / h if h > 0 else 0
+                    if 2.0 <= aspect_ratio <= 6.0 and w > 50 and h > 15:
+                        # Try to warp perspective
+                        try:
+                            pts = approx.reshape(4, 2)
+                            rect = np.zeros((4, 2), dtype="float32")
+                            
+                            # Order points: top-left, top-right, bottom-right, bottom-left
+                            s = pts.sum(axis=1)
+                            rect[0] = pts[np.argmin(s)]
+                            rect[2] = pts[np.argmax(s)]
+                            
+                            diff = np.diff(pts, axis=1)
+                            rect[1] = pts[np.argmin(diff)]
+                            rect[3] = pts[np.argmax(diff)]
+                            
+                            # Compute width and height
+                            widthA = np.sqrt(((rect[2][0] - rect[3][0]) ** 2) + ((rect[2][1] - rect[3][1]) ** 2))
+                            widthB = np.sqrt(((rect[1][0] - rect[0][0]) ** 2) + ((rect[1][1] - rect[0][1]) ** 2))
+                            maxWidth = max(int(widthA), int(widthB))
+                            
+                            heightA = np.sqrt(((rect[1][0] - rect[2][0]) ** 2) + ((rect[1][1] - rect[2][1]) ** 2))
+                            heightB = np.sqrt(((rect[0][0] - rect[3][0]) ** 2) + ((rect[0][1] - rect[3][1]) ** 2))
+                            maxHeight = max(int(heightA), int(heightB))
+                            
+                            if maxWidth > 50 and maxHeight > 15:
+                                # Destination points
+                                dst = np.array([
+                                    [0, 0],
+                                    [maxWidth - 1, 0],
+                                    [maxWidth - 1, maxHeight - 1],
+                                    [0, maxHeight - 1]], dtype="float32")
+                                
+                                # Perspective transform
+                                M = cv2.getPerspectiveTransform(rect, dst)
+                                warped = cv2.warpPerspective(region, M, (maxWidth, maxHeight))
+                                
+                                if warped.size > 0:
+                                    warped_regions.append(warped)
+                        except Exception as e:
+                            continue
+            
+            # Also add the original region scaled to different sizes
+            for scale in [0.8, 1.2, 1.5]:
+                scaled = cv2.resize(region, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+                warped_regions.append(scaled)
+                
+        except Exception as e:
+            print(f"[DEBUG] Plate candidate finding failed: {e}")
+        
+        return warped_regions
+    
+    def _create_preprocessing_variants(self, region: np.ndarray) -> Dict[str, np.ndarray]:
+        """
+        Create different preprocessing variants of the region for better OCR.
+        """
+        variants = {}
+        
+        try:
+            # Convert to grayscale if needed
+            if len(region.shape) == 3:
+                gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = region
+            
+            # Variant 1: High contrast
+            _, high_contrast = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            variants['high_contrast'] = cv2.cvtColor(high_contrast, cv2.COLOR_GRAY2BGR)
+            
+            # Variant 2: Adaptive threshold
+            adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                            cv2.THRESH_BINARY, 11, 2)
+            variants['adaptive'] = cv2.cvtColor(adaptive, cv2.COLOR_GRAY2BGR)
+            
+            # Variant 3: Denoised
+            denoised = cv2.fastNlMeansDenoisingColored(region, None, 10, 10, 7, 21)
+            variants['denoised'] = denoised
+            
+            # Variant 4: Sharpened
+            kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+            sharpened = cv2.filter2D(region, -1, kernel)
+            variants['sharpened'] = sharpened
+            
+            # Variant 5: Upscaled
+            upscaled = cv2.resize(region, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+            variants['upscaled'] = upscaled
+            
+            # Variant 6: Grayscale
+            variants['grayscale'] = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+            
+        except Exception as e:
+            print(f"[DEBUG] Preprocessing variants failed: {e}")
+        
+        return variants
+    
+    def _is_license_plate(self, text: str) -> bool:
+        """
+        Check if text looks like a license plate.
+        Enhanced to handle various formats including short plates like NH320.
+        """
+        if not text or not isinstance(text, str):
+            return False
+        
+        # Clean text - remove spaces and special characters
+        clean_text = re.sub(r'[^A-Za-z0-9]', '', text.upper())
+        
+        # Relaxed length check (3-10 chars for various plate formats)
+        if len(clean_text) < 3 or len(clean_text) > 10:
+            return False
+        
+        # Must have at least 1 letter and 1 number (even for short plates)
+        has_letters = sum(c.isalpha() for c in clean_text) >= 1
+        has_numbers = sum(c.isdigit() for c in clean_text) >= 1
+        
+        # Special case: Short plates like NH320 (2 letters + 3 numbers)
+        # This matches Indian, European, and many international formats
+        if len(clean_text) <= 6:
+            # At least one letter and one number
+            return has_letters and has_numbers
+        
+        # For longer plates, require at least 2 of each
+        if len(clean_text) > 6:
+            has_2_letters = sum(c.isalpha() for c in clean_text) >= 2
+            has_2_numbers = sum(c.isdigit() for c in clean_text) >= 2
+            return has_2_letters and has_2_numbers
         
         return has_letters and has_numbers
     
@@ -391,38 +766,100 @@ class CarPlateVideoProcessor:
         
         return None
     
+    def _track_plates(self, plates: List[Dict], car_bbox: List[int], frame_number: int) -> List[Dict]:
+        """Track plates for stable detection"""
+        tracked_plates = []
+        
+        for plate in plates:
+            plate_text = plate['text']
+            plate_bbox = plate['bbox']
+            plate_confidence = plate['confidence']
+            
+            # Check if plate is already tracked
+            if plate_text in self.plate_trackers:
+                tracker = self.plate_trackers[plate_text]
+                
+                # Update tracker with new detection
+                tracker['detections'].append({
+                    'frame_number': frame_number,
+                    'bbox': plate_bbox,
+                    'confidence': plate_confidence
+                })
+                
+                # Calculate stable plate text and confidence
+                stable_text = tracker['text']
+                stable_confidence = sum(d['confidence'] for d in tracker['detections']) / len(tracker['detections'])
+                
+                # Create stable plate info
+                stable_plate = {
+                    'stable_text': stable_text,
+                    'confidence': stable_confidence,
+                    'bbox': plate_bbox,
+                    'method': 'tracked',
+                    'device': 'GPU' if self.use_gpu else 'CPU'
+                }
+                
+                # Try to identify country if international recognizer is available
+                if self.plate_recognizer:
+                    country = self._identify_plate_country(stable_text)
+                    if country:
+                        stable_plate['country'] = country
+                
+                tracked_plates.append(stable_plate)
+            else:
+                # Create new tracker for plate
+                self.plate_trackers[plate_text] = {
+                    'text': plate_text,
+                    'detections': [{
+                        'frame_number': frame_number,
+                        'bbox': plate_bbox,
+                        'confidence': plate_confidence
+                    }]
+                }
+                
+                # Add plate to tracked plates
+                tracked_plates.append(plate)
+        
+        return tracked_plates
+    
     def _create_annotated_frame(self, frame: np.ndarray, frame_result: Dict) -> np.ndarray:
         """Create annotated frame with detections"""
         annotated = frame.copy()
         
+        print(f"[DEBUG] Annotating frame {frame_result['frame_number']}: {frame_result['cars_detected']} cars, {frame_result['plates_found']} plates")
+        
         # Draw cars and their plates
-        for car in frame_result['cars']:
+        for car_idx, car in enumerate(frame_result['cars']):
             bbox = car['bbox']
             x1, y1, x2, y2 = bbox
+            
+            print(f"[DEBUG] Car {car_idx}: {car['class_name']} with {len(car['plates'])} plates")
             
             # Draw car bounding box
             cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
             
-            # Add car label
+            # Add car label with BIGGER font
             car_label = f"{car['class_name']} ({car['confidence']:.2f})"
             cv2.putText(annotated, car_label, (x1, y1 - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
             
-            # Draw license plates - IMPROVED: Better formatting with yellow box
+            # Draw license plates - IMPROVED: Better formatting with yellow box and BIGGER text
             for i, plate in enumerate(car['plates']):
-                plate_text = plate['text']
-                confidence = plate['confidence']
+                plate_text = plate.get('stable_text', plate.get('text', ''))
+                confidence = plate.get('confidence', 0)
                 country = plate.get('country', '')
+                
+                print(f"[DEBUG] Drawing plate {i}: '{plate_text}' (conf: {confidence:.2f})")
                 
                 # Get plate bbox if available
                 plate_bbox = plate.get('bbox')
                 if plate_bbox:
                     px1, py1, px2, py2 = plate_bbox
                     # Draw yellow box around license plate region
-                    cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 3)
+                    cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 4)
                 
                 # Position for plate text label
-                plate_y = y1 - 30 - (i * 25)
+                plate_y = y1 - 50 - (i * 40)
                 
                 # Create plate label with "Plate: " prefix
                 if country:
@@ -430,27 +867,27 @@ class CarPlateVideoProcessor:
                 else:
                     plate_label = f"Plate: {plate_text} ({confidence:.2f})"
                 
-                # Draw background rectangle for plate text
-                (text_width, text_height), _ = cv2.getTextSize(plate_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+                # Draw background rectangle for plate text - BIGGER
+                (text_width, text_height), _ = cv2.getTextSize(plate_label, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 3)
                 cv2.rectangle(annotated, (x1, plate_y - text_height - 5), 
-                             (x1 + text_width + 5, plate_y + 5), (0, 255, 255), -1)
-                cv2.putText(annotated, plate_label, (x1, plate_y), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
+                             (x1 + text_width + 10, plate_y + 10), (0, 255, 255), -1)
+                cv2.putText(annotated, plate_label, (x1 + 5, plate_y + 5), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 3)
         
-        # Add frame info
+        # Add frame info with BIGGER font
         frame_text = f"Frame: {frame_result['frame_number']} | Cars: {frame_result['cars_detected']} | Plates: {frame_result['plates_found']}"
-        cv2.putText(annotated, frame_text, (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(annotated, frame_text, (10, 50), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
         
-        # Add processing time
+        # Add processing time with BIGGER font
         time_text = f"Time: {frame_result['processing_time']:.3f}s"
-        cv2.putText(annotated, time_text, (10, 60), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(annotated, time_text, (10, 100), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
         
-        # Add unique plates count
+        # Add unique plates count with BIGGER font
         unique_text = f"Unique Plates: {len(self.stats['unique_plates'])}"
-        cv2.putText(annotated, unique_text, (10, 90), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        cv2.putText(annotated, unique_text, (10, 150), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 0), 2)
         
         return annotated
     

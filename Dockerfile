@@ -1,6 +1,6 @@
 # ============================================================
 # Canberra Vision Detection System - Production Dockerfile
-# Fixed for Debian Trixie + Coolify deployment
+# Fixed: gradio/huggingface_hub compatibility + Debian Trixie
 # ============================================================
 FROM python:3.10-slim
 
@@ -12,7 +12,6 @@ ENV APP_ENV=production
 ENV GRADIO_SERVER_PORT=7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
 
-# Set working directory
 WORKDIR /app
 
 # Install system dependencies (Debian Trixie compatible)
@@ -39,56 +38,76 @@ RUN apt-get update && apt-get install -y \
 # Upgrade pip
 RUN pip install --upgrade pip setuptools wheel
 
-# ---- Install core dependencies first (lighter, faster) ----
+# -------------------------------------------------------
+# Step 1: Pin huggingface_hub first to avoid HfFolder error
+# (HfFolder was removed in huggingface_hub>=0.25)
+# -------------------------------------------------------
+RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
+
+# -------------------------------------------------------
+# Step 2: Install gradio (compatible with pinned hf_hub)
+# Must install AFTER huggingface_hub to avoid override
+# -------------------------------------------------------
+RUN pip install --no-cache-dir "gradio==4.44.1"
+
+# -------------------------------------------------------
+# Step 3: Core dependencies
+# -------------------------------------------------------
 RUN pip install --no-cache-dir \
-    gradio==4.44.1 \
     numpy \
     pillow \
     opencv-python-headless \
     psycopg2-binary \
-    python-dotenv
-
-# ---- Install ML dependencies (heavier) ----
-RUN pip install --no-cache-dir \
-    torch==2.1.2 --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir \
-    torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir \
-    ultralytics \
-    transformers \
-    timm \
-    scikit-learn \
+    python-dotenv \
     scipy \
+    scikit-learn \
     imageio-ffmpeg \
     pytesseract \
     sentencepiece \
-    protobuf==3.20.2 \
-    setuptools==68.0.0
+    "protobuf==3.20.2" \
+    "setuptools==68.0.0"
 
-# ---- Install PaddleOCR (CPU version for server without GPU) ----
-RUN pip install --no-cache-dir paddlepaddle==2.6.2 || \
-    echo "WARNING: paddlepaddle install failed, OCR may be limited"
+# -------------------------------------------------------
+# Step 4: PyTorch CPU (no CUDA needed on Coolify server)
+# -------------------------------------------------------
+RUN pip install --no-cache-dir \
+    "torch==2.1.2" \
+    "torchvision==0.16.2" \
+    --index-url https://download.pytorch.org/whl/cpu
 
+# -------------------------------------------------------
+# Step 5: ML models
+# -------------------------------------------------------
+RUN pip install --no-cache-dir \
+    ultralytics \
+    "transformers==4.37.2" \
+    timm
+
+# -------------------------------------------------------
+# Step 6: PaddleOCR - CPU version (server has no GPU)
+# Use || true so build doesn't fail if paddle unavailable
+# -------------------------------------------------------
+RUN pip install --no-cache-dir "paddlepaddle==2.6.2" || \
+    echo "WARNING: paddlepaddle failed - OCR will be limited"
 RUN pip install --no-cache-dir "paddleocr>=2.7.0" || \
-    echo "WARNING: paddleocr install failed, OCR may be limited"
+    echo "WARNING: paddleocr failed - OCR will be limited"
 
-# Copy the entire application
+# -------------------------------------------------------
+# Copy application
+# -------------------------------------------------------
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads processed processed_images processed_videos temp_gradio inputs outputs logs
+RUN mkdir -p uploads processed processed_images processed_videos \
+    temp_gradio inputs outputs logs
 
-# Set permissions
 RUN chmod -R 755 /app
 
-# Expose main Gradio port
+# Expose Gradio port
 EXPOSE 7860
 
-# Healthcheck - wait up to 5 min for heavy ML model loading
-HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=5 \
-    CMD curl -f http://localhost:7860/ || exit 1
+# Healthcheck — no curl needed in the image, use python
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/')" || exit 1
 
-# Default command
 CMD ["python", "apps/app.py"]

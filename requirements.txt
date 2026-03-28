@@ -1,5 +1,5 @@
-gradio==4.40.0
-gradio-client==0.15.1
+gradio==4.36.1
+gradio-client==0.10.0
 ultralytics
 pathlib
 typing

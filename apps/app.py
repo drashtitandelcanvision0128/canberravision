@@ -12,7 +12,7 @@ from pathlib import Path
 import subprocess
 import shutil
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple, Optional, Union
 
 # Set working directory to project root
 script_dir = Path(__file__).parent

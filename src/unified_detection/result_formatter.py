@@ -6,7 +6,7 @@ Formats detection results into strict JSON output format
 import json
 import numpy as np
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 from pathlib import Path
 
 from .unified_detector import (

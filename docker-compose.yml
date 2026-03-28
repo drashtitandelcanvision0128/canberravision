@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  # Main YOLO Car Plate Detection Application
+  main-app:
+    build: .
+    container_name: yolo-car-detection-main
+    ports:
+      - "7860:7860"
+    environment:
+      - GRADIO_SERVER_PORT=7860
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+      - ./inputs:/app/inputs
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # License Plate Image Detector
+  plate-detector:
+    build: .
+    container_name: yolo-plate-detector
+    ports:
+      - "7861:7861"
+    environment:
+      - GRADIO_SERVER_PORT=7861
+    command: ["python", "apps/license_plate_image_detector.py"]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # Enhanced Plate Detector (Angle Independent)
+  enhanced-detector:
+    build: .
+    container_name: yolo-enhanced-detector
+    ports:
+      - "7862:7862"
+    environment:
+      - GRADIO_SERVER_PORT=7862
+    command: ["python", "apps/enhanced_plate_detector.py"]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # Guaranteed Plate Detector
+  guaranteed-detector:
+    build: .
+    container_name: yolo-guaranteed-detector
+    ports:
+      - "7863:7863"
+    environment:
+      - GRADIO_SERVER_PORT=7863
+    command: ["python", "apps/guaranteed_plate_detector.py"]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # Simple Plate Detector
+  simple-detector:
+    build: .
+    container_name: yolo-simple-detector
+    ports:
+      - "7864:7864"
+    environment:
+      - GRADIO_SERVER_PORT=7864
+    command: ["python", "apps/simple_working_plate_detector.py"]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # Parking Dashboard
+  parking-dashboard:
+    build: .
+    container_name: yolo-parking-dashboard
+    ports:
+      - "5000:5000"
+    command: ["python", "apps/parking_dashboard.py"]
+    volumes:
+      - ./uploads:/app/uploads
+      - ./processed:/app/processed
+      - ./parking_detections:/app/parking_detections
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+  # Nginx Reverse Proxy (Optional - for load balancing)
+  nginx:
+    image: nginx:alpine
+    container_name: yolo-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - main-app
+      - plate-detector
+      - enhanced-detector
+      - guaranteed-detector
+      - simple-detector
+      - parking-dashboard
+    restart: unless-stopped
+    networks:
+      - yolo-network
+
+networks:
+  yolo-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  processed:
+  inputs:
+  outputs:
+  parking_detections:

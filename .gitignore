@@ -1,0 +1,126 @@
+# YOLO26 GitIgnore - Heavy Files for Light Deployment
+
+# Output folders (video/image results)
+outputs/
+output/
+results/
+detections/
+temp/
+tmp/
+
+# Model files (.pt files are heavy)
+*.pt
+models/
+weights/
+pretrained/
+
+# Video files (heavy for deployment)
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.wmv
+videos/
+video_files/
+
+# Large image datasets
+datasets/
+data/
+images/
+test_images/
+sample_images/
+
+# Cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+cache/
+.cache/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+*.out
+
+# Temporary processing files
+temp_*.jpg
+temp_*.png
+temp_*.mp4
+processed_*.jpg
+processed_*.png
+processed_*.mp4
+
+# Model artifacts
+*.onnx
+*.trt
+*.engine
+*.pb
+
+# Large data files
+*.csv
+*.json
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+
+# Configuration with sensitive data
+config.json
+secrets.json
+.api_keys
+.env
+
+# Gradio temporary files
+gradio_cached/
+tmp_gradio/
+
+# OCR and processing cache
+ocr_cache/
+text_cache/
+detection_cache/
+
+# Frame extraction folders
+frames/
+extracted_frames/
+
+# Generated reports and analytics
+reports/
+analytics/
+statistics/
+
+# Backup files
+*.bak
+*.backup
+*_backup
+
+# Development and testing
+test_*
+debug_*
+sample_*
+
+# Virtual environments
+.venv/
+.venv_gpu/
+yolo26_gpu_env/
+env/
+venv/
+
+# Python package files
+*.egg-info/
+dist/
+build/

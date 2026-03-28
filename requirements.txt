@@ -2,3 +2,29 @@ gradio==6.3.0
 ultralytics
 pathlib
 typing
+imageio-ffmpeg
+torchvision
+pytesseract
+transformers
+torch
+sentencepiece
+protobuf==3.20.2
+opencv-python
+timm
+# Enhanced detection dependencies
+numpy
+pillow
+scipy
+# K-means color detection dependencies
+scikit-learn>=1.3.0
+# ResNet-18 feature extraction dependencies
+torch>=1.9.0
+torchvision>=0.10.0
+# PaddleOCR dependencies (GPU enabled for CUDA support)
+paddlepaddle-gpu==2.6.2
+paddleocr>=3.4.0
+# Fallback to CPU version if GPU not available
+# paddlepaddle==2.6.2
+setuptools==68.0.0
+# LightOnOCR integration (GPU ready when CUDA is available)
+# Additional GPU dependencies can be added when CUDA is properly configured

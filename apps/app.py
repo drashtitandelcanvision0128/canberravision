@@ -7399,10 +7399,10 @@ with gr.Blocks(
                         img_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
                         img_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
                         
-                        # Hidden controls (always enabled)
-                        img_resnet = gr.Checkbox(value=True, visible=False)
-                        img_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, visible=False)
-                        img_ocr = gr.Checkbox(value=True, visible=False)
+                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
+                        img_resnet = gr.State(value=True)
+                        img_max_boxes = gr.State(value=10)
+                        img_ocr = gr.State(value=True)
                         
                 with gr.Column(scale=2):
                     img_output = gr.Image(type="pil", label="🎯 Detection Result")
@@ -7460,10 +7460,10 @@ with gr.Blocks(
                         vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="📦 Max Boxes per Frame")
                         vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
-                        # Hidden controls (always enabled)
-                        vid_resnet = gr.Checkbox(value=True, visible=False)
-                        vid_ocr = gr.Checkbox(value=True, visible=False)
-                        vid_ocr_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, visible=False)
+                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
+                        vid_resnet = gr.State(value=True)
+                        vid_ocr = gr.State(value=True)
+                        vid_ocr_every_n = gr.State(value=5)
                     
                     # Progress indicator
                     vid_progress = gr.Textbox(label="📊 Status", value="⏳ Ready to process video...", interactive=False)
@@ -7611,10 +7611,10 @@ with gr.Blocks(
                         webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="📦 Max Boxes per Frame")
                         webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
-                        # Hidden controls (always enabled)
-                        webcam_resnet = gr.Checkbox(value=False, visible=False)
-                        webcam_enable_ocr = gr.Checkbox(value=True, label="🔤 Enable Text Detection")
-                        webcam_ocr_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⚡ OCR Speed (every N frames)")
+                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
+                        webcam_resnet = gr.State(value=False)
+                        webcam_enable_ocr = gr.State(value=True)
+                        webcam_ocr_every_n = gr.State(value=5)
                     
                     gr.Markdown("#### 📹 Webcam Feed")
                     webcam_input = gr.Image(

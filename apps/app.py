@@ -8057,7 +8057,7 @@ if __name__ == "__main__":
             server_name=_server_host,
             server_port=_server_port,
             allowed_paths=[os.getcwd(), custom_temp],
-            prevent_thread_lock=False,
+            prevent_thread_lock=True,
         )
     except KeyboardInterrupt:
         print("\n[INFO] Application interrupted by user. Shutting down gracefully...")

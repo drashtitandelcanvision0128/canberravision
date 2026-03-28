@@ -48,6 +48,7 @@ RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
 # Step 2: Install gradio (compatible with pinned hf_hub)
 # Must install AFTER huggingface_hub to avoid override
 # -------------------------------------------------------
+RUN pip install --no-cache-dir "starlette==0.27.0" "jinja2==3.1.2" "fastapi==0.103.0"
 RUN pip install --no-cache-dir "gradio==4.25.0"
 RUN pip install --no-cache-dir "gradio-client==0.15.1"
 

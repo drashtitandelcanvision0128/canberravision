@@ -79,6 +79,7 @@ RUN pip install --no-cache-dir \
 # Step 5: ML models
 # -------------------------------------------------------
 RUN pip install --no-cache-dir \
+    "numpy<2.0.0" \
     ultralytics \
     "transformers==4.37.2" \
     timm
@@ -87,9 +88,9 @@ RUN pip install --no-cache-dir \
 # Step 6: PaddleOCR - CPU version (server has no GPU)
 # Use || true so build doesn't fail if paddle unavailable
 # -------------------------------------------------------
-RUN pip install --no-cache-dir "paddlepaddle==2.6.2" || \
+RUN pip install --no-cache-dir "numpy<2.0.0" "paddlepaddle==2.6.2" || \
     echo "WARNING: paddlepaddle failed - OCR will be limited"
-RUN pip install --no-cache-dir "paddleocr>=2.7.0" || \
+RUN pip install --no-cache-dir "numpy<2.0.0" "paddleocr>=2.7.0" || \
     echo "WARNING: paddleocr failed - OCR will be limited"
 
 # -------------------------------------------------------

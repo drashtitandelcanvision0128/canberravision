@@ -22,12 +22,11 @@ RUN apt-get update && apt-get install -y \
     libavformat-dev \
     libswscale-dev \
     libgtk-3-dev \
-    libcanberra-gtk-module \
-    libcanberra-gtk3-module \
+    libcanberra-gtk3-0t64 \
     tesseract-ocr \
     tesseract-ocr-eng \
     tesseract-ocr-osd \
-    libgl1-mesa-glx \
+    libgl1 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \

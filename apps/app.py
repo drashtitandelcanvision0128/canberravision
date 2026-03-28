@@ -7666,12 +7666,11 @@ with gr.Blocks(
                 show_progress=False,
             )
             
-            # Timer to update webcam info with JSON
-            webcam_timer = gr.Timer(2.0)  # Update every 2 seconds
-            webcam_timer.tick(
-                update_webcam_info,
-                outputs=webcam_info
-            )
+            # Timer to update webcam info with JSON - disabled for Gradio compatibility
+            # gr.Timer is only available in Gradio 4.32.0+, using alternative approach
+            # webcam_timer = gr.Timer(2.0)
+            # webcam_timer.tick(update_webcam_info, outputs=webcam_info)
+            # Note: JSON updates happen automatically via predict_webcam output
 
         # Parking Detection Tab - Enhanced with Webcam & Video
         with gr.TabItem("🅿️ Parking Detection"):

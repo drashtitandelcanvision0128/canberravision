@@ -1,0 +1,89 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+_trash/
+temp_gradio/
+temp_videos/
+processed_images/
+processed_videos/
+parking_detections/
+extracted_colors/
+uploads/
+*.log
+*.tmp
+
+# Large files and models (if any)
+*.pt
+*.pth
+*.onnx
+*.engine
+*.weights
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Test files
+tests/
+test_*
+*_test.py
+
+# Batch files (Windows specific)
+*.bat
+*.cmd
+
+# Cache and temporary files
+.cache/
+cache/
+tmp/
+temp/

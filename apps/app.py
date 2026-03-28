@@ -6,6 +6,7 @@ import sys
 import tempfile
 import json
 import time
+import signal
 from datetime import datetime
 from pathlib import Path
 import subprocess
@@ -120,6 +121,312 @@ try:
 except ImportError as e:
     PPE_DETECTION_AVAILABLE = False
     print(f"[WARNING] PPE detection system not available: {e}")
+
+# Import database service
+try:
+    from src.unified_detection.database_service import DatabaseService, get_database_service
+    DATABASE_AVAILABLE = True
+    print("[INFO] Database service loaded")
+    # Initialize database connection
+    _db_service = get_database_service()
+except ImportError as e:
+    DATABASE_AVAILABLE = False
+    print(f"[WARNING] Database service not available: {e}")
+
+# Import unified detection module
+try:
+    from unified_detection_module import process_unified_detection_simple
+    UNIFIED_DETECTION_AVAILABLE = True
+    print("[INFO] Unified detection module loaded")
+except ImportError as e:
+    UNIFIED_DETECTION_AVAILABLE = False
+    print(f"[WARNING] Unified detection module not available: {e}")
+
+# Create alias for unified detection function if module loaded
+if UNIFIED_DETECTION_AVAILABLE:
+    def process_unified_detection_all(image, conf_threshold=0.5):
+        """Wrapper that calls the unified detection module and saves to database"""
+        # Call the unified detection function
+        result = process_unified_detection_simple(
+            image, 
+            conf_threshold=conf_threshold,
+            get_model_func=get_model,
+            tesseract_available=TESSERACT_AVAILABLE,
+            parking_available=PARKING_DETECTION_AVAILABLE
+        )
+        
+        # Unpack result
+        annotated_image, json_output, summary = result
+        
+        # Save to database if available
+        if DATABASE_AVAILABLE and '_db_service' in globals() and _db_service and _db_service.enabled:
+            try:
+                import json
+                from datetime import datetime
+                from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PPEInfo, PlateInfo, ParkingSlotInfo
+                
+                # Parse JSON to get detections
+                data = json.loads(json_output)
+                detections = data.get('detections', {})
+                
+                # Create result object for database
+                db_result = UnifiedDetectionResult(
+                    timestamp=datetime.now().isoformat(),
+                    source="IMAGE",
+                    frame_number=0,
+                    processing_time_ms=data.get('metadata', {}).get('processing_time_ms', 0)
+                )
+                
+                # Add vehicle detections
+                for v in detections.get('vehicles', []):
+                    db_result.vehicle_detections.append(VehicleInfo(
+                        vehicle_id=v.get('id', ''),
+                        vehicle_type=v.get('type', ''),
+                        color=v.get('color', ''),
+                        confidence=v.get('confidence', 0),
+                        bbox=v.get('bbox', [0,0,0,0])
+                    ))
+                
+                # Add PPE detections
+                for p in detections.get('ppe', []):
+                    db_result.ppe_detections.append(PPEInfo(
+                        person_id=p.get('person_id', ''),
+                        helmet=p.get('helmet', False),
+                        seatbelt=p.get('seatbelt', False),
+                        vest=p.get('vest', False),
+                        confidence=p.get('confidence', 0),
+                        bbox=p.get('bbox', [0,0,0,0]),
+                        vehicle_type=p.get('vehicle_type', 'unknown')
+                    ))
+                
+                # Add plate detections - THIS IS THE KEY FIX
+                for idx, p in enumerate(detections.get('number_plates', [])):
+                    db_result.plate_detections.append(PlateInfo(
+                        plate_id=f"PLATE_{idx+1:04d}",
+                        text=p.get('text', ''),
+                        confidence=p.get('confidence', 0),
+                        bbox=p.get('bbox', [0,0,0,0])
+                    ))
+                
+                # Add parking detections
+                for s in detections.get('parking', []):
+                    db_result.parking_detections.append(ParkingSlotInfo(
+                        slot_id=s.get('slot_id', 0),
+                        occupied=s.get('occupied', False),
+                        confidence=s.get('confidence', 0),
+                        bbox=s.get('bbox', [0,0,0,0])
+                    ))
+                
+                # Save to database
+                _db_service.save_detection(db_result)
+                print(f"[INFO] Saved {len(detections.get('number_plates', []))} plates to database")
+            except Exception as db_err:
+                print(f"[WARNING] Failed to save to database: {db_err}")
+                import traceback
+                traceback.print_exc()
+        
+        return result
+    
+    # Add unified video detection wrapper
+    def process_unified_video_detection_all(video_path, conf_threshold=0.5):
+        """Wrapper that calls the unified video detection module and saves final results to database"""
+        from unified_detection_module import process_unified_video_detection
+        
+        if video_path is None:
+            return None, "{}", "Please upload a video first"
+        
+        print(f"[INFO] Starting unified video processing for: {video_path}")
+        
+        # Process the entire video first
+        result = process_unified_video_detection(
+            video_path=video_path,
+            conf_threshold=conf_threshold,
+            get_model_func=get_model,
+            tesseract_available=TESSERACT_AVAILABLE,
+            parking_available=PARKING_DETECTION_AVAILABLE
+        )
+        
+        if result.get('success'):
+            # After video processing is complete, save final aggregated results to database
+            if DATABASE_AVAILABLE and '_db_service' in globals() and _db_service and _db_service.enabled:
+                try:
+                    import json
+                    from datetime import datetime
+                    from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PlateInfo
+                    
+                    # Create final aggregated result for database
+                    stats = result.get('stats', {})
+                    db_result = UnifiedDetectionResult(
+                        timestamp=datetime.now().isoformat(),
+                        source="VIDEO",
+                        frame_number=stats.get('processed_frames', 0),
+                        processing_time_ms=int(stats.get('processing_time', 0) * 1000)
+                    )
+                    
+                    # Add unique vehicle detections (aggregated from all frames)
+                    unique_vehicles = {}
+                    for detection in result.get('detections', []):
+                        for vehicle in detection.get('vehicles', []):
+                            vehicle_type = vehicle.get('type', 'unknown')
+                            if vehicle_type not in unique_vehicles:
+                                unique_vehicles[vehicle_type] = 0
+                            unique_vehicles[vehicle_type] += 1
+                    
+                    for vehicle_type, count in unique_vehicles.items():
+                        db_result.vehicle_detections.append(VehicleInfo(
+                            vehicle_id=f"{vehicle_type.upper()}_{count:04d}",
+                            vehicle_type=vehicle_type,
+                            color="unknown",  # Default color since we don't have color info in aggregated results
+                            confidence=0.8,  # Average confidence
+                            bbox=[0, 0, 0, 0]  # Not applicable for aggregated results
+                        ))
+                    
+                    # Add unique license plates detected
+                    unique_plates = stats.get('unique_plates', [])
+                    for idx, plate_text in enumerate(unique_plates):
+                        if plate_text.strip():  # Only add non-empty plates
+                            db_result.plate_detections.append(PlateInfo(
+                                plate_id=f"VIDEO_PLATE_{idx+1:04d}",
+                                text=plate_text,
+                                confidence=0.7,  # Average confidence for video plates
+                                bbox=[0, 0, 0, 0]  # Not applicable for aggregated results
+                            ))
+                    
+                    # Save final aggregated results to database
+                    _db_service.save_detection(db_result)
+                    print(f"[INFO] Saved final video results to database:")
+                    print(f"  - Total frames processed: {stats.get('processed_frames', 0)}")
+                    print(f"  - Unique vehicle types: {len(unique_vehicles)}")
+                    print(f"  - Unique license plates: {len([p for p in unique_plates if p.strip()])}")
+                    
+                except Exception as db_err:
+                    print(f"[WARNING] Failed to save video results to database: {db_err}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Prepare outputs for Gradio
+            output_video = result.get('output_video', '')
+            stats = result.get('stats', {})
+            all_detections = result.get('detections', [])
+            
+            # Get the LAST frame's detections for database storage
+            last_frame_detections = all_detections[-1] if all_detections else None
+            
+            # Verify video file exists and prepare for Gradio display
+            if output_video and os.path.exists(output_video):
+                try:
+                    import shutil
+                    # Copy to a location Gradio can serve
+                    gradio_video_path = os.path.join(os.getcwd(), f"processed_video_{int(time.time())}.mp4")
+                    shutil.copy2(output_video, gradio_video_path)
+                    print(f"[INFO] Video copied for Gradio display: {gradio_video_path}")
+                    video_output = gradio_video_path
+                except Exception as e:
+                    print(f"[WARNING] Failed to copy video for display: {e}")
+                    video_output = output_video
+            else:
+                print(f"[WARNING] Output video not found: {output_video}")
+                video_output = None
+            
+            # After video processing is complete, save LAST FRAME results to database
+            if DATABASE_AVAILABLE and '_db_service' in globals() and _db_service and _db_service.enabled:
+                try:
+                    import json
+                    from datetime import datetime
+                    from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PlateInfo
+                    
+                    # Create result for last frame only
+                    stats = result.get('stats', {})
+                    db_result = UnifiedDetectionResult(
+                        timestamp=datetime.now().isoformat(),
+                        source="VIDEO_LAST_FRAME",
+                        frame_number=stats.get('processed_frames', 0),
+                        processing_time_ms=int(stats.get('processing_time', 0) * 1000)
+                    )
+                    
+                    # Add vehicles from LAST FRAME only
+                    if last_frame_detections:
+                        for vehicle in last_frame_detections.get('vehicles', []):
+                            db_result.vehicle_detections.append(VehicleInfo(
+                                vehicle_id=vehicle.get('vehicle_id', f"VEHICLE_{len(db_result.vehicle_detections)+1:04d}"),
+                                vehicle_type=vehicle.get('type', 'unknown'),
+                                color=vehicle.get('color', 'unknown'),
+                                confidence=vehicle.get('confidence', 0.0),
+                                bbox=vehicle.get('bbox', [0, 0, 0, 0])
+                            ))
+                        
+                        # Add license plates from LAST FRAME only
+                        for plate in last_frame_detections.get('plates', []):
+                            plate_text = plate.get('text', '').strip()
+                            if plate_text:  # Only add non-empty plates
+                                db_result.plate_detections.append(PlateInfo(
+                                    plate_id=plate.get('plate_id', f"PLATE_{len(db_result.plate_detections)+1:04d}"),
+                                    text=plate_text,
+                                    confidence=plate.get('confidence', 0.0),
+                                    bbox=plate.get('bbox', [0, 0, 0, 0])
+                                ))
+                    
+                    # Save LAST FRAME results to database
+                    _db_service.save_detection(db_result)
+                    print(f"[INFO] Saved LAST FRAME video results to database:")
+                    print(f"  - Frame number: {stats.get('processed_frames', 0)} (last frame)")
+                    print(f"  - Vehicles in last frame: {len(db_result.vehicle_detections)}")
+                    print(f"  - Plates in last frame: {len(db_result.plate_detections)}")
+                    
+                except Exception as db_err:
+                    print(f"[WARNING] Failed to save video results to database: {db_err}")
+                    import traceback
+                    traceback.print_exc()
+            
+            # Create JSON output
+            json_output = json.dumps({
+                'success': True,
+                'stats': stats,
+                'summary': result.get('summary', ''),
+                'output_video': output_video,
+                'video_exists': os.path.exists(output_video) if output_video else False
+            }, indent=2)
+            
+            # Create human-readable summary
+            summary = f"""🎥 **Video Processing Complete!**
+
+📊 **Processing Statistics:**
+• Total Frames: {stats.get('processed_frames', 0)}
+• Processing Time: {stats.get('processing_time', 0):.2f}s
+• Average FPS: {stats.get('fps', 0):.2f}
+
+🚗 **Vehicle Detection:**
+• Total Vehicles Detected: {stats.get('vehicles_detected', 0)}
+
+📍 **License Plate Detection:**
+• Total Plates Found: {stats.get('plates_found', 0)}
+• Unique Plates: {len(stats.get('unique_plates', []))}
+
+💾 **Output:**
+• Processed Video: {output_video}
+
+{result.get('summary', '')}"""
+            
+            return output_video, json_output, summary
+        else:
+            error_msg = result.get('error', 'Unknown error')
+            print(f"[ERROR] Video processing failed: {error_msg}")
+            
+            json_output = json.dumps({
+                'success': False,
+                'error': error_msg
+            }, indent=2)
+            
+            summary = f"❌ **Video Processing Failed**\n\nError: {error_msg}"
+            return None, json_output, summary
+else:
+    def process_unified_detection_all(image, conf_threshold=0.5):
+        """Fallback when unified detection is not available"""
+        return None, "{}", "Unified detection module not loaded"
+    
+    def process_unified_video_detection_all(video_path, conf_threshold=0.5):
+        """Fallback when unified video detection is not available"""
+        return {'error': 'Unified detection module not loaded', 'success': False}
 
 # Import enhanced detection for challenging images
 try:
@@ -7571,6 +7878,99 @@ with gr.Blocks(
                 time_limit=30,
             )
 
+        # ============================================================
+        # ALL DETECTION TAB - UNIFIED DETECTION (Image/Video/Webcam)
+        # ============================================================
+        with gr.TabItem("🔥 All Detection"):
+            gr.Markdown("## 🔥 All-in-One Detection System")
+            gr.Markdown("**Detect everything at once:** Vehicles + License Plates + PPE + Parking + Objects")
+            
+            with gr.Tabs():
+                # Image Upload Tab
+                with gr.TabItem("📁 Image"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            all_input_img = gr.Image(type="numpy", label="📁 Upload Image")
+                            
+                            all_conf_img = gr.Slider(
+                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
+                                label="🎯 Confidence Threshold"
+                            )
+                            
+                            all_btn_img = gr.Button("🔍 Run All Detection", variant="primary", size="lg")
+                            
+                        with gr.Column(scale=2):
+                            all_output_img = gr.Image(type="numpy", label="🎯 Detection Result", height=400)
+                            all_json_img = gr.Code(label="JSON Output", language="json", lines=15)
+                            all_summary_img = gr.Textbox(label="Summary", lines=10, interactive=False)
+                
+                # Video Upload Tab
+                with gr.TabItem("🎥 Video"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            all_input_vid = gr.Video(label="🎥 Upload Video")
+                            
+                            all_conf_vid = gr.Slider(
+                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
+                                label="🎯 Confidence Threshold"
+                            )
+                            
+                            all_btn_vid = gr.Button("🔍 Process Video", variant="primary", size="lg")
+                            
+                        with gr.Column(scale=2):
+                            all_output_vid = gr.Video(label="🎯 Processed Video", height=400)
+                            all_json_vid = gr.Code(label="JSON Output", language="json", lines=10)
+                            all_summary_vid = gr.Textbox(label="Summary", lines=8, interactive=False)
+                
+                # Live Webcam Tab
+                with gr.TabItem("📸 Webcam"):
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            gr.Markdown("#### 📹 Live Webcam Feed")
+                            
+                            all_conf_cam = gr.Slider(
+                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
+                                label="🎯 Confidence Threshold"
+                            )
+                            
+                            all_webcam_input = gr.Image(
+                                sources=["webcam"],
+                                type="numpy",
+                                label="📸 Live Camera",
+                                streaming=True,
+                                height=400,
+                            )
+                            
+                        with gr.Column(scale=2):
+                            gr.Markdown("#### 🎯 Live Detection")
+                            all_webcam_output = gr.Image(type="numpy", label="Real-time Results", height=400)
+                            all_webcam_info = gr.Textbox(
+                                label="Detection Info",
+                                interactive=False,
+                                lines=6,
+                                value="📹 Ready for live detection"
+                            )
+            
+            # Connect All Detection components
+            all_btn_img.click(
+                fn=process_unified_detection_all,
+                inputs=[all_input_img, all_conf_img],
+                outputs=[all_output_img, all_json_img, all_summary_img]
+            )
+            
+            all_btn_vid.click(
+                fn=process_unified_video_detection_all,
+                inputs=[all_input_vid, all_conf_vid],
+                outputs=[all_output_vid, all_json_vid, all_summary_vid]
+            )
+            
+            all_webcam_input.stream(
+                fn=process_unified_detection_all,
+                inputs=[all_webcam_input, all_conf_cam],
+                outputs=[all_webcam_output, all_webcam_info],
+                time_limit=30
+            )
+
     # Modern footer with system information
     gr.Markdown(
         """
@@ -7606,6 +8006,10 @@ with gr.Blocks(
         """
     )
 
+# ============================================================
+# END OF UNIFIED DETECTION SECTION
+# ============================================================
+
 if __name__ == "__main__":
     print("[INFO] Starting application...")
     print(f"[INFO] Python version: {sys.version}")
@@ -7622,6 +8026,27 @@ if __name__ == "__main__":
     if _gradio_port_env not in (None, "", "0"):
         _server_port = int(_gradio_port_env)
 
+    # Create custom temp directory with proper permissions
+    custom_temp = os.path.join(os.getcwd(), "temp_gradio")
+    os.makedirs(custom_temp, exist_ok=True)
+    print(f"[INFO] Using custom temp directory: {custom_temp}")
+    
+    # Set environment variable to use custom temp directory
+    os.environ["GRADIO_TEMP_DIR"] = custom_temp
+    
+    # Cleanup old temp files on startup
+    try:
+        import shutil
+        for item in os.listdir(custom_temp):
+            item_path = os.path.join(custom_temp, item)
+            if os.path.isfile(item_path):
+                os.remove(item_path)
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+        print("[INFO] Cleaned up old temporary files")
+    except Exception as cleanup_error:
+        print(f"[WARNING] Could not cleanup temp directory: {cleanup_error}")
+    
     try:
         demo.launch(
             ssr_mode=False,
@@ -7631,7 +8056,7 @@ if __name__ == "__main__":
             inbrowser=True,
             server_name="127.0.0.1",
             server_port=_server_port,
-            allowed_paths=[os.getcwd(), tempfile.gettempdir()],
+            allowed_paths=[os.getcwd(), custom_temp],
             prevent_thread_lock=False,
         )
     except KeyboardInterrupt:
@@ -7648,9 +8073,34 @@ if __name__ == "__main__":
                 inbrowser=False,  # Disable auto-browser opening
                 server_name="127.0.0.1",
                 server_port=7861 if _server_port is None else _server_port + 1,
-                allowed_paths=[os.getcwd(), tempfile.gettempdir()],
+                allowed_paths=[os.getcwd(), custom_temp],
                 prevent_thread_lock=True,  # Enable thread lock prevention
             )
         except Exception as e2:
             print(f"[ERROR] Alternative launch also failed: {e2}")
             sys.exit(1)
+    finally:
+        # Cleanup temp directory on exit
+        try:
+            if os.path.exists(custom_temp):
+                print(f"[INFO] Cleaning up temp directory: {custom_temp}")
+                shutil.rmtree(custom_temp)
+        except Exception as cleanup_error:
+            print(f"[WARNING] Could not cleanup temp directory on exit: {cleanup_error}")
+
+
+def cleanup_temp_directory(signum=None, frame=None):
+    """Signal handler for cleanup"""
+    custom_temp = os.path.join(os.getcwd(), "temp_gradio")
+    try:
+        if os.path.exists(custom_temp):
+            print(f"[INFO] Signal cleanup: Removing temp directory: {custom_temp}")
+            shutil.rmtree(custom_temp)
+    except Exception as e:
+        print(f"[WARNING] Signal cleanup failed: {e}")
+    sys.exit(0)
+
+
+# Register signal handlers for graceful shutdown
+signal.signal(signal.SIGINT, cleanup_temp_directory)
+signal.signal(signal.SIGTERM, cleanup_temp_directory)

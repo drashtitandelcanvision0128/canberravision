@@ -107,8 +107,8 @@ RUN chmod -R 755 /app
 # Expose Gradio port
 EXPOSE 7860
 
-# Healthcheck — no curl needed in the image, use python
+# Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/')" || exit 1
+    CMD curl -f http://127.0.0.1:7860/ || exit 1
 
 CMD ["python", "apps/app.py"]

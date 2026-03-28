@@ -7664,7 +7664,6 @@ with gr.Blocks(
                 ],
                 outputs=[webcam_output, webcam_info],
                 show_progress=False,
-                time_limit=30,
             )
             
             # Timer to update webcam info with JSON
@@ -7773,7 +7772,6 @@ with gr.Blocks(
                 inputs=[parking_webcam_input, parking_conf_cam, parking_model_cam, parking_labels_cam, parking_conf_show_cam, parking_every_n_cam],
                 outputs=[parking_webcam_output, parking_webcam_info],
                 show_progress=False,
-                time_limit=30,
             )
 
         # PPE Detection Tab - Similar structure to Parking Detection
@@ -7875,7 +7873,6 @@ with gr.Blocks(
                 inputs=[ppe_webcam_input, ppe_conf_cam, ppe_model_cam, ppe_labels_cam, ppe_conf_show_cam, ppe_every_n_cam],
                 outputs=[ppe_webcam_output, ppe_webcam_info],
                 show_progress=False,
-                time_limit=30,
             )
 
         # ============================================================
@@ -7968,7 +7965,6 @@ with gr.Blocks(
                 fn=process_unified_detection_all,
                 inputs=[all_webcam_input, all_conf_cam],
                 outputs=[all_webcam_output, all_webcam_info],
-                time_limit=30
             )
 
     # Modern footer with system information
@@ -8049,8 +8045,8 @@ if __name__ == "__main__":
     
     # Detect if running inside Docker container
     _is_docker = os.path.exists('/.dockerenv') or os.environ.get('APP_ENV') == 'production'
-    _server_host = "0.0.0.0" if _is_docker else "127.0.0.1"
-    _open_browser = not _is_docker
+    _server_host = "0.0.0.0"
+    _open_browser = False
     print(f"[INFO] Server host: {_server_host}, Open browser: {_open_browser}")
     
     try:

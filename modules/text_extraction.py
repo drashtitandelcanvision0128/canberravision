@@ -9,7 +9,7 @@ import time
 import json
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, List, Tuple, Union, Any
 import numpy as np
 import cv2
 

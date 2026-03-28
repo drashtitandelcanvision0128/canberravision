@@ -8047,14 +8047,20 @@ if __name__ == "__main__":
     except Exception as cleanup_error:
         print(f"[WARNING] Could not cleanup temp directory: {cleanup_error}")
     
+    # Detect if running inside Docker container
+    _is_docker = os.path.exists('/.dockerenv') or os.environ.get('APP_ENV') == 'production'
+    _server_host = "0.0.0.0" if _is_docker else "127.0.0.1"
+    _open_browser = not _is_docker
+    print(f"[INFO] Server host: {_server_host}, Open browser: {_open_browser}")
+    
     try:
         demo.launch(
             ssr_mode=False,
             share=False,
             show_error=True,
             quiet=False,
-            inbrowser=True,
-            server_name="127.0.0.1",
+            inbrowser=_open_browser,
+            server_name=_server_host,
             server_port=_server_port,
             allowed_paths=[os.getcwd(), custom_temp],
             prevent_thread_lock=False,
@@ -8070,11 +8076,11 @@ if __name__ == "__main__":
                 share=False,
                 show_error=True,
                 quiet=False,
-                inbrowser=False,  # Disable auto-browser opening
-                server_name="127.0.0.1",
+                inbrowser=False,
+                server_name=_server_host,
                 server_port=7861 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp],
-                prevent_thread_lock=True,  # Enable thread lock prevention
+                prevent_thread_lock=True,
             )
         except Exception as e2:
             print(f"[ERROR] Alternative launch also failed: {e2}")

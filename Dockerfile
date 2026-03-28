@@ -54,7 +54,7 @@ RUN pip install --no-cache-dir "gradio==4.44.1"
 # Step 3: Core dependencies
 # -------------------------------------------------------
 RUN pip install --no-cache-dir \
-    numpy \
+    "numpy<2.0.0" \
     pillow \
     opencv-python-headless \
     psycopg2-binary \

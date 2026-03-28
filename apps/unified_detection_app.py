@@ -638,8 +638,7 @@ def create_interface():
         webcam_input.stream(
             fn=process_webcam_frame,
             inputs=[webcam_input],
-            outputs=[output_image, json_output, summary_text],
-            time_limit=30  # 30 FPS limit
+            outputs=[output_image, json_output, summary_text]
         )
     
     return interface

@@ -766,6 +766,8 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
         print(f"[DEBUG] Error in license plate OCR: {e}")
         return ""
 
+# Re-import Optional to ensure availability during module loading
+from typing import Optional
 
 def _try_multi_angle_ocr(plate_crop: np.ndarray) -> Optional[str]:
     """

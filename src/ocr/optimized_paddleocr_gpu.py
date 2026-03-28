@@ -80,7 +80,7 @@ def get_paddle_ocr_instance(
     use_gpu: Optional[bool] = None,
     batch_size: int = 8,
     precision: str = 'fp32'
-) -> Optional[PaddleOCR]:
+) -> Optional["PaddleOCR"]:
     """
     Get or create optimized PaddleOCR instance with GPU support.
     

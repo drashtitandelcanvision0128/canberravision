@@ -8018,7 +8018,7 @@ if __name__ == "__main__":
         print("[INFO] CUDA not available, using CPU")
     
     _gradio_port_env = os.environ.get("GRADIO_SERVER_PORT")
-    _server_port = None
+    _server_port = 7860
     if _gradio_port_env not in (None, "", "0"):
         _server_port = int(_gradio_port_env)
 
@@ -8051,7 +8051,6 @@ if __name__ == "__main__":
     
     try:
         demo.launch(
-            ssr_mode=False,
             share=False,
             show_error=True,
             quiet=False,
@@ -8068,7 +8067,6 @@ if __name__ == "__main__":
         print("[INFO] Trying alternative launch configuration...")
         try:
             demo.launch(
-                ssr_mode=False,
                 share=False,
                 show_error=True,
                 quiet=False,

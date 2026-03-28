@@ -49,6 +49,7 @@ RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
 # Must install AFTER huggingface_hub to avoid override
 # -------------------------------------------------------
 RUN pip install --no-cache-dir "gradio==4.44.1"
+RUN pip install --no-cache-dir "gradio-client==0.16.0"
 
 # -------------------------------------------------------
 # Step 3: Core dependencies

@@ -8861,6 +8861,8 @@ with gr.Blocks(
         # ============================================================
         # ALL DETECTION TAB - UNIFIED DETECTION (Image/Video/Webcam)
         # ============================================================
+        # Temporarily commented as requested
+        """
         with gr.TabItem(" All Detection"):
             gr.Markdown("##  All-in-One Detection System")
             gr.Markdown("**Detect everything at once:** Vehicles + License Plates + PPE + Parking + Objects")
@@ -8880,48 +8882,28 @@ with gr.Blocks(
                             all_btn_img = gr.Button("🔍 Run All Detection", variant="primary", size="lg")
                             
                         with gr.Column(scale=2):
-                            all_output_img = gr.Image(type="numpy", label="🎯 Detection Result", height=400)
-                            all_json_img = gr.Code(label="JSON Output", language="json", lines=15)
-                            all_summary_img = gr.Textbox(label="Summary", lines=10, interactive=False)
+                            all_output_img = gr.Image(type="pil", label="Detection Results")
+                            all_json_img = gr.JSON(label="JSON Results")
+                            all_summary_img = gr.Markdown("### Upload an image to see results")
                 
-                # Video Upload Tab
+                # Video Detection Sub-tab
                 with gr.TabItem("🎥 Video"):
                     with gr.Row():
                         with gr.Column(scale=1):
-                            all_input_vid = gr.Video(label="🎥 Upload Video")
-                            
-                            all_conf_vid = gr.Slider(
-                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
-                                label="🎯 Confidence Threshold"
-                            )
-                            
-                            all_btn_vid = gr.Button("🔍 Process Video", variant="primary", size="lg")
-                            
+                            all_input_vid = gr.Video(label="Upload Video")
+                            all_conf_vid = gr.Slider(0.1, 1.0, 0.5, step=0.1, label="Confidence Threshold")
+                            all_btn_vid = gr.Button("🎬 Process Video", variant="primary")
+                        
                         with gr.Column(scale=2):
-                            all_output_vid = gr.Video(label="🎯 Processed Video", height=400)
-                            all_json_vid = gr.Code(label="JSON Output", language="json", lines=10)
-                            all_summary_vid = gr.Textbox(label="Summary", lines=8, interactive=False)
+                            all_output_vid = gr.Video(label="Processed Video")
+                            all_json_vid = gr.JSON(label="Video Results")
+                            all_summary_vid = gr.Markdown("### Upload a video to see results")
                 
-                # Live Webcam Tab
-                with gr.TabItem("📸 Webcam"):
+                # Webcam Detection Sub-tab
+                with gr.TabItem("📹 Webcam"):
                     with gr.Row():
                         with gr.Column(scale=1):
-                            gr.Markdown("#### 📹 Live Webcam Feed")
-                            
-                            all_conf_cam = gr.Slider(
-                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
-                                label="🎯 Confidence Threshold"
-                            )
-                            
-                            all_webcam_input = gr.Image(
-                                sources=["webcam"],
-                                type="numpy",
-                                label="📸 Live Camera",
-                                streaming=True,
-                                height=400,
-                            )
-                            
-                        with gr.Column(scale=2):
+                            all_conf_cam = gr.Slider(0.1, 1.0, 0.5, step=0.1, label="Confidence Threshold")
                             gr.Markdown("#### 🎯 Live Detection")
                             all_webcam_output = gr.Image(type="numpy", label="Real-time Results", height=400)
                             all_webcam_info = gr.Textbox(
@@ -8949,6 +8931,7 @@ with gr.Blocks(
                 inputs=[all_webcam_input, all_conf_cam],
                 outputs=[all_webcam_output, all_webcam_info],
             )
+        """
 
     # Footer removed as requested
 

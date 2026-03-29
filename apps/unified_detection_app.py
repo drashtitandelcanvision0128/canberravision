@@ -419,24 +419,25 @@ def create_interface():
     .json-output {
         font-family: 'Courier New', monospace;
         font-size: 12px;
-        background-color: #1e1e1e;
-        color: #d4d4d4;
+        background-color: var(--color-background-secondary);
+        color: var(--color-text-primary);
         padding: 15px;
         border-radius: 8px;
         max-height: 500px;
         overflow-y: auto;
+        border: 1px solid var(--color-border-primary);
     }
     .detection-panel {
-        border: 2px solid #4CAF50;
+        border: 2px solid var(--color-accent-soft);
         border-radius: 10px;
         padding: 20px;
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        background: var(--color-background-primary);
     }
     .title-text {
         text-align: center;
         font-size: 32px;
         font-weight: bold;
-        background: linear-gradient(45deg, #00f2ff, #00ff88);
+        background: linear-gradient(45deg, var(--color-accent-primary), var(--color-accent-secondary));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 10px;

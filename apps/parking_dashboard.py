@@ -429,42 +429,42 @@ def create_templates():
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-        .header { background: #2c3e50; color: white; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--color-background-primary); color: var(--color-text-primary); }
+        .header { background: var(--color-background-secondary); color: var(--color-text-primary); padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .header h1 { font-size: 1.8rem; font-weight: 300; }
         .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .stat-card h3 { color: #7f8c8d; font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; }
-        .stat-card .value { font-size: 2rem; font-weight: bold; color: #2c3e50; }
+        .stat-card { background: var(--color-background-secondary); padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-card h3 { color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 2rem; font-weight: bold; color: var(--color-text-primary); }
         .stat-card .change { font-size: 0.8rem; margin-top: 0.5rem; }
-        .positive { color: #27ae60; }
-        .negative { color: #e74c3c; }
+        .positive { color: var(--color-success); }
+        .negative { color: var(--color-error); }
         .zones-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-        .zone-card { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
-        .zone-header { background: #34495e; color: white; padding: 1rem; }
+        .zone-card { background: var(--color-background-secondary); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; }
+        .zone-header { background: var(--color-background-tertiary); color: var(--color-text-primary); padding: 1rem; }
         .zone-content { padding: 1.5rem; }
-        .occupancy-bar { background: #ecf0f1; height: 20px; border-radius: 10px; overflow: hidden; margin: 1rem 0; }
-        .occupancy-fill { background: #3498db; height: 100%; transition: width 0.3s ease; }
+        .occupancy-bar { background: var(--color-border-primary); height: 20px; border-radius: 10px; overflow: hidden; margin: 1rem 0; }
+        .occupancy-fill { background: var(--color-accent-primary); height: 100%; transition: width 0.3s ease; }
         .spots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; margin-top: 1rem; }
         .spot { width: 40px; height: 40px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: bold; color: white; cursor: pointer; }
-        .spot.empty { background: #27ae60; }
-        .spot.occupied { background: #e74c3c; }
-        .alerts-section { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 2rem; }
+        .spot.empty { background: var(--color-success); }
+        .spot.occupied { background: var(--color-error); }
+        .alerts-section { background: var(--color-background-secondary); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 2rem; }
         .alert { padding: 1rem; margin: 0.5rem 0; border-radius: 4px; border-left: 4px solid; }
-        .alert.critical { border-left-color: #e74c3c; background: #fdf2f2; }
-        .alert.high { border-left-color: #f39c12; background: #fef9e7; }
-        .alert.medium { border-left-color: #3498db; background: #ebf3fd; }
-        .alert.low { border-left-color: #27ae60; background: #e8f8f5; }
+        .alert.critical { border-left-color: var(--color-error); background: var(--color-error-background); }
+        .alert.high { border-left-color: var(--color-warning); background: var(--color-warning-background); }
+        .alert.medium { border-left-color: var(--color-accent-primary); background: var(--color-accent-background); }
+        .alert.low { border-left-color: var(--color-success); background: var(--color-success-background); }
         .controls { display: flex; gap: 1rem; margin-bottom: 2rem; }
         .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background 0.3s; }
-        .btn-primary { background: #3498db; color: white; }
-        .btn-success { background: #27ae60; color: white; }
-        .btn-danger { background: #e74c3c; color: white; }
+        .btn-primary { background: var(--color-accent-primary); color: white; }
+        .btn-success { background: var(--color-success); color: white; }
+        .btn-danger { background: var(--color-error); color: white; }
         .btn:hover { opacity: 0.9; }
-        .chart-container { background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 2rem; }
-        .loading { text-align: center; padding: 2rem; color: #7f8c8d; }
-        .error { background: #e74c3c; color: white; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+        .chart-container { background: var(--color-background-secondary); border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 2rem; }
+        .loading { text-align: center; padding: 2rem; color: var(--color-text-secondary); }
+        .error { background: var(--color-error); color: white; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
     </style>
 </head>
 <body>
@@ -542,8 +542,8 @@ def create_templates():
                     datasets: [{
                         label: 'Occupancy Rate (%)',
                         data: [],
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderColor: 'var(--color-accent-primary)',
+                        backgroundColor: 'var(--color-accent-background)',
                         tension: 0.4
                     }]
                 },
@@ -648,7 +648,7 @@ def create_templates():
                 const alertsContainer = document.getElementById('alerts-container');
                 
                 if (alerts.length === 0) {
-                    alertsContainer.innerHTML = '<div style="color: #27ae60;">✅ No active alerts</div>';
+                    alertsContainer.innerHTML = '<div style="color: var(--color-success);">✅ No active alerts</div>';
                 } else {
                     alertsContainer.innerHTML = alerts.map(alert => `
                         <div class="alert ${alert.severity.toLowerCase()}">

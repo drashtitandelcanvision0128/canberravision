@@ -98,9 +98,674 @@ try:
         print("[INFO] Gender detection model loaded successfully")
     else:
         print("[WARNING] Gender detection model failed to load")
-except ImportError as e:
+except ImportError:
     GENDER_MODEL_AVAILABLE = False
-    gender_model = None
+    print("[WARNING] Gender detection model not available")
+
+# Custom CSS for Exact C-Vision Theme from Image
+CUSTOM_CSS = """
+/* Global Theme Variables - Exact Match from Image */
+:root {
+    /* C-Vision Dark Theme */
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --secondary-color: #1e40af;
+    --accent-color: #60a5fa;
+    --background-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+    --background-color: #0f172a;
+    --surface-color: #1e293b;
+    --card-color: #334155;
+    --text-primary: #ffffff;
+    --text-secondary: #e2e8f0;
+    --text-muted: #94a3b8;
+    --border-color: #475569;
+    --success-color: #10b981;
+    --warning-color: #f59e0b;
+    --error-color: #ef4444;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+    --glow-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Main Container - Exact Background Match */
+.gradio-container {
+    background: var(--background-gradient) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    min-height: 100vh;
+}
+
+/* Header - C-Vision Branding */
+.gradio-container > div:first-child {
+    background: var(--surface-color) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 15px 20px !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* C-Vision Logo and Title */
+.c-vision-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px !important;
+    color: var(--text-primary) !important;
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    padding: 15px 20px !important;
+}
+
+/* Settings Button */
+.settings-button {
+    background: var(--primary-color) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+}
+
+.settings-button:hover {
+    background: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 0 15px var(--glow-color) !important;
+}
+
+/* Settings Dropdown */
+.settings-dropdown {
+    position: relative !important;
+    display: inline-block !important;
+}
+
+.settings-menu {
+    display: none !important;
+    position: absolute !important;
+    right: 0 !important;
+    top: 100% !important;
+    background: var(--surface-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 0 20px var(--shadow-color) !important;
+    z-index: 1000 !important;
+    min-width: 150px !important;
+    margin-top: 5px !important;
+}
+
+.settings-menu a {
+    display: block !important;
+    padding: 10px 15px !important;
+    color: var(--text-secondary) !important;
+    text-decoration: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    transition: all 0.3s ease !important;
+    font-size: 14px !important;
+}
+
+.settings-menu a:last-child {
+    border-bottom: none !important;
+}
+
+.settings-menu a:hover {
+    background: var(--card-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.settings-menu a:first-child:hover {
+    background: var(--card-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Navigation Tabs - Exact Match */
+.tabs {
+    background: transparent !important;
+    border: none !important;
+    margin: 20px 0 !important;
+}
+
+.tabs button {
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    border: none !important;
+    border-radius: 8px !important;
+    margin: 0 5px !important;
+    padding: 12px 20px !important;
+    transition: all 0.3s ease !important;
+    font-weight: 500 !important;
+    font-size: 14px !important;
+}
+
+.tabs button:hover {
+    background: var(--card-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.tabs button.selected {
+    background: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 0 20px var(--glow-color) !important;
+}
+
+/* Main Content Area */
+.main-content {
+    padding: 0 20px !important;
+}
+
+/* Section Headers */
+.section-header {
+    color: var(--text-primary) !important;
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    margin-bottom: 20px !important;
+    text-align: center !important;
+}
+
+/* Upload Panel - Exact Match */
+.upload-panel {
+    background: var(--surface-color) !important;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 8px !important;
+    text-align: center !important;
+    position: relative !important;
+    transition: all 0.3s ease !important;
+    min-height: 60px !important;
+}
+
+.upload-panel:hover {
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 30px var(--glow-color) !important;
+}
+
+.upload-panel h3 {
+    color: var(--text-primary) !important;
+    margin-bottom: 5px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+}
+
+/* Image Upload Area - Exact Match */
+.upload-area {
+    border: 2px dashed var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 40px 20px !important;
+    background: var(--card-color) !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+}
+
+.upload-area:hover {
+    border-color: var(--primary-color) !important;
+    background: var(--surface-color) !important;
+}
+
+.upload-icon {
+    font-size: 48px !important;
+    color: var(--primary-color) !important;
+    margin-bottom: 15px !important;
+}
+
+.upload-text {
+    color: var(--text-secondary) !important;
+    font-size: 16px !important;
+    margin-bottom: 10px !important;
+}
+
+.upload-subtext {
+    color: var(--text-muted) !important;
+    font-size: 14px !important;
+}
+
+/* Result Panel - Exact Match */
+.result-panel {
+    background: var(--surface-color) !important;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    min-height: 400px !important;
+    position: relative !important;
+}
+
+.result-panel h3 {
+    color: var(--text-primary) !important;
+    margin-bottom: 15px !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+}
+
+/* Result Image Container - Inside the panel */
+.result-image-container {
+    background: var(--card-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 10px !important;
+    margin-top: 0 !important;
+    position: relative !important;
+}
+
+.result-image-container img {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 8px !important;
+}
+
+.result-placeholder {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 300px !important;
+    color: var(--text-muted) !important;
+}
+
+.result-placeholder-icon {
+    font-size: 64px !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 20px !important;
+    opacity: 0.5 !important;
+}
+
+/* AI Model Selection - Exact Match */
+.model-selection {
+    background: var(--surface-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    padding: 20px !important;
+    margin-top: 20px !important;
+}
+
+.model-selection h4 {
+    color: var(--text-primary) !important;
+    margin-bottom: 15px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+}
+
+/* Radio Button Groups - Exact Match */
+.gradio-container .gr-radio-group {
+    display: flex !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+.gradio-container .gr-radio-group label {
+    background: var(--card-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    color: var(--text-secondary) !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    margin: 0 !important;
+}
+
+.gradio-container .gr-radio-group label:hover {
+    background: var(--surface-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.gradio-container .gr-radio-group input[type="radio"]:checked + label {
+    background: var(--primary-color) !important;
+    color: white !important;
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 15px var(--glow-color) !important;
+}
+
+/* Detect Button - Exact Match */
+.detect-button {
+    background: var(--primary-color) !important;
+    border: 2px solid var(--primary-color) !important;
+    color: white !important;
+    border-radius: 12px !important;
+    padding: 15px 30px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    width: 100% !important;
+    margin-top: 20px !important;
+    box-shadow: 0 0 20px var(--glow-color) !important;
+}
+
+.detect-button:hover {
+    background: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 0 30px var(--glow-color) !important;
+}
+
+/* Advanced Settings - Exact Match */
+.advanced-settings {
+    margin-top: 20px !important;
+}
+
+.advanced-settings .gr-accordion {
+    background: var(--surface-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+}
+
+.advanced-settings .gr-accordion button {
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    border: none !important;
+    padding: 15px !important;
+    font-weight: 500 !important;
+}
+
+/* Features Section - Exact Match */
+.features-section {
+    background: var(--surface-color) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    padding: 25px !important;
+    margin-top: 20px !important;
+}
+
+.features-header {
+    color: var(--text-primary) !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin-bottom: 15px !important;
+}
+
+.ready-message {
+    color: var(--success-color) !important;
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    margin-bottom: 10px !important;
+}
+
+.instructions {
+    color: var(--text-secondary) !important;
+    font-size: 14px !important;
+    margin-bottom: 20px !important;
+    line-height: 1.5 !important;
+}
+
+.features-list {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.features-list li {
+    color: var(--text-secondary) !important;
+    padding: 8px 0 !important;
+    font-size: 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.features-list li::before {
+    content: "✓" !important;
+    color: var(--success-color) !important;
+    font-weight: bold !important;
+}
+
+/* GPU Graphics - Exact Match */
+.gpu-graphics {
+    position: absolute !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 80px !important;
+    height: 80px !important;
+    background: var(--card-color) !important;
+    border: 2px solid var(--primary-color) !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    color: var(--primary-color) !important;
+    box-shadow: 0 0 20px var(--glow-color) !important;
+}
+
+/* Override all Gradio defaults */
+.gradio-container .gr-block,
+.gradio-container .gr-box,
+.gradio-container .gr-panel {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Hide Gradio footer */
+.gradio-container .footer,
+.gradio-container .gr-footer,
+footer {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Hide any bottom links or options */
+.gradio-container > div:last-child,
+.gradio-container .gradio-footer,
+.gradio-container .gradio-app-footer {
+    display: none !important;
+}
+
+.gradio-container .gr-button {
+    background: var(--primary-color) !important;
+    border: 1px solid var(--primary-color) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.gradio-container .gr-button:hover {
+    background: var(--primary-hover) !important;
+    border-color: var(--primary-hover) !important;
+}
+
+.gradio-container .gr-image,
+.gradio-container .gr-plot {
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    background: var(--card-color) !important;
+}
+
+.gradio-container .gr-markdown {
+    color: var(--text-primary) !important;
+}
+
+.gradio-container .gr-markdown h1,
+.gradio-container .gr-markdown h2,
+.gradio-container .gr-markdown h3 {
+    color: var(--text-primary) !important;
+}
+
+.gradio-container .gr-markdown p,
+.gradio-container .gr-markdown span,
+.gradio-container .gr-markdown div {
+    color: var(--text-secondary) !important;
+}
+
+.gradio-container .gr-slider {
+    background: var(--card-color) !important;
+}
+
+.gradio-container .gr-slider input[type="range"] {
+    background: var(--primary-color) !important;
+}
+
+.gradio-container .gr-textbox,
+.gradio-container .gr-number {
+    background: var(--card-color) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+    border-radius: 8px !important;
+}
+
+.gradio-container label {
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+}
+
+/* Remove all unwanted margins and padding */
+.gradio-container > div {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--surface-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-hover);
+}
+"""
+
+# JavaScript for theme toggle functionality
+THEME_JS = """
+function toggleTheme() {
+    const html = document.documentElement;
+    const currentTheme = html.getAttribute('data-theme');
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    // Update toggle button text
+    const toggleBtn = document.querySelector('.theme-toggle');
+    if (toggleBtn) {
+        toggleBtn.innerHTML = newTheme === 'light' ? '🌙' : '☀️';
+    }
+    
+    // Force refresh of CSS variables and text colors
+    forceThemeUpdate(newTheme);
+    
+    console.log('Theme switched to:', newTheme);
+}
+
+function forceThemeUpdate(theme) {
+    // Force text color updates for all elements
+    const allElements = document.querySelectorAll('*');
+    const textColor = theme === 'light' ? '#0f172a' : '#f1f5f9';
+    
+    allElements.forEach(element => {
+        if (element.children.length === 0 || element.tagName === 'P' || 
+            element.tagName === 'SPAN' || element.tagName === 'DIV' ||
+            element.tagName === 'H1' || element.tagName === 'H2' || 
+            element.tagName === 'H3' || element.tagName === 'H4' ||
+            element.tagName === 'H5' || element.tagName === 'H6' ||
+            element.tagName === 'LABEL') {
+            element.style.color = textColor;
+        }
+    });
+    
+    // Force reflow
+    document.body.style.display = 'none';
+    document.body.offsetHeight; // Trigger reflow
+    document.body.style.display = '';
+    
+    // Apply theme again after reflow
+    setTimeout(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+        forceTextColors(theme);
+    }, 100);
+}
+
+function forceTextColors(theme) {
+    const textColor = theme === 'light' ? '#0f172a' : '#f1f5f9';
+    
+    // Target specific Gradio elements
+    const gradioElements = document.querySelectorAll('.gradio-container *, .gr-container *');
+    gradioElements.forEach(element => {
+        if (element.classList.contains('markdown') || 
+            element.tagName === 'P' || element.tagName === 'SPAN' || 
+            element.tagName === 'DIV' || element.tagName === 'LABEL') {
+            element.style.color = textColor;
+        }
+    });
+    
+    // Target markdown content specifically
+    const markdownElements = document.querySelectorAll('.markdown, .markdown *');
+    markdownElements.forEach(element => {
+        element.style.color = textColor;
+    });
+}
+
+// Load saved theme on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    
+    // Create and add theme toggle button
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'theme-toggle';
+    toggleBtn.innerHTML = savedTheme === 'light' ? '🌙' : '☀️';
+    toggleBtn.onclick = toggleTheme;
+    toggleBtn.title = 'Toggle Theme';
+    
+    document.body.appendChild(toggleBtn);
+    
+    // Force apply theme styles
+    setTimeout(() => {
+        forceThemeUpdate(savedTheme);
+    }, 100);
+    
+    console.log('Initial theme set to:', savedTheme);
+});
+
+// Apply theme immediately if DOM is already loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        console.log('Theme applied on DOM ready:', savedTheme);
+    });
+} else {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    forceThemeUpdate(savedTheme);
+    console.log('Theme applied immediately:', savedTheme);
+}
+
+// Also handle Gradio's dynamic content loading
+const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            // Force text colors for new content
+            setTimeout(() => {
+                forceTextColors(savedTheme);
+            }, 50);
+        }
+    });
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+"""
 
 # Import parking detection system
 try:
@@ -558,7 +1223,7 @@ def _extract_video_path(video_value):
 
 def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", progress_callback=None, enable_ocr=True, ocr_every_n=1, force_gpu=True):
     """
-    🚀 ULTRA-FAST VIDEO PROCESSING - GPU ACCELERATED
+    ULTRA-FAST VIDEO PROCESSING - GPU ACCELERATED
     
     Args:
         video_path: Path to video file
@@ -573,8 +1238,8 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         (output_path, detection_summary, json_results) - Path, summary, and JSON with text + colors
     """
     try:
-        print(f"[INFO] 🚀 Starting GPU-ACCELERATED video processing: {mode} mode")
-        print(f"[INFO] 🔥 FORCING GPU USAGE for maximum speed!")
+        print(f"[INFO] Starting GPU-ACCELERATED video processing: {mode} mode")
+        print(f"[INFO] FORCING GPU USAGE for maximum speed!")
         start_time = time.time()
         
         # Extract video path
@@ -588,7 +1253,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         # FORCE GPU USAGE
         if force_gpu:
             device = 0  # Force GPU 0 (RTX 4050)
-            print(f"[INFO] 🔥 FORCING GPU 0 - RTX 4050 for maximum performance!")
+            print(f"[INFO] FORCING GPU 0 - RTX 4050 for maximum performance!")
             if not torch.cuda.is_available():
                 print("[WARNING] CUDA not available, falling back to CPU")
                 device = "cpu"
@@ -603,31 +1268,31 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             imgsz = 256  # Reduced from 320 for max speed
             skip_frames = 3  # Skip more frames
             batch_size = 32  # Max batch size for RTX 4050
-            print("[INFO] ⚡ ULTRA-FAST GPU MODE - 1-2 minutes expected")
+            print("[INFO] ULTRA-FAST GPU MODE - 1-2 minutes expected")
         elif mode == "fast":
             conf_threshold = 0.35
             imgsz = 416  # Balanced size
             skip_frames = 2  # Skip every 2nd frame
             batch_size = 24  # High batch size for GPU
-            print("[INFO] 🚀 FAST GPU MODE - 2-4 minutes expected")
+            print("[INFO] FAST GPU MODE - 2-4 minutes expected")
         else:  # balanced
             conf_threshold = 0.3
             imgsz = 512  # Higher quality
             skip_frames = 1  # Process every frame
             batch_size = 16  # Moderate batch size
-            print("[INFO] ⚖️ BALANCED GPU MODE - 4-6 minutes expected")
+            print("[INFO] BALANCED GPU MODE - 4-6 minutes expected")
         
-        print(f"[INFO] 🔥 GPU Device: {device}, Image size: {imgsz}, Skip frames: {skip_frames}, Batch: {batch_size}")
+        print(f"[INFO] GPU Device: {device}, Image size: {imgsz}, Skip frames: {skip_frames}, Batch: {batch_size}")
         
         # Enable mixed precision for 2x speed
         use_amp = device != "cpu"
         if use_amp:
-            print("[INFO] 🔥 Mixed Precision (AMP) ENABLED for 2x speed boost!")
+            print("[INFO] Mixed Precision (AMP) ENABLED for 2x speed boost!")
             # Optimize GPU memory settings for RTX 4050
             torch.cuda.empty_cache()
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.enabled = True
-            print("[INFO] 🔥 GPU Memory Optimized for RTX 4050")
+            print("[INFO] GPU Memory Optimized for RTX 4050")
         
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -668,13 +1333,13 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         all_color_results = []  # Store all color results for JSON output
         frame_idx = 0
         
-        print("[INFO] 🚀 Starting GPU-ACCELERATED frame processing...")
+        print("[INFO] Starting GPU-ACCELERATED frame processing...")
         
         # Import color detection
         try:
             from kmeans_color_detector import detect_image_colors
             COLOR_DETECTOR_AVAILABLE = True
-            print("[INFO] 🎨 Color detector loaded for JSON output")
+            print("[INFO] Color detector loaded for JSON output")
         except Exception as e:
             print(f"[WARNING] Color detector not available: {e}")
             COLOR_DETECTOR_AVAILABLE = False
@@ -1110,7 +1775,7 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
         summary_lines.append(f"  • 🔴 Red Family: 10 Shades (Misty Rose → Maroon)")
         summary_lines.append(f"  • 🔵 Blue Family: 10 Shades (Ice Blue → Midnight Blue)")
         summary_lines.append(f"  • 🟢 Green Family: 10 Shades (Mint → Emerald)")
-        summary_lines.append(f"  • 🟡 Yellow/Orange: 10 Shades (Light Yellow → Deep Orange)")
+        summary_lines.append(f"  • 🟡 Yellow Family: 10 Shades (Light Yellow → Deep Yellow)")
         summary_lines.append(f"  • 🟣 Purple/Pink: 9 Shades (Lavender → Indigo)")
         summary_lines.append(f"  • ⚫ Neutral: 7 Shades (White → Black)")
         summary_lines.append(f"  • 🧠 AI Model: MobileNetV2 + HSV + LAB Analysis")
@@ -1135,13 +1800,13 @@ def _classify_object_with_category(class_name, class_id):
         
         # Vehicles
         'bicycle': ('Bicycle', 'Vehicle', (0, 255, 255)),  # Yellow
-        'car': ('Car', 'Vehicle', (255, 165, 0)),  # Orange
-        'motorcycle': ('Motorcycle', 'Vehicle', (255, 165, 0)),  # Orange
-        'bus': ('Bus', 'Vehicle', (255, 165, 0)),  # Orange
-        'truck': ('Truck', 'Vehicle', (255, 165, 0)),  # Orange
-        'boat': ('Boat', 'Vehicle', (255, 165, 0)),  # Orange
-        'train': ('Train', 'Vehicle', (255, 165, 0)),  # Orange
-        'airplane': ('Airplane', 'Vehicle', (255, 165, 0)),  # Orange
+        'car': ('Car', 'Vehicle', (255, 0, 0)),  # Blue (BGR format)
+        'motorcycle': ('Motorcycle', 'Vehicle', (255, 0, 0)),  # Blue
+        'bus': ('Bus', 'Vehicle', (255, 0, 0)),  # Blue
+        'truck': ('Truck', 'Vehicle', (255, 0, 0)),  # Blue
+        'boat': ('Boat', 'Vehicle', (255, 0, 0)),  # Blue
+        'train': ('Train', 'Vehicle', (255, 0, 0)),  # Blue
+        'airplane': ('Airplane', 'Vehicle', (255, 0, 0)),  # Blue
         
         # Traffic Objects
         'traffic light': ('Traffic Light', 'Traffic', (0, 0, 255)),  # Blue
@@ -1184,23 +1849,23 @@ def _classify_object_with_category(class_name, class_id):
         'sink': ('🚰 Sink', 'Appliance', (128, 128, 128)),  # Gray
         
         # Personal Items - Enhanced Categories
-        'backpack': ('🎒 Backpack', 'Personal', (255, 140, 0)),  # Dark Orange
-        'handbag': ('👜 Handbag', 'Personal', (255, 140, 0)),  # Dark Orange
-        'suitcase': ('🧳 Suitcase', 'Personal', (255, 140, 0)),  # Dark Orange
-        'umbrella': ('☂️ Umbrella', 'Personal', (255, 140, 0)),  # Dark Orange
+        'backpack': ('🎒 Backpack', 'Personal', (255, 0, 0)),  # Blue
+        'handbag': ('👜 Handbag', 'Personal', (255, 0, 0)),  # Blue
+        'suitcase': ('🧳 Suitcase', 'Personal', (255, 0, 0)),  # Blue
+        'umbrella': ('☂️ Umbrella', 'Personal', (255, 0, 0)),  # Blue
         'tie': ('👔 Tie', 'Clothing', (128, 0, 128)),  # Purple
         
         # Sports & Recreation
-        'sports ball': ('⚽ Sports Ball', 'Sports', (255, 69, 0)),  # Red Orange
-        'baseball bat': ('🏏 Baseball Bat', 'Sports', (255, 69, 0)),  # Red Orange
-        'baseball glove': ('🧤 Baseball Glove', 'Sports', (255, 69, 0)),  # Red Orange
-        'skateboard': ('🛹 Skateboard', 'Sports', (255, 69, 0)),  # Red Orange
-        'surfboard': ('🏄 Surfboard', 'Sports', (255, 69, 0)),  # Red Orange
-        'tennis racket': ('🎾 Tennis Racket', 'Sports', (255, 69, 0)),  # Red Orange
-        'frisbee': ('🥏 Frisbee', 'Sports', (255, 69, 0)),  # Red Orange
-        'kite': ('🪁 Kite', 'Sports', (255, 69, 0)),  # Red Orange
-        'skis': ('🎿 Skis', 'Sports', (255, 69, 0)),  # Red Orange
-        'snowboard': ('🏂 Snowboard', 'Sports', (255, 69, 0)),  # Red Orange
+        'sports ball': ('⚽ Sports Ball', 'Sports', (255, 0, 0)),  # Blue
+        'baseball bat': ('🏏 Baseball Bat', 'Sports', (255, 0, 0)),  # Blue
+        'baseball glove': ('🧤 Baseball Glove', 'Sports', (255, 0, 0)),  # Blue
+        'skateboard': ('🛹 Skateboard', 'Sports', (255, 0, 0)),  # Blue
+        'surfboard': ('🏄 Surfboard', 'Sports', (255, 0, 0)),  # Blue
+        'tennis racket': ('🎾 Tennis Racket', 'Sports', (255, 0, 0)),  # Blue
+        'frisbee': ('🥏 Frisbee', 'Sports', (255, 0, 0)),  # Blue
+        'kite': ('🪁 Kite', 'Sports', (255, 0, 0)),  # Blue
+        'skis': ('🎿 Skis', 'Sports', (255, 0, 0)),  # Blue
+        'snowboard': ('🏂 Snowboard', 'Sports', (255, 0, 0)),  # Blue
         
         # Food Items
         'banana': ('🍌 Banana', 'Food', (0, 255, 0)),  # Green
@@ -1234,7 +1899,7 @@ def _classify_object_with_category(class_name, class_id):
         'scissors': ('✂️ Scissors', 'Object', (128, 128, 128)),  # Gray
         'teddy bear': ('🧸 Teddy Bear', 'Toy', (255, 182, 193)),  # Light Pink
         'hair drier': ('💨 Hair Drier', 'Object', (128, 128, 128)),  # Gray
-        'toothbrush': ('🪥 Toothbrush', 'Personal', (255, 140, 0)),  # Dark Orange
+        'toothbrush': ('🪥 Toothbrush', 'Personal', (255, 0, 0)),  # Blue
     }
     
     # Get classification
@@ -3695,11 +4360,10 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
     palette_bgr = {
         "red": (0, 0, 255),
-        "orange": (0, 165, 255),
+        "blue": (255, 0, 0),  # Blue (BGR format)
         "yellow": (0, 255, 255),
         "green": (0, 255, 0),
         "cyan": (255, 255, 0),
-        "blue": (255, 0, 0),
         "purple": (255, 0, 255),
         "pink": (203, 192, 255),
         "brown": (42, 42, 165),
@@ -7556,9 +8220,74 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
         return error_frame, f"⚠️ **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
 
 
-# Create the Gradio app with enhanced modern interface
+# Create the Gradio app with enhanced modern interface and blue/black theme
 with gr.Blocks(
     title="YOLO26 AI Vision",
+    css=CUSTOM_CSS,
+    head=f'''
+    <script>{THEME_JS}</script>
+    <script>
+    function toggleSettings() {{
+        const menu = document.getElementById('settings-menu');
+        if (menu && menu.style.display === 'block') {{
+            menu.style.display = 'none';
+        }} else if (menu) {{
+            menu.style.display = 'block';
+        }}
+    }}
+    
+    function setTheme(theme) {{
+        const root = document.documentElement;
+        
+        if (theme === 'light') {{
+            root.style.setProperty('--background-color', '#ffffff');
+            root.style.setProperty('--surface-color', '#f8fafc');
+            root.style.setProperty('--card-color', '#ffffff');
+            root.style.setProperty('--text-primary', '#1f2937');
+            root.style.setProperty('--text-secondary', '#374151');
+            root.style.setProperty('--text-muted', '#6b7280');
+            root.style.setProperty('--border-color', '#e5e7eb');
+            root.style.setProperty('--background-gradient', 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #ffffff 100%)');
+        }} else if (theme === 'dark') {{
+            root.style.setProperty('--background-color', '#0f172a');
+            root.style.setProperty('--surface-color', '#1e293b');
+            root.style.setProperty('--card-color', '#334155');
+            root.style.setProperty('--text-primary', '#ffffff');
+            root.style.setProperty('--text-secondary', '#e2e8f0');
+            root.style.setProperty('--text-muted', '#94a3b8');
+            root.style.setProperty('--border-color', '#475569');
+            root.style.setProperty('--background-gradient', 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)');
+        }} else if (theme === 'default') {{
+            // Reset to original CSS variables
+            root.style.removeProperty('--background-color');
+            root.style.removeProperty('--surface-color');
+            root.style.removeProperty('--card-color');
+            root.style.removeProperty('--text-primary');
+            root.style.removeProperty('--text-secondary');
+            root.style.removeProperty('--text-muted');
+            root.style.removeProperty('--border-color');
+            root.style.removeProperty('--background-gradient');
+        }}
+        
+        // Close the menu
+        const menu = document.getElementById('settings-menu');
+        if (menu) {{
+            menu.style.display = 'none';
+        }}
+    }}
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(event) {{
+        const dropdown = document.querySelector('.settings-dropdown');
+        const menu = document.getElementById('settings-menu');
+        
+        if (dropdown && menu && !dropdown.contains(event.target)) {{
+            menu.style.display = 'none';
+        }}
+    }});
+    </script>
+    ''',
+    theme=gr.themes.Soft()
 ) as demo:
     
     # Display device status with modern styling
@@ -7574,21 +8303,62 @@ with gr.Blocks(
             """
         )
         
+    # Add C-Vision Header with Professional Look
+    gr.HTML("""
+    <div class="c-vision-header">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 50%, #1e3a8a 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 20px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3); border: 2px solid rgba(255, 255, 255, 0.1);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14,2 14,8 20,8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10,9 9,9 8,9"></polyline>
+                </svg>
+            </div>
+            <span style="color: white; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Canberra-Vision</span>
+        </div>
+        <div style="color: #cbd5e1; font-size: 15px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.9;">Advanced AI Vision Platform</div>
+    </div>
+    """)
+    
     with gr.Tabs():
-        # Image Tab - Simplified
-        with gr.TabItem("🖼️ Image Detection"):
+        # Image Detection Tab - Exact Match from Image
+        with gr.TabItem("Image Detection"):
             gr.Markdown("### Upload an image for instant AI-powered object detection")
+            
+            # Upload Panel at Top - with integrated upload functionality
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.HTML("""
+                    <div class="upload-panel">
+                        <h3>📁 Upload Image</h3>
+                    </div>
+                    """)
+                    img_input = gr.Image(type="pil", label="", show_label=False)
+                with gr.Column(scale=2):
+                    img_output = gr.Image(type="pil", label="Detection Result", show_label=True)
             
             with gr.Row():
                 with gr.Column(scale=1):
-                    img_input = gr.Image(type="pil", label="📁 Upload Image")
+                    # AI Model Selection - Exact Match
+                    gr.HTML("""
+                    <div class="model-selection">
+                        <h4>AI Model</h4>
+                    </div>
+                    """)
                     
-                    with gr.Row():
-                        img_model = gr.Radio(choices=MODEL_CHOICES, label="🤖 AI Model", value="yolo26n")
+                    img_model = gr.Radio(
+                        choices=MODEL_CHOICES, 
+                        label="", 
+                        value="yolo26n",
+                        info=""
+                    )
                     
-                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg")
+                    # Detect Button - Exact Match
+                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg", elem_classes=["detect-button"])
                     
-                    # Advanced settings (collapsible)
+                    # Advanced Settings - Exact Match
                     with gr.Accordion("⚙️ Advanced Settings", open=False):
                         img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="🎯 Confidence Threshold")
                         img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="📏 IoU Threshold")
@@ -7596,14 +8366,31 @@ with gr.Blocks(
                         img_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
                         img_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
                         
-                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
+                        # Hidden controls (always enabled)
                         img_resnet = gr.State(value=True)
                         img_max_boxes = gr.State(value=10)
                         img_ocr = gr.State(value=True)
                         
                 with gr.Column(scale=2):
-                    img_output = gr.Image(type="pil", label="🎯 Detection Result")
-                    img_summary = gr.Markdown(label="📋 Detection Summary", value="📸 **Ready to detect!**\n\nUpload an image and click **🚀 Detect Objects** to start AI analysis.\n\n✨ **Features:**\n- 🚗 Vehicle detection\n- 📍 License plate recognition\n- 🎨 Color classification\n- ⚡ GPU-powered processing")
+                    # JSON Result Box - Exact Match
+                    gr.HTML("""
+                    <div class="features-section">
+                        <div class="features-header">Result</div>
+                        <div class="ready-message">JSON Results</div>
+                        <div class="instructions">
+                            Detection results will appear in JSON format here.
+                        </div>
+                        <ul class="features-list">
+                            <li>Vehicle detection</li>
+                            <li>License Plate Recognition</li>
+                            <li>Color classification</li>
+                            <li>GPU-powered processing</li>
+                        </ul>
+                        <div class="gpu-graphics">GPU</div>
+                    </div>
+                    """)
+                    
+                    img_summary = gr.Code(label="JSON Results", language="json", lines=15, value="{}")
 
             img_btn.click(
                 predict_image,
@@ -7622,8 +8409,8 @@ with gr.Blocks(
                 outputs=[img_output, img_summary],
             )
 
-        # Video Tab - Simplified
-        with gr.TabItem("🎥 Video Processing"):
+        # Video Processing Tab - Exact Match from Image
+        with gr.TabItem("Video Processing"):
             gr.Markdown("### Upload a video for AI-powered object detection and tracking")
             
             with gr.Row():
@@ -7637,7 +8424,7 @@ with gr.Blocks(
                     
                     # Advanced settings (collapsible)
                     with gr.Accordion("⚙️ Advanced Settings", open=False):
-                        # NEW: Video Processing Speed Selection
+                        # Video Processing Speed Selection
                         vid_speed_mode = gr.Radio(
                             choices=[
                                 ("⚡ Ultra-Fast (3-4 min)", "ultra_fast"),
@@ -7657,7 +8444,7 @@ with gr.Blocks(
                         vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="📦 Max Boxes per Frame")
                         vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
-                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
+                        # Hidden controls (always enabled)
                         vid_resnet = gr.State(value=True)
                         vid_ocr = gr.State(value=True)
                         vid_ocr_every_n = gr.State(value=5)
@@ -7869,9 +8656,9 @@ with gr.Blocks(
             # webcam_timer.tick(update_webcam_info, outputs=webcam_info)
             # Note: JSON updates happen automatically via predict_webcam output
 
-        # Parking Detection Tab - Enhanced with Webcam & Video
-        with gr.TabItem("🅿️ Parking Detection"):
-            gr.Markdown("### 🅿️ Smart Parking Space Detection System")
+        # Parking Detection Tab - Exact Match from Image
+        with gr.TabItem("Parking Detection"):
+            gr.Markdown("### Smart Parking Space Detection System")
             gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
             
             with gr.Tabs():
@@ -7970,9 +8757,9 @@ with gr.Blocks(
                 show_progress=False,
             )
 
-        # PPE Detection Tab - Similar structure to Parking Detection
-        with gr.TabItem("🦺 PPE Detection"):
-            gr.Markdown("### 🦺 PPE (Personal Protective Equipment) Detection System")
+        # PPE Detection Tab - Exact Match from Image
+        with gr.TabItem("PPE Detection"):
+            gr.Markdown("### PPE (Personal Protective Equipment) Detection System")
             gr.Markdown("Detect safety equipment compliance on workers in images, videos, or live webcam feeds.")
             
             with gr.Tabs():
@@ -8074,8 +8861,8 @@ with gr.Blocks(
         # ============================================================
         # ALL DETECTION TAB - UNIFIED DETECTION (Image/Video/Webcam)
         # ============================================================
-        with gr.TabItem("🔥 All Detection"):
-            gr.Markdown("## 🔥 All-in-One Detection System")
+        with gr.TabItem(" All Detection"):
+            gr.Markdown("##  All-in-One Detection System")
             gr.Markdown("**Detect everything at once:** Vehicles + License Plates + PPE + Parking + Objects")
             
             with gr.Tabs():
@@ -8163,40 +8950,7 @@ with gr.Blocks(
                 outputs=[all_webcam_output, all_webcam_info],
             )
 
-    # Modern footer with system information
-    gr.Markdown(
-        """
-        <div style="margin-top: 40px; padding: 20px; background: linear-gradient(45deg, #f8fafc 0%, #e2e8f0 100%); 
-             border-radius: 12px; text-align: center;">
-            <h3 style="margin: 0 0 10px 0; color: #1f2937;">🔧 System Information</h3>
-            <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 20px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">⚡</div>
-                    <div style="font-weight: 600; color: #059669;">GPU Optimized</div>
-                    <div style="font-size: 14px; color: #6b7280;">RTX 4050 Ready</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">🚀</div>
-                    <div style="font-weight: 600; color: #7c3aed;">High Speed</div>
-                    <div style="font-size: 14px; color: #6b7280;">17ms Processing</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">🎯</div>
-                    <div style="font-weight: 600; color: #dc2626;">AI Powered</div>
-                    <div style="font-size: 14px; color: #6b7280;">YOLO26 Models</div>
-                </div>
-                <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 5px;">📊</div>
-                    <div style="font-weight: 600; color: #0891b2;">Multi-Task</div>
-                    <div style="font-size: 14px; color: #6b7280;">Detection + OCR + PPE</div>
-                </div>
-            </div>
-            <p style="margin: 20px 0 0 0; font-size: 14px; color: #6b7280;">
-                💡 <strong>Tip:</strong> Use the "Advanced Settings" to fine-tune detection parameters for your specific use case.
-            </p>
-        </div>
-        """
-    )
+    # Footer removed as requested
 
 # ============================================================
 # END OF UNIFIED DETECTION SECTION

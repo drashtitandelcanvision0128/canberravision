@@ -1,14 +1,16 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-import asyncio
-import os
-import sys
 import tempfile
+import signal
+import sys
+import os
+import shutil
 import json
 import time
 import signal
 from datetime import datetime
 from pathlib import Path
+import asyncio
 import subprocess
 import shutil
 from pathlib import Path
@@ -4219,91 +4221,20 @@ def predict_image(
     if img is None:
         return None, "Please upload an image first"
 
-    # Use the enhanced YOLO detector with vehicle classification
     try:
-        from src.core.detector import YOLODetector
-        detector = YOLODetector(model_name=model_name)
-        print("[INFO] Using enhanced YOLO detector with vehicle classification")
-    except Exception as e:
-        print(f"[WARNING] Enhanced detector not available, using fallback: {e}")
-        # Fallback to original method
-        model = get_model(model_name)
-        device = _get_device()
-        models = model if isinstance(model, list) else [model]
-        
-        # Processing Flow Optimization
-        if device != "cpu" and torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            torch.cuda.synchronize()
-
-        all_results = []
-        for m in models:
-            r = m.predict(
-                source=img,
-                conf=conf_threshold,
-                iou=iou_threshold,
-                imgsz=imgsz,
-                device=device,
-                verbose=False,
-                half=True if device != "cpu" else False,
-            )
-            if r:
-                all_results.append(r[0])
-
-        if not all_results:
-            return img, "No objects detected"
-    else:
-        # Use enhanced detector
-        if hasattr(img, 'convert'):  # PIL Image
-            frame_bgr = np.array(img.convert('RGB'))
-            frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2BGR)
-        elif isinstance(img, np.ndarray):
-            if img.dtype != np.uint8:
-                img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-            if len(img.shape) == 3 and img.shape[2] == 3:
-                frame_bgr = img
-            else:
-                return img, "Invalid image format"
-        else:
-            return img, "Unsupported image format"
-
-        # Use enhanced detection with vehicle classification
+        # Use the enhanced YOLO detector with vehicle classification
         try:
-            detections = detector.detect_objects(frame_bgr, conf_threshold, iou_threshold, imgsz)
-            print(f"[INFO] Enhanced detection found {len(detections)} objects")
-            
-            # Convert detections back to YOLO format for compatibility with existing code
-            if detections:
-                # Create a mock YOLO result for compatibility
-                class MockResult:
-                    def __init__(self, detections, names):
-                        self.boxes = self._create_mock_boxes(detections)
-                        self.names = names
-                    
-                    def _create_mock_boxes(self, detections):
-                        class MockBoxes:
-                            def __init__(self, detections):
-                                self.xyxy = torch.tensor([[d['bbox'][0], d['bbox'][1], d['bbox'][2], d['bbox'][3]] for d in detections])
-                                self.conf = torch.tensor([d['confidence'] for d in detections])
-                                self.cls = torch.tensor([d['class_id'] for d in detections])
-                        return MockBoxes(detections)
-                
-                # Get model names
-                model_obj = detector.model
-                names = model_obj.names if hasattr(model_obj, 'names') else {i: f"class_{i}" for i in range(80)}
-                
-                all_results = [MockResult(detections, names)]
-                print(f"[INFO] Created mock result with {len(detections)} detections")
-            else:
-                return img, "No objects detected"
-                
+            from src.core.detector import YOLODetector
+            detector = YOLODetector(model_name=model_name)
+            print("[INFO] Using enhanced YOLO detector with vehicle classification")
         except Exception as e:
-            print(f"[ERROR] Enhanced detection failed: {e}")
+            print(f"[WARNING] Enhanced detector not available, using fallback: {e}")
             # Fallback to original method
             model = get_model(model_name)
             device = _get_device()
             models = model if isinstance(model, list) else [model]
             
+            # Processing Flow Optimization
             if device != "cpu" and torch.cuda.is_available():
                 torch.cuda.empty_cache()
                 torch.cuda.synchronize()
@@ -4323,187 +4254,453 @@ def predict_image(
                     all_results.append(r[0])
 
             if not all_results:
-                return img, "No objects detected"
-
-    # Convert to BGR for OpenCV operations with defensive checks
-    if hasattr(img, 'convert'):  # PIL Image
-        frame_rgb = np.array(img.convert('RGB'))
-    elif isinstance(img, np.ndarray):
-        if img.dtype != np.uint8:
-            img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-        if len(img.shape) == 2:  # grayscale
-            frame_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        elif img.shape[2] == 4:  # RGBA
-            frame_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
-        elif img.shape[2] == 3:  # BGR or RGB
-            # Assume RGB if not BGR (most web frameworks send RGB)
-            frame_rgb = img
-        else:
-            raise ValueError(f"Unsupported image shape: {img.shape}")
-    else:
-        raise ValueError(f"Unsupported image type: {type(img)}")
-    
-    # Ensure RGB format before converting to BGR
-    if frame_rgb.shape[2] == 3:
-        frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-    else:
-        raise ValueError(f"Expected 3 channels, got {frame_rgb.shape[2]}")
-    
-    # Generate unique image ID for JSON text extraction
-    image_id = f"img_{int(time.time() * 1000)}"
-    
-    # Perform comprehensive text extraction if OCR is enabled
-    json_text_results = None
-    if enable_ocr:
-        print(f"[DEBUG] Starting JSON-based text extraction for image {image_id}")
-        json_text_results = extract_text_from_image_json(frame_bgr, image_id)
-        print(f"[DEBUG] Text extraction completed for {image_id}")
-    
-    # Use professional annotation system to prevent overlapping labels
-    try:
-        # Add project root to path if not already there
-        import sys
-        import os
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-        if project_root not in sys.path:
-            sys.path.insert(0, project_root)
-        
-        from src.processors.professional_annotator import professional_annotator
-        
-        # Convert YOLO results to detection format for professional annotator
-        detections = []
-        for res in all_results:
-            if hasattr(res, 'boxes') and res.boxes is not None:
-                boxes = res.boxes
-                if hasattr(boxes, 'xyxy') and len(boxes) > 0:
-                    xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
-                    conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
-                    cls = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls)
-                    names = res.names
+                # Convert to RGB PIL Image properly
+                try:
+                    if hasattr(img, 'convert'):
+                        result_image = img.convert('RGB')
+                    elif isinstance(img, np.ndarray):
+                        if len(img.shape) == 3 and img.shape[2] == 3:
+                            # Check if it's BGR (OpenCV default) and convert to RGB
+                            if img.dtype == np.uint8:
+                                result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                            else:
+                                result_image = Image.fromarray(img)
+                        else:
+                            result_image = Image.fromarray(img)
+                    else:
+                        result_image = Image.fromarray(np.array(img))
                     
-                    for i in range(len(boxes)):
-                        if conf[i] > 0.3:  # Confidence threshold
-                            x1, y1, x2, y2 = map(int, xyxy[i])
-                            confidence = float(conf[i])
-                            class_id = int(cls[i])
-                            class_name = names.get(class_id, f"class_{class_id}")
-                            
-                            detection = {
-                                'bbox': [x1, y1, x2, y2],
-                                'confidence': confidence,
-                                'class_name': class_name,
-                                'class_id': class_id
-                            }
-                            
-                            # Add simple color detection
-                            try:
-                                crop = frame_bgr[y1:y2, x1:x2]
-                                if crop.size > 0:
-                                    avg_color_per_row = np.average(crop, axis=0)
-                                    avg_color = np.average(avg_color_per_row, axis=0)
-                                    b, g, r = map(int, avg_color)
-                                    
-                                    # Simple color classification
-                                    if r > 200 and g > 200 and b > 200:
-                                        color = "white"
-                                    elif r < 50 and g < 50 and b < 50:
-                                        color = "black"
-                                    elif r > g and r > b:
-                                        color = "red" if r > 150 else "brown"
-                                    elif g > r and g > b:
-                                        color = "green" if g > 150 else "olive"
-                                    elif b > r and b > g:
-                                        color = "blue" if b > 150 else "navy"
-                                    elif r > 150 and g > 150:
-                                        color = "yellow"
-                                    elif r > 150 and b > 150:
-                                        color = "magenta"
-                                    elif g > 150 and b > 150:
-                                        color = "cyan"
-                                    else:
-                                        color = "gray"
-                                    
-                                    detection['color'] = color
-                            except Exception:
-                                detection['color'] = 'unknown'
-                            
-                            detections.append(detection)
-        
-        # Extract license plates from JSON results if available
-        if json_text_results and enable_ocr:
-            try:
-                extraction = json_text_results.get("text_extraction", {})
-                license_plates = extraction.get("license_plates", [])
-                
-                # Create mapping of vehicles to license plates
-                for plate_info in license_plates:
-                    if plate_info.get("object_id") and plate_info.get("plate_text"):
-                        plate_text = plate_info["plate_text"]
-                        object_id = plate_info["object_id"]
-                        
-                        # Find corresponding detection
-                        for detection in detections:
-                            if str(detection.get('class_id')) == object_id.split('_')[-1]:
-                                detection['license_plate'] = plate_text
-                                break
-            except Exception as e:
-                print(f"[DEBUG] License plate mapping failed: {e}")
-        
-        # Use professional annotator
-        if detections:
-            annotated_bgr = professional_annotator.annotate_detections(
-                frame_bgr,
-                detections,
-                show_confidence=show_conf,
-                show_info_panel=True
-            )
-            
-            # Add JSON text annotations if available
-            if json_text_results and enable_ocr:
-                annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
+                    # Ensure the image is valid
+                    if result_image is None:
+                        result_image = Image.new('RGB', (640, 480), color='black')
+                    
+                    return result_image, "No objects detected"
+                except Exception as e:
+                    print(f"[ERROR] Failed to convert image in early return: {e}")
+                    # Last resort: create a blank image
+                    return Image.new('RGB', (640, 480), color='black'), "No objects detected"
         else:
-            annotated_bgr = frame_bgr
+            # Use enhanced detector
+            if hasattr(img, 'convert'):  # PIL Image
+                frame_bgr = np.array(img.convert('RGB'))
+                frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2BGR)
+            elif isinstance(img, np.ndarray):
+                if img.dtype != np.uint8:
+                    img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
+                if len(img.shape) == 3 and img.shape[2] == 3:
+                    frame_bgr = img
+                else:
+                    return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Invalid image format"
+            else:
+                return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Unsupported image format"
+
+            # Use enhanced detection with vehicle classification
+            try:
+                detections = detector.detect_objects(frame_bgr, conf_threshold, iou_threshold, imgsz)
+                print(f"[INFO] Enhanced detection found {len(detections)} objects")
+                
+                # Convert detections back to YOLO format for compatibility with existing code
+                if detections:
+                    # Create a mock YOLO result for compatibility
+                    class MockResult:
+                        def __init__(self, detections, names):
+                            self.boxes = self._create_mock_boxes(detections)
+                            self.names = names
+                        
+                        def _create_mock_boxes(self, detections):
+                            class MockBoxes:
+                                def __init__(self, detections):
+                                    self.xyxy = torch.tensor([[d['bbox'][0], d['bbox'][1], d['bbox'][2], d['bbox'][3]] for d in detections])
+                                    self.conf = torch.tensor([d['confidence'] for d in detections])
+                                    self.cls = torch.tensor([d['class_id'] for d in detections])
+                                    self._detections = detections
+                                
+                                def __len__(self):
+                                    return len(self._detections)
+                                
+                                def __getitem__(self, idx):
+                                    return {
+                                        'xyxy': self.xyxy[idx],
+                                        'conf': self.conf[idx],
+                                        'cls': self.cls[idx]
+                                    }
+                            
+                            return MockBoxes(detections)
+                    
+                    # Get model names
+                    model_obj = detector.model
+                    names = model_obj.names if hasattr(model_obj, 'names') else {i: f"class_{i}" for i in range(80)}
+                    
+                    all_results = [MockResult(detections, names)]
+                    print(f"[INFO] Created mock result with {len(detections)} detections")
+                else:
+                    # No detections - return original image as PIL RGB
+                    try:
+                        if hasattr(img, 'convert'):
+                            result_image = img.convert('RGB')
+                        elif isinstance(img, np.ndarray):
+                            if len(img.shape) == 3 and img.shape[2] == 3:
+                                # Convert BGR to RGB if needed
+                                if img.dtype == np.uint8:
+                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                                else:
+                                    result_image = Image.fromarray(img)
+                            else:
+                                result_image = Image.fromarray(img)
+                        else:
+                            result_image = Image.fromarray(np.array(img))
+                        
+                        # Ensure the image is valid
+                        if result_image is None:
+                            result_image = Image.new('RGB', (640, 480), color='black')
+                        
+                        return result_image, "No objects detected"
+                    except Exception as e:
+                        print(f"[ERROR] Failed to convert image in enhanced detector: {e}")
+                        return Image.new('RGB', (640, 480), color='black'), "No objects detected"
+                    
+            except Exception as e:
+                print(f"[ERROR] Enhanced detection failed: {e}")
+                # Fallback to original method
+                model = get_model(model_name)
+                device = _get_device()
+                models = model if isinstance(model, list) else [model]
+                
+                if device != "cpu" and torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                    torch.cuda.synchronize()
+
+                all_results = []
+                for m in models:
+                    r = m.predict(
+                        source=img,
+                        conf=conf_threshold,
+                        iou=iou_threshold,
+                        imgsz=imgsz,
+                        device=device,
+                        verbose=False,
+                        half=True if device != "cpu" else False,
+                    )
+                    if r:
+                        all_results.append(r[0])
+
+                if not all_results:
+                    try:
+                        if hasattr(img, 'convert'):
+                            result_image = img.convert('RGB')
+                        elif isinstance(img, np.ndarray):
+                            if len(img.shape) == 3 and img.shape[2] == 3:
+                                # Convert BGR to RGB if needed
+                                if img.dtype == np.uint8:
+                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                                else:
+                                    result_image = Image.fromarray(img)
+                            else:
+                                result_image = Image.fromarray(img)
+                        else:
+                            result_image = Image.fromarray(np.array(img))
+                        
+                        # Ensure the image is valid
+                        if result_image is None:
+                            result_image = Image.new('RGB', (640, 480), color='black')
+                        
+                        return result_image, "No objects detected"
+                    except Exception as e:
+                        print(f"[ERROR] Failed to convert image in fallback: {e}")
+                        return Image.new('RGB', (640, 480), color='black'), "No objects detected"
+
+        # Convert to BGR for OpenCV operations with defensive checks
+        if hasattr(img, 'convert'):  # PIL Image
+            frame_rgb = np.array(img.convert('RGB'))
+        elif isinstance(img, np.ndarray):
+            if img.dtype != np.uint8:
+                img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
+            if len(img.shape) == 2:  # grayscale
+                frame_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            elif img.shape[2] == 4:  # RGBA
+                frame_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
+            elif img.shape[2] == 3:  # BGR or RGB
+                # Assume RGB if not BGR (most web frameworks send RGB)
+                frame_rgb = img
+            else:
+                raise ValueError(f"Unsupported image shape: {img.shape}")
+        else:
+            raise ValueError(f"Unsupported image type: {type(img)}")
+        
+        # Ensure RGB format before converting to BGR
+        if frame_rgb.shape[2] == 3:
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+        else:
+            raise ValueError(f"Expected 3 channels, got {frame_rgb.shape[2]}")
+        
+        # Generate unique image ID for JSON text extraction
+        image_id = f"img_{int(time.time() * 1000)}"
+        
+        # Perform comprehensive text extraction if OCR is enabled
+        json_text_results = None
+        if enable_ocr:
+            print(f"[DEBUG] Starting JSON-based text extraction for image {image_id}")
+            json_text_results = extract_text_from_image_json(frame_bgr, image_id)
+            print(f"[DEBUG] Text extraction completed for {image_id}")
+        
+        # Use professional annotation system to prevent overlapping labels
+        try:
+            # Add project root to path if not already there
+            import sys
+            import os
+            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            if project_root not in sys.path:
+                sys.path.insert(0, project_root)
             
-    except Exception as e:
-        print(f"[WARNING] Professional annotator not available, using fallback: {e}")
-        # Fallback to original annotation method
-        annotated_bgr = frame_bgr
-        for idx, res in enumerate(all_results):
-            annotated_bgr = _annotate_with_color(
-                annotated_bgr,
-                res,
-                show_labels,
-                show_conf,
-                enable_resnet=bool(enable_resnet),
-                max_boxes=int(max_boxes),
-                resnet_every_n=1,
-                stream_key_prefix=None,
-                enable_ocr=False,
-                ocr_every_n=1,
-            )
+            from src.processors.professional_annotator import professional_annotator
+            
+            # Convert YOLO results to detection format for professional annotator
+            detections = []
+            for res in all_results:
+                if hasattr(res, 'boxes') and res.boxes is not None:
+                    boxes = res.boxes
+                    if hasattr(boxes, 'xyxy') and len(boxes) > 0:
+                        xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
+                        conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
+                        cls = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls)
+                        names = res.names
+                        
+                        for i in range(len(boxes)):
+                            if conf[i] > 0.3:  # Confidence threshold
+                                x1, y1, x2, y2 = map(int, xyxy[i])
+                                confidence = float(conf[i])
+                                class_id = int(cls[i])
+                                class_name = names.get(class_id, f"class_{class_id}")
+                                
+                                detection = {
+                                    'bbox': [x1, y1, x2, y2],
+                                    'confidence': confidence,
+                                    'class_name': class_name,
+                                    'class_id': class_id
+                                }
+                                
+                                # Add simple color detection
+                                try:
+                                    crop = frame_bgr[y1:y2, x1:x2]
+                                    if crop.size > 0:
+                                        avg_color_per_row = np.average(crop, axis=0)
+                                        avg_color = np.average(avg_color_per_row, axis=0)
+                                        b, g, r = map(int, avg_color)
+                                        
+                                        # Simple color classification
+                                        if r > 200 and g > 200 and b > 200:
+                                            color = "white"
+                                        elif r < 50 and g < 50 and b < 50:
+                                            color = "black"
+                                        elif r > g and r > b:
+                                            color = "red" if r > 150 else "brown"
+                                        elif g > r and g > b:
+                                            color = "green" if g > 150 else "olive"
+                                        elif b > r and b > g:
+                                            color = "blue" if b > 150 else "navy"
+                                        elif r > 150 and g > 150:
+                                            color = "yellow"
+                                        elif r > 150 and b > 150:
+                                            color = "magenta"
+                                        elif g > 150 and b > 150:
+                                            color = "cyan"
+                                        else:
+                                            color = "gray"
+                                        
+                                        detection['color'] = color
+                                except Exception:
+                                    detection['color'] = 'unknown'
+                                
+                                detections.append(detection)
+            
+            # Extract license plates from JSON results if available
+            if json_text_results and enable_ocr:
+                try:
+                    extraction = json_text_results.get("text_extraction", {})
+                    license_plates = extraction.get("license_plates", [])
+                    
+                    # Create mapping of vehicles to license plates
+                    for plate_info in license_plates:
+                        if plate_info.get("object_id") and plate_info.get("plate_text"):
+                            plate_text = plate_info["plate_text"]
+                            object_id = plate_info["object_id"]
+                            
+                            # Find corresponding detection
+                            for detection in detections:
+                                if str(detection.get('class_id')) == object_id.split('_')[-1]:
+                                    detection['license_plate'] = plate_text
+                                    break
+                except Exception as e:
+                    print(f"[DEBUG] License plate mapping failed: {e}")
+            
+            # Use professional annotator
+            if detections:
+                annotated_bgr = professional_annotator.annotate_detections(
+                    frame_bgr,
+                    detections,
+                    show_confidence=show_conf,
+                    show_info_panel=True
+                )
+                
+                # Add JSON text annotations if available
+                if json_text_results and enable_ocr:
+                    annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
+            else:
+                annotated_bgr = frame_bgr
+                
+        except Exception as e:
+            print(f"[WARNING] Professional annotator not available, using fallback: {e}")
+            # Fallback to original annotation method
+            annotated_bgr = frame_bgr.copy()
+            print(f"[DEBUG] Starting fallback annotation with {len(all_results)} results")
+            for idx, res in enumerate(all_results):
+                print(f"[DEBUG] Annotating result {idx+1}/{len(all_results)}: {type(res)}")
+                annotated_bgr = _annotate_with_color(
+                    annotated_bgr,
+                    res,
+                    show_labels,
+                    show_conf,
+                    enable_resnet=bool(enable_resnet),
+                    max_boxes=int(max_boxes),
+                    resnet_every_n=1,
+                    stream_key_prefix=None,
+                    enable_ocr=False,
+                    ocr_every_n=1,
+                )
+                print(f"[DEBUG] Annotation complete for result {idx+1}, image shape: {annotated_bgr.shape if hasattr(annotated_bgr, 'shape') else 'N/A'}")
+            
+            # If we have JSON text results, add text annotations from JSON
+            if json_text_results and enable_ocr:
+                print(f"[DEBUG] Adding JSON text annotations")
+                annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
         
-        # If we have JSON text results, add text annotations from JSON
+        # Generate detection summary
+        print(f"[DEBUG] Generating detection summary from {len(all_results)} results")
+        summaries = [
+            _generate_detection_summary(r, enable_resnet=bool(enable_resnet), enable_ocr=False)
+            for r in all_results
+        ]
+        summary = "\n\n".join([s for s in summaries if s])
+        print(f"[DEBUG] Summary generated: {summary[:100]}...")
+        
+        # Add JSON text extraction results to summary
         if json_text_results and enable_ocr:
-            annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
-    
-    # Generate detection summary
-    summaries = [
-        _generate_detection_summary(r, enable_resnet=bool(enable_resnet), enable_ocr=False)
-        for r in all_results
-    ]
-    summary = "\n\n".join([s for s in summaries if s])
-    
-    # Add JSON text extraction results to summary
-    if json_text_results and enable_ocr:
-        text_summary = format_text_extraction_results(json_text_results)
-        summary = f"{summary}\n\n{text_summary}"
+            text_summary = format_text_extraction_results(json_text_results)
+            summary = f"{summary}\n\n{text_summary}"
+            
+            # Also add raw JSON for debugging
+            json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
+            summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
         
-        # Also add raw JSON for debugging
-        json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
-    
-    annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(annotated_rgb), summary
+        # Ensure annotated_bgr is valid
+        if annotated_bgr is None or not isinstance(annotated_bgr, np.ndarray):
+            print(f"[WARNING] annotated_bgr is invalid (type: {type(annotated_bgr)}), using original frame")
+            annotated_bgr = frame_bgr
+        
+        print(f"[DEBUG] Final annotated_bgr shape: {annotated_bgr.shape}, dtype: {annotated_bgr.dtype}")
+            
+        # Convert BGR to RGB for PIL
+        if len(annotated_bgr.shape) == 3 and annotated_bgr.shape[2] == 3:
+            print(f"[DEBUG] Converting BGR to RGB")
+            annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
+        else:
+            print(f"[DEBUG] Using annotated_bgr as-is (not 3-channel)")
+            annotated_rgb = annotated_bgr
+        
+        print(f"[DEBUG] Creating PIL Image from array shape: {annotated_rgb.shape}")
+        try:
+            result_image = Image.fromarray(annotated_rgb)
+            print(f"[DEBUG] PIL Image created: {result_image.size}, mode: {result_image.mode}")
+        except Exception as e:
+            print(f"[ERROR] Failed to create PIL Image: {e}")
+            # Fallback: try to convert original image
+            try:
+                if hasattr(img, 'convert'):
+                    result_image = img.convert('RGB')
+                elif isinstance(img, np.ndarray):
+                    if len(img.shape) == 3 and img.shape[2] == 3:
+                        # If it's BGR, convert to RGB
+                        if img.dtype == np.uint8:
+                            result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                        else:
+                            result_image = Image.fromarray(img)
+                    else:
+                        result_image = Image.fromarray(img)
+                else:
+                    result_image = Image.fromarray(np.array(img))
+                print(f"[DEBUG] Fallback PIL Image created: {result_image.size}, mode: {result_image.mode}")
+            except Exception as e2:
+                print(f"[ERROR] Fallback also failed: {e2}")
+                # Last resort: create a blank image
+                result_image = Image.new('RGB', (640, 480), color='black')
+                print(f"[DEBUG] Created blank fallback image")
+        
+        # Ensure the image is valid before returning
+        if result_image is None:
+            print(f"[ERROR] result_image is None, creating blank image")
+            result_image = Image.new('RGB', (640, 480), color='black')
+        
+        # Convert the final image to RGB if it's not already, as Gradio expects RGB
+        if result_image.mode != 'RGB':
+            print(f"[DEBUG] Converting image from {result_image.mode} to RGB")
+            result_image = result_image.convert('RGB')
+        
+        # Final validation
+        print(f"[DEBUG] Final image - Size: {result_image.size}, Mode: {result_image.mode}, Type: {type(result_image)}")
+        
+        # Test if we can save the image (to verify it's valid)
+        try:
+            test_path = "test_output_image.jpg"
+            result_image.save(test_path)
+            print(f"[DEBUG] Successfully saved test image to {test_path}")
+            os.remove(test_path)  # Clean up
+        except Exception as e:
+            print(f"[ERROR] Could not save test image: {e}")
+        
+        # Ensure the image is in RGB mode and proper format
+        if result_image.mode != 'RGB':
+            print(f"[DEBUG] Converting image from {result_image.mode} to RGB")
+            result_image = result_image.convert('RGB')
+        
+        # Make sure the image is not corrupted
+        try:
+            # Verify the image can be loaded
+            result_image.load()
+            print(f"[DEBUG] Image successfully loaded and verified")
+        except Exception as e:
+            print(f"[ERROR] Image load failed: {e}")
+            # Create a new blank image if corrupted
+            result_image = Image.new('RGB', (640, 480), color='black')
+        
+        return result_image, summary
+        
+    except Exception as e:
+        error_msg = f"Error in predict_image: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        import traceback
+        traceback.print_exc()
+        # Ensure we return a proper PIL Image
+        try:
+            if isinstance(img, np.ndarray):
+                if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
+                    # Convert BGR to RGB
+                    img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                else:
+                    img_pil = Image.fromarray(img if img.dtype == np.uint8 else (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
+            elif hasattr(img, 'convert'):
+                img_pil = img.convert('RGB')
+            else:
+                img_pil = Image.fromarray(np.array(img))
+            
+            # Ensure the image is valid
+            if img_pil is None:
+                img_pil = Image.new('RGB', (640, 480), color='black')
+                
+            return img_pil, f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details."
+        except Exception as e2:
+            print(f"[ERROR] Exception handler also failed: {e2}")
+            # Last resort: return a blank image with error message
+            return Image.new('RGB', (640, 480), color='black'), f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details."
 
 
 def predict_video(
@@ -8005,6 +8202,18 @@ with gr.Blocks(
 # END OF UNIFIED DETECTION SECTION
 # ============================================================
 
+def cleanup_temp_directory(signum=None, frame=None):
+    """Signal handler for cleanup"""
+    custom_temp = os.path.join(os.getcwd(), "temp_gradio")
+    try:
+        if os.path.exists(custom_temp):
+            print(f"[INFO] Signal cleanup: Removing temp directory: {custom_temp}")
+            shutil.rmtree(custom_temp)
+    except Exception as e:
+        print(f"[WARNING] Signal cleanup failed: {e}")
+    sys.exit(0)
+
+
 if __name__ == "__main__":
     print("[INFO] Starting application...")
     print(f"[INFO] Python version: {sys.version}")
@@ -8049,15 +8258,18 @@ if __name__ == "__main__":
     print(f"[INFO] Server host: {_server_host}, Open browser: {_open_browser}")
     
     try:
+        # Register signal handlers for graceful shutdown
+        signal.signal(signal.SIGINT, cleanup_temp_directory)
+        signal.signal(signal.SIGTERM, cleanup_temp_directory)
+        
         demo.launch(
             share=False,
             show_error=True,
             quiet=False,
             inbrowser=_open_browser,
-            server_name=_server_host,
+            server_name="localhost",
             server_port=_server_port,
-            allowed_paths=[os.getcwd(), custom_temp],
-            prevent_thread_lock=True,
+            allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
         )
     except KeyboardInterrupt:
         print("\n[INFO] Application interrupted by user. Shutting down gracefully...")
@@ -8070,10 +8282,9 @@ if __name__ == "__main__":
                 show_error=True,
                 quiet=False,
                 inbrowser=False,
-                server_name=_server_host,
+                server_name="localhost",
                 server_port=7861 if _server_port is None else _server_port + 1,
-                allowed_paths=[os.getcwd(), custom_temp],
-                prevent_thread_lock=True,
+                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
             )
         except Exception as e2:
             print(f"[ERROR] Alternative launch also failed: {e2}")
@@ -8086,20 +8297,3 @@ if __name__ == "__main__":
                 shutil.rmtree(custom_temp)
         except Exception as cleanup_error:
             print(f"[WARNING] Could not cleanup temp directory on exit: {cleanup_error}")
-
-
-def cleanup_temp_directory(signum=None, frame=None):
-    """Signal handler for cleanup"""
-    custom_temp = os.path.join(os.getcwd(), "temp_gradio")
-    try:
-        if os.path.exists(custom_temp):
-            print(f"[INFO] Signal cleanup: Removing temp directory: {custom_temp}")
-            shutil.rmtree(custom_temp)
-    except Exception as e:
-        print(f"[WARNING] Signal cleanup failed: {e}")
-    sys.exit(0)
-
-
-# Register signal handlers for graceful shutdown
-signal.signal(signal.SIGINT, cleanup_temp_directory)
-signal.signal(signal.SIGTERM, cleanup_temp_directory)

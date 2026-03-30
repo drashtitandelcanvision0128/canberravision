@@ -9047,8 +9047,7 @@ if __name__ == "__main__":
                 server_name=_gradio_server_name,
                 server_port=_server_port,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-                prevent_thread_lock=False,
-                show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
+                prevent_thread_lock=False
             )
             print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
             print("[SUCCESS] Application is ready to accept requests!")
@@ -9075,8 +9074,7 @@ if __name__ == "__main__":
                 server_name=_gradio_server_name,
                 server_port=7861 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-                prevent_thread_lock=False,
-                show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
+                prevent_thread_lock=False
             )
             print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
         except Exception as e2:

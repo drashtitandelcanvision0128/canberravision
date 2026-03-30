@@ -8956,6 +8956,12 @@ if __name__ == "__main__":
     print(f"[INFO] Python version: {sys.version}")
     print(f"[INFO] Gradio version: {gr.__version__}")
     
+    # Print all environment variables for debugging
+    print("[DEBUG] Environment Variables:")
+    print(f"  APP_ENV: {os.environ.get('APP_ENV', 'not set')}")
+    print(f"  GRADIO_SERVER_PORT: {os.environ.get('GRADIO_SERVER_PORT', 'not set')}")
+    print(f"  GRADIO_SERVER_NAME: {os.environ.get('GRADIO_SERVER_NAME', 'not set')}")
+    
     # Check if CUDA is available for GPU operations
     if torch.cuda.is_available():
         print(f"[INFO] CUDA available: {torch.cuda.get_device_name(0)}")
@@ -8966,6 +8972,8 @@ if __name__ == "__main__":
     _server_port = 7860
     if _gradio_port_env not in (None, "", "0"):
         _server_port = int(_gradio_port_env)
+    
+    print(f"[INFO] Server will run on port: {_server_port}")
 
     # Create custom temp directory with proper permissions
     custom_temp = os.path.join(os.getcwd(), "temp_gradio")
@@ -8990,8 +8998,12 @@ if __name__ == "__main__":
     
     # Detect if running inside Docker container
     _is_docker = os.path.exists('/.dockerenv') or os.environ.get('APP_ENV') == 'production'
-    _server_host = "0.0.0.0"
+    
+    # Get server configuration from environment variables (Docker-friendly)
+    _gradio_server_name = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0" if _is_docker else "localhost")
+    _server_host = _gradio_server_name
     _open_browser = False
+    print(f"[INFO] Docker mode: {_is_docker}")
     print(f"[INFO] Server host: {_server_host}, Open browser: {_open_browser}")
     
     try:
@@ -8999,30 +9011,40 @@ if __name__ == "__main__":
         signal.signal(signal.SIGINT, cleanup_temp_directory)
         signal.signal(signal.SIGTERM, cleanup_temp_directory)
         
+        print(f"[INFO] Starting Gradio server on {_gradio_server_name}:{_server_port}")
+        print(f"[INFO] Waiting for server to initialize...")
+        
         demo.launch(
             share=False,
             show_error=True,
             quiet=False,
             inbrowser=_open_browser,
-            server_name="localhost",
+            server_name=_gradio_server_name,
             server_port=_server_port,
             allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
+            prevent_thread_lock=False,
         )
+        
+        print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
+        
     except KeyboardInterrupt:
         print("\n[INFO] Application interrupted by user. Shutting down gracefully...")
     except Exception as e:
         print(f"[ERROR] Failed to launch application: {e}")
         print("[INFO] Trying alternative launch configuration...")
         try:
+            print(f"[INFO] Starting alternative server on {_gradio_server_name}:{_server_port + 1}")
             demo.launch(
                 share=False,
                 show_error=True,
                 quiet=False,
                 inbrowser=False,
-                server_name="localhost",
+                server_name=_gradio_server_name,
                 server_port=7861 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
+                prevent_thread_lock=False,
             )
+            print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
         except Exception as e2:
             print(f"[ERROR] Alternative launch also failed: {e2}")
             sys.exit(1)

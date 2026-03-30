@@ -108,13 +108,16 @@ RUN echo "Build timestamp: $(date)" > /app/build_info.txt
 RUN mkdir -p uploads processed processed_images processed_videos \
     temp_gradio inputs outputs logs
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 RUN chmod -R 755 /app
 
 # Expose Gradio port
 EXPOSE 7860
 
 # Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
-    CMD curl -f http://127.0.0.1:7860/ || exit 1
+HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
+    CMD python health_check.py || exit 1
 
-CMD ["python", "apps/app.py"]
+CMD ["./start.sh"]

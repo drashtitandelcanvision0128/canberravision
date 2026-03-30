@@ -8227,6 +8227,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 demo = gr.Blocks(
     title="YOLO26 AI Vision",
     css=CUSTOM_CSS,
+    show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
     head=f'''
     <script>{THEME_JS}</script>
     <script>

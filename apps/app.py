@@ -9015,7 +9015,7 @@ with demo:
     
     with gr.Tabs():
         # Image Detection Tab - Exact Match from Image
-        with gr.TabItem("Image Detection"):
+        with gr.TabItem("Image Detection", selected=True):
             gr.Markdown("### Upload an image for instant AI-powered object detection")
             
             # Upload Panel at Top - with integrated upload functionality
@@ -9522,82 +9522,7 @@ with demo:
                 show_progress=False,
             )
 
-        # ============================================================
-        # ALL DETECTION TAB - UNIFIED DETECTION (Image/Video/Webcam)
-        # ============================================================
-        # Temporarily commented as requested
-        """
-        with gr.TabItem(" All Detection"):
-            gr.Markdown("##  All-in-One Detection System")
-            gr.Markdown("**Detect everything at once:** Vehicles + License Plates + PPE + Parking + Objects")
-            
-            with gr.Tabs():
-                # Image Upload Tab
-                with gr.TabItem("📁 Image"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            all_input_img = gr.Image(type="numpy", label="📁 Upload Image")
-                            
-                            all_conf_img = gr.Slider(
-                                minimum=0.1, maximum=1.0, value=0.5, step=0.05,
-                                label="🎯 Confidence Threshold"
-                            )
-                            
-                            all_btn_img = gr.Button("🔍 Run All Detection", variant="primary", size="lg")
-                            
-                        with gr.Column(scale=2):
-                            all_output_img = gr.Image(type="pil", label="Detection Results")
-                            all_json_img = gr.JSON(label="JSON Results")
-                            all_summary_img = gr.Markdown("### Upload an image to see results")
-                
-                # Video Detection Sub-tab
-                with gr.TabItem("🎥 Video"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            all_input_vid = gr.Video(label="Upload Video")
-                            all_conf_vid = gr.Slider(0.1, 1.0, 0.5, step=0.1, label="Confidence Threshold")
-                            all_btn_vid = gr.Button("🎬 Process Video", variant="primary")
-                        
-                        with gr.Column(scale=2):
-                            all_output_vid = gr.Video(label="Processed Video")
-                            all_json_vid = gr.JSON(label="Video Results")
-                            all_summary_vid = gr.Markdown("### Upload a video to see results")
-                
-                # Webcam Detection Sub-tab
-                with gr.TabItem("📹 Webcam"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            all_conf_cam = gr.Slider(0.1, 1.0, 0.5, step=0.1, label="Confidence Threshold")
-                            gr.Markdown("#### 🎯 Live Detection")
-                            all_webcam_output = gr.Image(type="numpy", label="Real-time Results", height=400)
-                            all_webcam_info = gr.Textbox(
-                                label="Detection Info",
-                                interactive=False,
-                                lines=6,
-                                value="📹 Ready for live detection"
-                            )
-            
-            # Connect All Detection components
-            all_btn_img.click(
-                fn=process_unified_detection_all,
-                inputs=[all_input_img, all_conf_img],
-                outputs=[all_output_img, all_json_img, all_summary_img]
-            )
-            
-            all_btn_vid.click(
-                fn=process_unified_video_detection_all,
-                inputs=[all_input_vid, all_conf_vid],
-                outputs=[all_output_vid, all_json_vid, all_summary_vid]
-            )
-            
-            all_webcam_input.stream(
-                fn=process_unified_detection_all,
-                inputs=[all_webcam_input, all_conf_cam],
-                outputs=[all_webcam_output, all_webcam_info],
-            )
-        """
-
-    # Footer removed as requested
+        # Footer removed as requested
 
 # ============================================================
 # END OF UNIFIED DETECTION SECTION

@@ -50,7 +50,7 @@ RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
 # -------------------------------------------------------
 # Force reinstall of FastAPI and Pydantic v2 to ensure compatibility with gradio 4.25.0
 RUN pip install --no-cache-dir --force-reinstall "starlette==0.36.3" "jinja2==3.1.2" "fastapi==0.110.0" "pydantic>=2.0.0"
-RUN pip install --no-cache-dir "gradio==4.25.0"
+RUN pip install --no-cache-dir "gradio==4.44.0"
 RUN pip install --no-cache-dir "gradio-client==0.15.1"
 
 # -------------------------------------------------------

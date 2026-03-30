@@ -9025,7 +9025,17 @@ if __name__ == "__main__":
         if not demo:
             raise ValueError("Demo object is None or not properly initialized")
         
+        # Test API info generation before launch
+        print("[INFO] Testing API info generation...")
         try:
+            api_info = demo.get_api_info()
+            print(f"[INFO] API info generated successfully: {len(api_info)} endpoints")
+        except Exception as api_error:
+            print(f"[WARNING] API info generation failed: {api_error}")
+            print("[INFO] Continuing with launch anyway...")
+        
+        try:
+            print("[INFO] Launching Gradio server...")
             demo.launch(
                 share=False,
                 show_error=True,
@@ -9037,6 +9047,8 @@ if __name__ == "__main__":
                 prevent_thread_lock=False,
             )
             print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
+            print("[SUCCESS] Application is ready to accept requests!")
+            
         except Exception as launch_error:
             print(f"[ERROR] Gradio launch failed: {launch_error}")
             print(f"[ERROR] Launch error type: {type(launch_error)}")

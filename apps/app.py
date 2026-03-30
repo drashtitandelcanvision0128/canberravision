@@ -8277,179 +8277,9 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
         return error_frame, f"⚠️ **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
 
 
-# Create the Gradio app with enhanced modern interface and blue/black theme
+# Create simplified Gradio app without complex CSS/JS
 demo = gr.Blocks(
     title="YOLO26 AI Vision",
-    css=CUSTOM_CSS,
-    head=f'''
-    <script>{THEME_JS}</script>
-    <script>
-    function toggleSettings() {{
-        const menu = document.getElementById('settings-menu');
-        if (menu && menu.style.display === 'block') {{
-            menu.style.display = 'none';
-        }} else if (menu) {{
-            menu.style.display = 'block';
-        }}
-    }}
-    
-    function setTheme(theme) {{
-        const root = document.documentElement;
-        
-        if (theme === 'light') {{
-            root.style.setProperty('--background-color', '#ffffff');
-            root.style.setProperty('--surface-color', '#f8fafc');
-            root.style.setProperty('--card-color', '#ffffff');
-            root.style.setProperty('--text-primary', '#1f2937');
-            root.style.setProperty('--text-secondary', '#374151');
-            root.style.setProperty('--text-muted', '#6b7280');
-            root.style.setProperty('--border-color', '#e5e7eb');
-            root.style.setProperty('--background-gradient', 'linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #ffffff 100%)');
-        }} else if (theme === 'dark') {{
-            root.style.setProperty('--background-color', '#0f172a');
-            root.style.setProperty('--surface-color', '#1e293b');
-            root.style.setProperty('--card-color', '#334155');
-            root.style.setProperty('--text-primary', '#ffffff');
-            root.style.setProperty('--text-secondary', '#e2e8f0');
-            root.style.setProperty('--text-muted', '#94a3b8');
-            root.style.setProperty('--border-color', '#475569');
-            root.style.setProperty('--background-gradient', 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)');
-        }} else if (theme === 'default') {{
-            // Reset to original CSS variables
-            root.style.removeProperty('--background-color');
-            root.style.removeProperty('--surface-color');
-            root.style.removeProperty('--card-color');
-            root.style.removeProperty('--text-primary');
-            root.style.removeProperty('--text-secondary');
-            root.style.removeProperty('--text-muted');
-            root.style.removeProperty('--border-color');
-            root.style.removeProperty('--background-gradient');
-        }}
-        
-        // Close the menu
-        const menu = document.getElementById('settings-menu');
-        if (menu) {{
-            menu.style.display = 'none';
-        }}
-    }}
-    
-    // Close menu when clicking outside
-    document.addEventListener('click', function(event) {{
-        const dropdown = document.querySelector('.settings-dropdown');
-        const menu = document.getElementById('settings-menu');
-        
-        if (dropdown && menu && !dropdown.contains(event.target)) {{
-            menu.style.display = 'none';
-        }}
-    }});
-    
-    // Fix for tab selection issues in production - More aggressive approach
-    (function() {{
-        console.log('Applying tab selection fix...');
-        
-        // Function to fix tabs
-        function fixTabs() {{
-            console.log('Fixing tabs...');
-            const tabs = document.querySelectorAll('[role="tab"], .tab-item, button[aria-selected]');
-            console.log(`Found ${{tabs.length}} tabs`);
-            
-            tabs.forEach(function(tab, index) {{
-                // Force tab visibility and interaction
-                tab.style.setProperty('display', 'block', 'important');
-                tab.style.setProperty('visibility', 'visible', 'important');
-                tab.style.setProperty('pointer-events', 'auto', 'important');
-                tab.style.setProperty('opacity', '1', 'important');
-                
-                // Remove disabled/hidden attributes
-                tab.removeAttribute('disabled');
-                tab.removeAttribute('aria-disabled');
-                tab.setAttribute('aria-hidden', 'false');
-                
-                // Force click event if it's the first tab
-                if (index === 0) {{
-                    setTimeout(function() {{
-                        console.log('Clicking first tab...');
-                        tab.click();
-                    }}, 100);
-                }}
-                
-                // Add robust click handler
-                tab.onclick = function(e) {{
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    console.log(`Tab clicked: ${{tab.textContent || tab.innerText || 'Tab ' + index}}`);
-                    
-                    // Find and activate corresponding panel
-                    const tabId = tab.getAttribute('aria-controls') || 
-                                 tab.getAttribute('data-tab-target') ||
-                                 tab.getAttribute('href')?.replace('#', '');
-                    
-                    if (tabId) {{
-                        const panel = document.getElementById(tabId);
-                        if (panel) {{
-                            console.log(`Activating panel: ${{tabId}}`);
-                            // Show this panel
-                            panel.style.setProperty('display', 'block', 'important');
-                            panel.style.setProperty('visibility', 'visible', 'important');
-                            panel.setAttribute('aria-hidden', 'false');
-                            
-                            // Hide other panels
-                            const allPanels = document.querySelectorAll('[role="tabpanel"], .tab-panel');
-                            allPanels.forEach(function(p) {{
-                                if (p !== panel) {{
-                                    p.style.setProperty('display', 'none', 'important');
-                                    p.setAttribute('aria-hidden', 'true');
-                                }}
-                            }});
-                        }}
-                    }}
-                    
-                    // Update tab states
-                    tabs.forEach(function(t) {{
-                        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
-                        t.classList.toggle('selected', t === tab);
-                    }});
-                    
-                    return false;
-                }};
-            }});
-            
-            // Also fix any tab panels
-            const panels = document.querySelectorAll('[role="tabpanel"], .tab-panel');
-            panels.forEach(function(panel, index) {{
-                if (index === 0) {{
-                    panel.style.setProperty('display', 'block', 'important');
-                    panel.setAttribute('aria-hidden', 'false');
-                }} else {{
-                    panel.style.setProperty('display', 'none', 'important');
-                    panel.setAttribute('aria-hidden', 'true');
-                }}
-            }});
-        }}
-        
-        // Apply fix immediately
-        fixTabs();
-        
-        // Apply fix multiple times to ensure it works
-        setTimeout(fixTabs, 500);
-        setTimeout(fixTabs, 1000);
-        setTimeout(fixTabs, 2000);
-        
-        // Also apply when DOM is ready
-        if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', fixTabs);
-        }} else {{
-            fixTabs();
-        }}
-        
-        // Apply when window loads
-        window.addEventListener('load', fixTabs);
-        
-        console.log('Tab selection fix applied');
-    }})();
-    </script>
-    ''',
     theme=gr.themes.Soft()
 )
 
@@ -8468,24 +8298,9 @@ with demo:
             """
         )
         
-    # Add C-Vision Header with Professional Look
-    gr.HTML("""
-    <div class="c-vision-header">
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <div style="width: 45px; height: 45px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 50%, #1e3a8a 100%); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 20px; box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3); border: 2px solid rgba(255, 255, 255, 0.1);">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10,9 9,9 8,9"></polyline>
-                </svg>
-            </div>
-            <span style="color: white; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Canberra-Vision</span>
-        </div>
-        <div style="color: #cbd5e1; font-size: 15px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; opacity: 0.9;">Advanced AI Vision Platform</div>
-    </div>
-    """)
+    # Simple header
+    gr.Markdown("# 🚀 Canberra Vision AI Platform")
+    gr.Markdown("Advanced AI Vision Detection System")
     
     with gr.Tabs():
         # Image Detection Tab - Exact Match from Image
@@ -8495,33 +8310,23 @@ with demo:
             # Upload Panel at Top - with integrated upload functionality
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.HTML("""
-                    <div class="upload-panel">
-                        <h3>📁 Upload Image</h3>
-                    </div>
-                    """)
-                    img_input = gr.Image(type="pil", label="", show_label=False)
+                    gr.Markdown("### 📁 Upload Image")
+                    img_input = gr.Image(type="pil", label="Upload Image", show_label=True)
                 with gr.Column(scale=2):
                     img_output = gr.Image(type="pil", label="Detection Result", show_label=True)
             
             with gr.Row():
                 with gr.Column(scale=1):
-                    # AI Model Selection - Exact Match
-                    gr.HTML("""
-                    <div class="model-selection">
-                        <h4>AI Model</h4>
-                    </div>
-                    """)
+                    gr.Markdown("### 🤖 AI Model")
                     
                     img_model = gr.Radio(
                         choices=MODEL_CHOICES, 
-                        label="", 
-                        value="yolo26n",
-                        info=""
+                        label="Select Model", 
+                        value="yolo26n"
                     )
                     
                     # Detect Button - Exact Match
-                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg", elem_classes=["detect-button"])
+                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg")
                     
                     # Advanced Settings - Exact Match
                     with gr.Accordion("⚙️ Advanced Settings", open=False):
@@ -8537,24 +8342,7 @@ with demo:
                         img_ocr = gr.Checkbox(value=True, visible=False)
                         
                 with gr.Column(scale=2):
-                    # JSON Result Box - Exact Match
-                    gr.HTML("""
-                    <div class="features-section">
-                        <div class="features-header">Result</div>
-                        <div class="ready-message">JSON Results</div>
-                        <div class="instructions">
-                            Detection results will appear in JSON format here.
-                        </div>
-                        <ul class="features-list">
-                            <li>Vehicle detection</li>
-                            <li>License Plate Recognition</li>
-                            <li>Color classification</li>
-                            <li>GPU-powered processing</li>
-                        </ul>
-                        <div class="gpu-graphics">GPU</div>
-                    </div>
-                    """)
-                    
+                    gr.Markdown("### 📊 Detection Results")
                     img_summary = gr.Code(label="JSON Results", language="json", lines=15, value="{}")
 
             img_btn.click(

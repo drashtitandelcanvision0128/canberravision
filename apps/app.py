@@ -250,16 +250,46 @@ CUSTOM_CSS = """
     margin: 20px 0 !important;
 }
 
-.tabs button {
-    background: transparent !important;
+/* Force tab visibility in production */
+.tabs button,
+.tabs [role="tab"],
+.tab-item,
+button[aria-selected] {
+    background: var(--card-color) !important;
     color: var(--text-secondary) !important;
-    border: none !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 10px 20px !important;
+    margin-right: 5px !important;
     border-radius: 8px !important;
-    margin: 0 5px !important;
-    padding: 12px 20px !important;
-    transition: all 0.3s ease !important;
-    font-weight: 500 !important;
+    cursor: pointer !important;
+    display: block !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
     font-size: 14px !important;
+    transition: all 0.3s ease !important;
+}
+
+/* Ensure first tab is shown by default */
+.tabs button:first-child,
+.tabs [role="tab"]:first-child,
+.tab-item:first-child {
+    background: var(--primary-color) !important;
+    color: white !important;
+    box-shadow: 0 0 20px var(--glow-color) !important;
+}
+
+/* Tab panels visibility */
+[role="tabpanel"],
+.tab-panel {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+[role="tabpanel"]:first-child,
+.tab-panel:first-child {
+    display: block !important;
+    visibility: visible !important;
 }
 
 .tabs button:hover {
@@ -8313,54 +8343,111 @@ demo = gr.Blocks(
         }}
     }});
     
-    // Fix for tab selection issues in production
-    document.addEventListener('DOMContentLoaded', function() {{
-        // Wait for Gradio components to initialize
-        setTimeout(function() {{
-            // Find all tab elements
-            const tabs = document.querySelectorAll('[role="tab"]');
-            tabs.forEach(function(tab) {{
-                // Ensure tab is interactive and visible
-                tab.style.display = '';
-                tab.style.visibility = 'visible';
+    // Fix for tab selection issues in production - More aggressive approach
+    (function() {{
+        console.log('Applying tab selection fix...');
+        
+        // Function to fix tabs
+        function fixTabs() {{
+            console.log('Fixing tabs...');
+            const tabs = document.querySelectorAll('[role="tab"], .tab-item, button[aria-selected]');
+            console.log(`Found ${{tabs.length}} tabs`);
+            
+            tabs.forEach(function(tab, index) {{
+                // Force tab visibility and interaction
+                tab.style.setProperty('display', 'block', 'important');
+                tab.style.setProperty('visibility', 'visible', 'important');
+                tab.style.setProperty('pointer-events', 'auto', 'important');
+                tab.style.setProperty('opacity', '1', 'important');
+                
+                // Remove disabled/hidden attributes
+                tab.removeAttribute('disabled');
+                tab.removeAttribute('aria-disabled');
                 tab.setAttribute('aria-hidden', 'false');
                 
-                // Remove any disabled attributes
-                tab.removeAttribute('disabled');
+                // Force click event if it's the first tab
+                if (index === 0) {{
+                    setTimeout(function() {{
+                        console.log('Clicking first tab...');
+                        tab.click();
+                    }}, 100);
+                }}
                 
-                // Add click handler to ensure tab selection works
-                tab.addEventListener('click', function(e) {{
+                // Add robust click handler
+                tab.onclick = function(e) {{
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    // Manually trigger tab selection if Gradio's handler fails
-                    try {{
-                        // Get the tab panel
-                        const tabId = tab.getAttribute('aria-controls');
-                        if (tabId) {{
-                            const panel = document.getElementById(tabId);
-                            if (panel) {{
-                                // Show this panel
-                                panel.style.display = '';
-                                panel.setAttribute('aria-hidden', 'false');
-                                
-                                // Hide other panels
-                                const allPanels = document.querySelectorAll('[role="tabpanel"]');
-                                allPanels.forEach(function(p) {{
-                                    if (p !== panel) {{
-                                        p.style.display = 'none';
-                                        p.setAttribute('aria-hidden', 'true');
-                                    }}
-                                }});
-                            }}
+                    console.log(`Tab clicked: ${{tab.textContent || tab.innerText || 'Tab ' + index}}`);
+                    
+                    // Find and activate corresponding panel
+                    const tabId = tab.getAttribute('aria-controls') || 
+                                 tab.getAttribute('data-tab-target') ||
+                                 tab.getAttribute('href')?.replace('#', '');
+                    
+                    if (tabId) {{
+                        const panel = document.getElementById(tabId);
+                        if (panel) {{
+                            console.log(`Activating panel: ${{tabId}}`);
+                            // Show this panel
+                            panel.style.setProperty('display', 'block', 'important');
+                            panel.style.setProperty('visibility', 'visible', 'important');
+                            panel.setAttribute('aria-hidden', 'false');
+                            
+                            // Hide other panels
+                            const allPanels = document.querySelectorAll('[role="tabpanel"], .tab-panel');
+                            allPanels.forEach(function(p) {{
+                                if (p !== panel) {{
+                                    p.style.setProperty('display', 'none', 'important');
+                                    p.setAttribute('aria-hidden', 'true');
+                                }}
+                            }});
                         }}
-                    }} catch (err) {{
-                        console.warn('Tab selection fix failed:', err);
                     }}
-                }});
+                    
+                    // Update tab states
+                    tabs.forEach(function(t) {{
+                        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+                        t.classList.toggle('selected', t === tab);
+                    }});
+                    
+                    return false;
+                }};
             }});
-        }}, 1000); // Wait 1 second for initialization
-    }});
+            
+            // Also fix any tab panels
+            const panels = document.querySelectorAll('[role="tabpanel"], .tab-panel');
+            panels.forEach(function(panel, index) {{
+                if (index === 0) {{
+                    panel.style.setProperty('display', 'block', 'important');
+                    panel.setAttribute('aria-hidden', 'false');
+                }} else {{
+                    panel.style.setProperty('display', 'none', 'important');
+                    panel.setAttribute('aria-hidden', 'true');
+                }}
+            }});
+        }}
+        
+        // Apply fix immediately
+        fixTabs();
+        
+        // Apply fix multiple times to ensure it works
+        setTimeout(fixTabs, 500);
+        setTimeout(fixTabs, 1000);
+        setTimeout(fixTabs, 2000);
+        
+        // Also apply when DOM is ready
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', fixTabs);
+        }} else {{
+            fixTabs();
+        }}
+        
+        // Apply when window loads
+        window.addEventListener('load', fixTabs);
+        
+        console.log('Tab selection fix applied');
+    }})();
     </script>
     ''',
     theme=gr.themes.Soft()

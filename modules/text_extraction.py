@@ -2046,6 +2046,9 @@ def _clean_general_text(text: str) -> str:
     if not text:
         return ""
     
+    # Remove ALL question marks first (from anywhere in the text)
+    text = text.replace('?', '').replace('??', '').replace('???', '').replace('????', '')
+    
     # Remove excessive whitespace and convert to proper case
     cleaned = text.strip()
     
@@ -2053,10 +2056,10 @@ def _clean_general_text(text: str) -> str:
     cleaned = re.sub(r'\s+', ' ', cleaned)
     
     # Remove common OCR artifacts but keep more characters for general text
-    # Keep letters, numbers, spaces, and common punctuation
+    # Keep letters, numbers, spaces, and common punctuation (except question marks)
     valid_chars = []
     for char in cleaned:
-        if char.isalnum() or char.isspace() or char in '.,!?-:;()[]{}"/\'@#$%&*+=<>' :
+        if char.isalnum() or char.isspace() or char in '.,!-:;()[]{}"/\'@#$%&*+=<>' :
             valid_chars.append(char)
     
     result = ''.join(valid_chars)
@@ -2075,6 +2078,9 @@ def _clean_license_plate_text(text: str) -> str:
     """Clean and normalize OCR text for license plates."""
     if not text:
         return ""
+    
+    # Remove ALL question marks first (from anywhere in the text)
+    text = text.replace('?', '').replace('??', '').replace('???', '').replace('????', '')
     
     # Remove whitespace and convert to uppercase
     cleaned = text.strip().upper()

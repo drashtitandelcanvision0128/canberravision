@@ -9014,20 +9014,32 @@ if __name__ == "__main__":
         signal.signal(signal.SIGTERM, cleanup_temp_directory)
         
         print(f"[INFO] Starting Gradio server on {_gradio_server_name}:{_server_port}")
+        print(f"[INFO] Demo object: {demo}")
+        print(f"[INFO] Demo type: {type(demo)}")
         print(f"[INFO] Waiting for server to initialize...")
         
-        demo.launch(
-            share=False,
-            show_error=True,
-            quiet=False,
-            inbrowser=_open_browser,
-            server_name=_gradio_server_name,
-            server_port=_server_port,
-            allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-            prevent_thread_lock=False,
-        )
+        # Validate demo before launching
+        if not demo:
+            raise ValueError("Demo object is None or not properly initialized")
         
-        print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
+        try:
+            demo.launch(
+                share=False,
+                show_error=True,
+                quiet=False,
+                inbrowser=_open_browser,
+                server_name=_gradio_server_name,
+                server_port=_server_port,
+                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
+                prevent_thread_lock=False,
+            )
+            print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
+        except Exception as launch_error:
+            print(f"[ERROR] Gradio launch failed: {launch_error}")
+            print(f"[ERROR] Launch error type: {type(launch_error)}")
+            import traceback
+            traceback.print_exc()
+            raise launch_error
         
     except KeyboardInterrupt:
         print("\n[INFO] Application interrupted by user. Shutting down gracefully...")

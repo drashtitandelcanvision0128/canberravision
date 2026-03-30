@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+"""
+Debug script to test Gradio demo creation and launch in container environment
+"""
+import os
+import sys
+import gradio as gr
+
+print("=" * 60)
+print("YOLO Vision System - Debug Startup")
+print("=" * 60)
+
+# Print environment
+print("\n[DEBUG] Environment Variables:")
+env_vars = ["APP_ENV", "GRADIO_SERVER_PORT", "GRADIO_SERVER_NAME", "PYTHONPATH"]
+for var in env_vars:
+    value = os.environ.get(var, "NOT SET")
+    print(f"  {var}: {value}")
+
+print(f"\n[DEBUG] Python version: {sys.version}")
+print(f"[DEBUG] Current directory: {os.getcwd()}")
+
+try:
+    print(f"\n[DEBUG] Gradio version: {gr.__version__}")
+except Exception as e:
+    print(f"[ERROR] Gradio import failed: {e}")
+    sys.exit(1)
+
+# Test simple demo creation
+print("\n[DEBUG] Testing simple demo creation...")
+try:
+    simple_demo = gr.Blocks(title="Test Demo")
+    print(f"[DEBUG] Simple demo created: {simple_demo}")
+except Exception as e:
+    print(f"[ERROR] Simple demo creation failed: {e}")
+    sys.exit(1)
+
+# Test actual app demo import
+print("\n[DEBUG] Testing app demo import...")
+try:
+    sys.path.insert(0, os.getcwd())
+    from apps.app import demo
+    print(f"[DEBUG] App demo imported: {demo}")
+    print(f"[DEBUG] App demo title: {getattr(demo, 'title', 'No title')}")
+    
+    if hasattr(demo, 'launch'):
+        print("[DEBUG] Demo has launch method")
+    else:
+        print("[ERROR] Demo missing launch method")
+        
+except Exception as e:
+    print(f"[ERROR] App demo import failed: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+print("\n[DEBUG] All tests passed! Demo should be ready to launch.")
+print("=" * 60)

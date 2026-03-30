@@ -487,3 +487,40 @@ if __name__ == "__main__":
     print("   - 56 color shades across 6 families")
     print("   - Enhanced confidence calculation")
     print("   - Fallback to K-means only if ResNet-18 fails")
+
+
+# Wrapper functions for compatibility with modules expecting different function names
+def detect_image_colors(image: np.ndarray, region: Optional[Tuple[int, int, int, int]] = None) -> Dict:
+    """Wrapper for detect_colors_enhanced for backward compatibility"""
+    return detect_colors_enhanced(image, region)
+
+def categorize_detected_object(class_name: str, color_result: Dict, confidence: float = 0.8, 
+                               object_features: Optional[np.ndarray] = None) -> Dict:
+    """Wrapper for categorize_object_enhanced for backward compatibility"""
+    return categorize_object_enhanced(class_name, color_result, confidence, object_features)
+
+def analyze_scene(image: np.ndarray, detections: List[Dict]) -> Dict:
+    """Simple scene analysis based on detected objects and their colors"""
+    try:
+        scene_colors = detect_colors_enhanced(image)
+        
+        object_categories = []
+        for det in detections:
+            class_name = det.get('class_name', 'Unknown')
+            color_info = det.get('color_info', {})
+            object_categories.append({
+                'class': class_name,
+                'color_family': color_info.get('family', 'Unknown'),
+                'color_shade': color_info.get('shade', 'Unknown')
+            })
+        
+        return {
+            'success': True,
+            'scene_analysis': {
+                'dominant_color_family': scene_colors.get('primary_color', {}).get('family', 'Unknown'),
+                'object_count': len(detections),
+                'objects': object_categories
+            }
+        }
+    except Exception as e:
+        return {'success': False, 'error': str(e)}

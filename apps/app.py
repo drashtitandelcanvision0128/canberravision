@@ -9320,86 +9320,87 @@ with demo:
             # webcam_timer.tick(update_webcam_info, outputs=webcam_info)
             # Note: JSON updates happen automatically via predict_webcam output
 
-        # Parking Detection Tab - Exact Match from Image
+        # Parking Detection Tab - Flattened structure to avoid nested tabs
         with gr.TabItem("Parking Detection"):
             gr.Markdown("### Smart Parking Space Detection System")
             gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
             
-            with gr.Tabs():
-                # Image Upload Tab
-                with gr.TabItem("📁 Image Upload"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
-                            parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                                parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
-                            
-                            parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
-                            
-                        with gr.Column(scale=2):
-                            parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
-                            parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
-
-                # Video Upload Tab  
-                with gr.TabItem("🎥 Video Upload"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            parking_video_input = gr.Video(label="🎥 Upload Parking Video")
-                            parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                                parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
-                                parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                            
-                            parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
-                            
-                        with gr.Column(scale=2):
-                            parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
-                            parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
-                            parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
-
-                # Live Webcam Tab
-                with gr.TabItem("📸 Live Webcam"):
-                    gr.Markdown("### 📸 Real-time Parking Detection with Webcam")
+            # Image Upload Section
+            gr.Markdown("#### 📁 Image Upload")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
+                    parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
                     
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            gr.Markdown("#### 🎛️ Control Panel")
-                            
-                            parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                                parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
-                                parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                            
-                            gr.Markdown("#### 📹 Webcam Feed")
-                            parking_webcam_input = gr.Image(
-                                sources=["webcam"],
-                                type="numpy",
-                                label="📸 Live Camera",
-                                streaming=True,
-                                height=420,
-                            )
-                            
-                        with gr.Column(scale=2):
-                            gr.Markdown("#### 🎯 Live Parking Detection")
-                            parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
-                            
-                            gr.Markdown("#### 📊 Live Statistics")
-                            parking_webcam_info = gr.Textbox(
-                                label="Detection Info", 
-                                interactive=False, 
-                                lines=8, 
-                                value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
-                            )
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                        parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+                    
+                    parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
+                    
+                with gr.Column(scale=2):
+                    parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
+                    parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
+
+            gr.Markdown("---")
+            
+            # Video Upload Section  
+            gr.Markdown("#### 🎥 Video Upload")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    parking_video_input = gr.Video(label="🎥 Upload Parking Video")
+                    parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                        parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
+                        parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    
+                    parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
+                    
+                with gr.Column(scale=2):
+                    parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
+                    parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
+                    parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
+
+            gr.Markdown("---")
+            
+            # Live Webcam Section
+            gr.Markdown("#### 📸 Live Webcam")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("##### 🎛️ Control Panel")
+                    
+                    parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+                        parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
+                        parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    
+                    gr.Markdown("##### 📹 Webcam Feed")
+                    parking_webcam_input = gr.Image(
+                        sources=["webcam"],
+                        type="numpy",
+                        label="📸 Live Camera",
+                        streaming=True,
+                        height=420,
+                    )
+                    
+                with gr.Column(scale=2):
+                    gr.Markdown("##### 🎯 Live Parking Detection")
+                    parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
+                    
+                    gr.Markdown("##### 📊 Live Statistics")
+                    parking_webcam_info = gr.Textbox(
+                        label="Detection Info", 
+                        interactive=False, 
+                        lines=8, 
+                        value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
+                    )
 
             # Connect all components
             parking_btn_img.click(
@@ -9421,86 +9422,87 @@ with demo:
                 show_progress=False,
             )
 
-        # PPE Detection Tab - Exact Match from Image
+        # PPE Detection Tab - Flattened structure to avoid nested tabs
         with gr.TabItem("PPE Detection"):
             gr.Markdown("### PPE (Personal Protective Equipment) Detection System")
             gr.Markdown("Detect safety equipment compliance on workers in images, videos, or live webcam feeds.")
             
-            with gr.Tabs():
-                # Image Upload Tab
-                with gr.TabItem("📁 Image Upload"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            ppe_input = gr.Image(type="pil", label="📁 Upload Image")
-                            ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                                ppe_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                ppe_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
-                            
-                            ppe_btn_img = gr.Button("🦺 Detect PPE", variant="primary")
-                            
-                        with gr.Column(scale=2):
-                            ppe_output_img = gr.Image(type="pil", label="🦺 PPE Analysis", height=400)
-                            ppe_summary_img = gr.Markdown("## 📸 Upload an image to start PPE detection")
-
-                # Video Upload Tab  
-                with gr.TabItem("🎥 Video Upload"):
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            ppe_video_input = gr.Video(label="🎥 Upload Video")
-                            ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                                ppe_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                ppe_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
-                                ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                            
-                            ppe_btn_vid = gr.Button("🦺 Analyze Video", variant="primary")
-                            
-                        with gr.Column(scale=2):
-                            ppe_video_output = gr.Video(label="🦺 Video Analysis", height=400)
-                            ppe_video_download = gr.File(label="📥 Download Processed Video", visible=False)
-                            ppe_summary_vid = gr.Markdown("## 🎥 Upload a video to start PPE detection")
-
-                # Live Webcam Tab
-                with gr.TabItem("📸 Live Webcam"):
-                    gr.Markdown("### 📸 Real-time PPE Detection with Webcam")
+            # Image Upload Section
+            gr.Markdown("#### 📁 Image Upload")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    ppe_input = gr.Image(type="pil", label="📁 Upload Image")
+                    ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
                     
-                    with gr.Row():
-                        with gr.Column(scale=1):
-                            gr.Markdown("#### 🎛️ Control Panel")
-                            
-                            ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Settings", open=False):
-                                ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                                ppe_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                                ppe_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
-                                ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                            
-                            gr.Markdown("#### 📹 Webcam Feed")
-                            ppe_webcam_input = gr.Image(
-                                sources=["webcam"],
-                                type="numpy",
-                                label="📸 Live Camera",
-                                streaming=True,
-                                height=420,
-                            )
-                            
-                        with gr.Column(scale=2):
-                            gr.Markdown("#### 🎯 Live PPE Detection")
-                            ppe_webcam_output = gr.Image(type="numpy", label="🦺 Real-time Results", height=420)
-                            
-                            gr.Markdown("#### 📊 Live Statistics")
-                            ppe_webcam_info = gr.Textbox(
-                                label="Detection Info", 
-                                interactive=False, 
-                                lines=8, 
-                                value="📹 **Status:** Ready to start\n\n🦺 Point camera at workers for PPE detection!"
-                            )
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                        ppe_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        ppe_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+                    
+                    ppe_btn_img = gr.Button("🦺 Detect PPE", variant="primary")
+                    
+                with gr.Column(scale=2):
+                    ppe_output_img = gr.Image(type="pil", label="🦺 PPE Analysis", height=400)
+                    ppe_summary_img = gr.Markdown("## 📸 Upload an image to start PPE detection")
+
+            gr.Markdown("---")
+            
+            # Video Upload Section  
+            gr.Markdown("#### 🎥 Video Upload")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    ppe_video_input = gr.Video(label="🎥 Upload Video")
+                    ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                        ppe_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        ppe_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
+                        ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    
+                    ppe_btn_vid = gr.Button("🦺 Analyze Video", variant="primary")
+                    
+                with gr.Column(scale=2):
+                    ppe_video_output = gr.Video(label="🦺 Video Analysis", height=400)
+                    ppe_video_download = gr.File(label="📥 Download Processed Video", visible=False)
+                    ppe_summary_vid = gr.Markdown("## 🎥 Upload a video to start PPE detection")
+
+            gr.Markdown("---")
+            
+            # Live Webcam Section
+            gr.Markdown("#### 📸 Live Webcam")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Markdown("##### 🎛️ Control Panel")
+                    
+                    ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    
+                    with gr.Accordion("⚙️ Settings", open=False):
+                        ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
+                        ppe_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
+                        ppe_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
+                        ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    
+                    gr.Markdown("##### 📹 Webcam Feed")
+                    ppe_webcam_input = gr.Image(
+                        sources=["webcam"],
+                        type="numpy",
+                        label="📸 Live Camera",
+                        streaming=True,
+                        height=420,
+                    )
+                    
+                with gr.Column(scale=2):
+                    gr.Markdown("##### 🎯 Live PPE Detection")
+                    ppe_webcam_output = gr.Image(type="numpy", label="🦺 Real-time Results", height=420)
+                    
+                    gr.Markdown("##### 📊 Live Statistics")
+                    ppe_webcam_info = gr.Textbox(
+                        label="Detection Info", 
+                        interactive=False, 
+                        lines=8, 
+                        value="📹 **Status:** Ready to start\n\n🦺 Point camera at workers for PPE detection!"
+                    )
 
             # Connect all PPE components
             ppe_btn_img.click(

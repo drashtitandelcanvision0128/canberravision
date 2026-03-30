@@ -9270,13 +9270,12 @@ with demo:
                         type="numpy",
                         label="📸 Live Camera",
                         streaming=True,
-                        height=420,
-                        elem_id="webcam_input",
+                        height=420
                     )
                     
                 with gr.Column(scale=2):
                     gr.Markdown("#### 🎯 Live Detection")
-                    webcam_output = gr.Image(type="numpy", label="🔍 Real-time Results", height=620, elem_id="webcam_output")
+                    webcam_output = gr.Image(type="numpy", label="🔍 Real-time Results", height=620)
                     
                     gr.Markdown("#### 📊 Detection Info")
                     webcam_info = gr.Textbox(label="Detection Info", interactive=False, lines=10, value="📹 **Status:** Ready to start\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!")

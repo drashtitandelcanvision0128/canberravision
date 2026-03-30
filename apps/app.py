@@ -897,7 +897,10 @@ if UNIFIED_DETECTION_AVAILABLE:
     # Add unified video detection wrapper
     def process_unified_video_detection_all(video_path, conf_threshold=0.5):
         """Wrapper that calls the unified video detection module and saves final results to database"""
-        from unified_detection_module import process_unified_video_detection
+        try:
+            from unified_detection_module import process_unified_video_detection
+        except ImportError:
+            return None, "{}", "⚠️ Unified video detection module not available"
         
         if video_path is None:
             return None, "{}", "Please upload a video first"

@@ -1,0 +1,61 @@
+# ============================================================
+# Canberra Vision Detection System - DEBUG Dockerfile
+# Used for testing minimal Gradio interface
+# ============================================================
+FROM python:3.10-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+ENV APP_ENV=production
+ENV GRADIO_SERVER_PORT=7860
+ENV GRADIO_SERVER_NAME=0.0.0.0
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    curl \
+    unzip \
+    pkg-config \
+    ffmpeg \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --upgrade pip setuptools wheel
+
+# Install minimal dependencies for testing
+RUN pip install --no-cache-dir \
+    "gradio==4.25.0" \
+    "numpy<2.0.0" \
+    torch \
+    torchvision
+
+# Copy the minimal test app
+COPY minimal_app.py .
+
+# Make the test app executable
+RUN chmod +x minimal_app.py
+
+# Expose Gradio port
+EXPOSE 7860
+
+# Simple health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://127.0.0.1:7860/ || exit 1
+
+# Run the minimal test app
+CMD ["python", "minimal_app.py"]

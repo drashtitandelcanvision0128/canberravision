@@ -32,25 +32,36 @@ python -c "import gradio as gr; print(f'Gradio version: {gr.__version__}')" || {
     exit 1
 }
 
-# Test demo creation
+# Test demo creation with full error output
 echo "[STARTUP] Testing demo creation..."
 python -c "
-import sys, os
+import sys, os, traceback
 sys.path.insert(0, '/app')
 try:
+    print('[DEBUG] Starting demo import...')
     from apps.app import demo
-    print(f'Demo created successfully: {type(demo)}')
-    print(f'Demo title: {demo.title}')
+    print(f'[DEBUG] Demo imported successfully: {type(demo)}')
+    print(f'[DEBUG] Demo title: {demo.title}')
+    print(f'[DEBUG] Demo has launch method: {hasattr(demo, \"launch\")}')
 except Exception as e:
-    print(f'Demo creation failed: {e}')
-    import traceback
+    print(f'[ERROR] Demo creation failed: {e}')
+    print('[ERROR] Full traceback:')
     traceback.print_exc()
     exit(1)
 " || {
-    echo "[ERROR] Demo creation failed!"
+    echo "[ERROR] Demo creation failed! Check the error output above."
     exit 1
 }
 
-# Start the application
+# Start the application with error handling
 echo "[STARTUP] Starting Gradio application..."
-exec python apps/app.py
+echo "[STARTUP] If this fails, the error will be shown below:"
+
+# Run the app and capture any errors
+if python apps/app.py; then
+    echo "[STARTUP] ✅ Application started successfully!"
+else
+    echo "[ERROR] ❌ Application failed to start!"
+    echo "[ERROR] Check the error output above for details."
+    exit 1
+fi

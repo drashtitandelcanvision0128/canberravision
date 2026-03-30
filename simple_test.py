@@ -33,7 +33,7 @@ with demo:
             gr.Markdown(f"- **Server**: {os.environ.get('GRADIO_SERVER_NAME')}:{os.environ.get('GRADIO_SERVER_PORT')}")
             gr.Markdown(f"- **Environment**: {os.environ.get('APP_ENV')}")
             gr.Markdown(f"- **Gradio Version**: {gr.__version__}")
-            gr.Markdown(f"- **Domain**: https://p0g0wkk4wk8o4wcgcggs0kcc.senseword.com")
+            gr.Markdown(f"- **Domain**: Local development server")
             
         with gr.Column():
             gr.Markdown("### Test Controls:")
@@ -62,7 +62,7 @@ try:
         prevent_thread_lock=False,
     )
     print("✅ Server started successfully!")
-    print("🌐 Access at: https://p0g0wkk4wk8o4wcgcggs0kcc.senseword.com")
+    print("🌐 Access at: http://localhost:7860")
 except Exception as e:
     print(f"❌ Failed to start: {e}")
     import traceback

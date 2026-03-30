@@ -1,0 +1,38 @@
+# ============================================================
+# Simple Test Dockerfile for Coolify Debugging
+# ============================================================
+FROM python:3.10-slim
+
+# Set environment variables exactly as in Coolify
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV APP_ENV=production
+ENV GRADIO_SERVER_PORT=7860
+ENV GRADIO_SERVER_NAME=0.0.0.0
+
+WORKDIR /app
+
+# Install basic system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install only essential Python packages
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir gradio==4.25.0
+
+# Copy the simple test app
+COPY simple_test.py .
+
+# Make it executable
+RUN chmod +x simple_test.py
+
+# Expose the exact port you configured in Coolify
+EXPOSE 7860
+
+# Simple health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://127.0.0.1:7860/ || exit 1
+
+# Run the simple test
+CMD ["python", "simple_test.py"]

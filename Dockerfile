@@ -108,8 +108,8 @@ RUN echo "Build timestamp: $(date)" > /app/build_info.txt
 RUN mkdir -p uploads processed processed_images processed_videos \
     temp_gradio inputs outputs logs
 
-# Make startup script executable
-RUN chmod +x start.sh
+# Make startup scripts executable
+RUN chmod +x start.sh start_production.py
 
 RUN chmod -R 755 /app
 
@@ -120,4 +120,5 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
     CMD python health_check.py || exit 1
 
-CMD ["./start.sh"]
+# Use production startup script for Coolify
+CMD ["python", "start_production.py"]

@@ -62,6 +62,27 @@ if "CUDA_VISIBLE_DEVICES" not in os.environ:
 os.environ['OPENCV_VIDEOIO_PRIORITY_MSMF'] = '0'
 os.environ['OPENCV_VIDEOIO_PRIORITY_DSHOW'] = '0'
 
+# Production Environment Configuration for Coolify
+IS_PRODUCTION = os.environ.get('APP_ENV') == 'production' or os.environ.get('ENV') == 'production'
+if IS_PRODUCTION:
+    print("[INFO] Production environment detected")
+    print("[INFO] Applying production optimizations...")
+    
+    # Force CPU mode in production (Coolify servers typically don't have GPU)
+    os.environ['CUDA_VISIBLE_DEVICES'] = ''
+    
+    # Set production server settings
+    _gradio_server_name = os.environ.get('GRADIO_SERVER_NAME', '0.0.0.0')
+    _gradio_server_port = int(os.environ.get('GRADIO_SERVER_PORT', '7860'))
+    _open_browser = False  # Never open browser in production
+    
+    print(f"[INFO] Production server config: {_gradio_server_name}:{_gradio_server_port}")
+else:
+    print("[INFO] Development environment detected")
+    _gradio_server_name = 'localhost'
+    _gradio_server_port = 7860
+    _open_browser = True
+
 try:
     import pytesseract
     TESSERACT_AVAILABLE = True
@@ -8291,6 +8312,55 @@ demo = gr.Blocks(
             menu.style.display = 'none';
         }}
     }});
+    
+    // Fix for tab selection issues in production
+    document.addEventListener('DOMContentLoaded', function() {{
+        // Wait for Gradio components to initialize
+        setTimeout(function() {{
+            // Find all tab elements
+            const tabs = document.querySelectorAll('[role="tab"]');
+            tabs.forEach(function(tab) {{
+                // Ensure tab is interactive and visible
+                tab.style.display = '';
+                tab.style.visibility = 'visible';
+                tab.setAttribute('aria-hidden', 'false');
+                
+                // Remove any disabled attributes
+                tab.removeAttribute('disabled');
+                
+                // Add click handler to ensure tab selection works
+                tab.addEventListener('click', function(e) {{
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Manually trigger tab selection if Gradio's handler fails
+                    try {{
+                        // Get the tab panel
+                        const tabId = tab.getAttribute('aria-controls');
+                        if (tabId) {{
+                            const panel = document.getElementById(tabId);
+                            if (panel) {{
+                                // Show this panel
+                                panel.style.display = '';
+                                panel.setAttribute('aria-hidden', 'false');
+                                
+                                // Hide other panels
+                                const allPanels = document.querySelectorAll('[role="tabpanel"]');
+                                allPanels.forEach(function(p) {{
+                                    if (p !== panel) {{
+                                        p.style.display = 'none';
+                                        p.setAttribute('aria-hidden', 'true');
+                                    }}
+                                }});
+                            }}
+                        }}
+                    }} catch (err) {{
+                        console.warn('Tab selection fix failed:', err);
+                    }}
+                }});
+            }});
+        }}, 1000); // Wait 1 second for initialization
+    }});
     </script>
     ''',
     theme=gr.themes.Soft()
@@ -9005,14 +9075,17 @@ if __name__ == "__main__":
         print(f"[WARNING] Could not cleanup temp directory: {cleanup_error}")
     
     # Detect if running inside Docker container
-    _is_docker = os.path.exists('/.dockerenv') or os.environ.get('APP_ENV') == 'production'
+    _is_docker = os.path.exists('/.dockerenv') or IS_PRODUCTION
     
-    # Get server configuration from environment variables (Docker-friendly)
-    _gradio_server_name = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0" if _is_docker else "localhost")
+    # Use production configuration if already set
+    if '_gradio_server_name' not in globals():
+        _gradio_server_name = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0" if _is_docker else "localhost")
+    
     _server_host = _gradio_server_name
-    _open_browser = False
+    _server_port = _gradio_server_port
     print(f"[INFO] Docker mode: {_is_docker}")
-    print(f"[INFO] Server host: {_server_host}, Open browser: {_open_browser}")
+    print(f"[INFO] Production mode: {IS_PRODUCTION}")
+    print(f"[INFO] Server host: {_server_host}:{_server_port}, Open browser: {_open_browser}")
     
     try:
         # Register signal handlers for graceful shutdown

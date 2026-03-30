@@ -43,6 +43,14 @@ try:
     print(f'[DEBUG] Demo imported successfully: {type(demo)}')
     print(f'[DEBUG] Demo title: {demo.title}')
     print(f'[DEBUG] Demo has launch method: {hasattr(demo, \"launch\")}')
+    
+    # Test if demo can generate API info (this was causing issues before)
+    print('[DEBUG] Testing API info generation...')
+    api_info = demo.get_api_info()
+    print(f'[DEBUG] API info generated: {len(api_info)} endpoints')
+    
+    print('[DEBUG] Demo validation complete!')
+    
 except Exception as e:
     print(f'[ERROR] Demo creation failed: {e}')
     print('[ERROR] Full traceback:')

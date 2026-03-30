@@ -1343,9 +1343,12 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             from kmeans_color_detector import detect_image_colors
             COLOR_DETECTOR_AVAILABLE = True
             print("[INFO] Color detector loaded for JSON output")
-        except Exception as e:
-            print(f"[WARNING] Color detector not available: {e}")
+        except ImportError:
+            print("[WARNING] K-means color detector not available: No module named 'kmeans_color_detector'")
             COLOR_DETECTOR_AVAILABLE = False
+            # Create fallback function
+            def detect_image_colors(image_path, k=5):
+                return {"dominant_colors": ["#808080"], "color_names": ["gray"]}
         
         # Main processing loop with optimizations
         while True:
@@ -8372,9 +8375,9 @@ with demo:
                         img_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
                         
                         # Hidden controls (always enabled)
-                        img_resnet = gr.State(value=True)
-                        img_max_boxes = gr.State(value=10)
-                        img_ocr = gr.State(value=True)
+                        img_resnet = gr.Checkbox(value=True, visible=False)
+                        img_max_boxes = gr.Number(value=10, visible=False)
+                        img_ocr = gr.Checkbox(value=True, visible=False)
                         
                 with gr.Column(scale=2):
                     # JSON Result Box - Exact Match
@@ -8450,9 +8453,9 @@ with demo:
                         vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
                         # Hidden controls (always enabled)
-                        vid_resnet = gr.State(value=True)
-                        vid_ocr = gr.State(value=True)
-                        vid_ocr_every_n = gr.State(value=5)
+                        vid_resnet = gr.Checkbox(value=True, visible=False)
+                        vid_ocr = gr.Checkbox(value=True, visible=False)
+                        vid_ocr_every_n = gr.Number(value=5, visible=False)
                     
                     # Progress indicator
                     vid_progress = gr.Textbox(label="📊 Status", value="⏳ Ready to process video...", interactive=False)
@@ -8600,10 +8603,10 @@ with demo:
                         webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="📦 Max Boxes per Frame")
                         webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
                         
-                        # Hidden controls (always enabled) - using gr.State instead to avoid schema issues
-                        webcam_resnet = gr.State(value=False)
-                        webcam_enable_ocr = gr.State(value=True)
-                        webcam_ocr_every_n = gr.State(value=5)
+                        # Hidden controls (always enabled) - using hidden components to avoid schema issues
+                        webcam_resnet = gr.Checkbox(value=False, visible=False)
+                        webcam_enable_ocr = gr.Checkbox(value=True, visible=False)
+                        webcam_ocr_every_n = gr.Number(value=5, visible=False)
                     
                     gr.Markdown("#### 📹 Webcam Feed")
                     webcam_input = gr.Image(

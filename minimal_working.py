@@ -87,7 +87,7 @@ try:
         prevent_thread_lock=False,
     )
     print("[SUCCESS] Application is ready!")
-    print(f"[SUCCESS] Access at: https://p0g0wkk4wk8o4wcgcggs0kcc.senseword.com")
+    print(f"[SUCCESS] Access at: http://localhost:7860")
     
 except Exception as e:
     print(f"[ERROR] Failed to launch: {e}")

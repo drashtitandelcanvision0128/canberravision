@@ -1,5 +1,6 @@
 gradio==4.25.0
 gradio-client==0.15.1
+pydantic==2.10.6
 ultralytics
 pathlib
 typing

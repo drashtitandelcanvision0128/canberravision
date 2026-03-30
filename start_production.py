@@ -10,12 +10,16 @@ import logging
 import traceback
 from pathlib import Path
 
+# Create logs directory if it doesn't exist
+log_dir = Path('logs')
+log_dir.mkdir(exist_ok=True)
+
 # Set up production logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/app/logs/production.log'),
+        logging.FileHandler('logs/production.log'),
         logging.StreamHandler()
     ]
 )
@@ -76,7 +80,7 @@ def test_demo_creation():
     
     try:
         # Add app directory to path
-        app_dir = Path('/app')
+        app_dir = Path('.')
         if str(app_dir) not in sys.path:
             sys.path.insert(0, str(app_dir))
         
@@ -135,7 +139,7 @@ def main():
             inbrowser=False,  # Never open browser in production
             server_name=os.environ['GRADIO_SERVER_NAME'],
             server_port=int(os.environ['GRADIO_SERVER_PORT']),
-            allowed_paths=['/app'],
+            allowed_paths=['.'],
             prevent_thread_lock=False
         )
         

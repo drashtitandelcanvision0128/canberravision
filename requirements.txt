@@ -30,3 +30,4 @@ psycopg2-binary
 setuptools==68.0.0
 # LightOnOCR integration (GPU ready when CUDA is available)
 # Additional GPU dependencies can be added when CUDA is properly configured
+# Optional enhanced modules - these are warnings only, core functionality works without them

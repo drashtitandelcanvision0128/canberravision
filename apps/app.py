@@ -8227,7 +8227,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 demo = gr.Blocks(
     title="YOLO26 AI Vision",
     css=CUSTOM_CSS,
-    show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
     head=f'''
     <script>{THEME_JS}</script>
     <script>
@@ -9046,6 +9045,7 @@ if __name__ == "__main__":
                 server_port=_server_port,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
                 prevent_thread_lock=False,
+                show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
             )
             print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
             print("[SUCCESS] Application is ready to accept requests!")
@@ -9073,6 +9073,7 @@ if __name__ == "__main__":
                 server_port=7861 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
                 prevent_thread_lock=False,
+                show_api=False,  # Disable API docs to avoid TypeError with additionalProperties
             )
             print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
         except Exception as e2:

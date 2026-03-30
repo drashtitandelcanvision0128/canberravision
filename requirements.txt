@@ -1,4 +1,4 @@
-gradio==4.25.0
+gradio==4.32.2
 gradio-client==0.15.1
 pydantic==2.10.6
 ultralytics

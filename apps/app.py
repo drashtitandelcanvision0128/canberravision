@@ -8221,7 +8221,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
 
 # Create the Gradio app with enhanced modern interface and blue/black theme
-with gr.Blocks(
+demo = gr.Blocks(
     title="YOLO26 AI Vision",
     css=CUSTOM_CSS,
     head=f'''
@@ -8288,7 +8288,9 @@ with gr.Blocks(
     </script>
     ''',
     theme=gr.themes.Soft()
-) as demo:
+)
+
+with demo:
     
     # Display device status with modern styling
     device = _get_device()

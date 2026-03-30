@@ -9015,7 +9015,7 @@ with demo:
     
     with gr.Tabs():
         # Image Detection Tab - Exact Match from Image
-        with gr.TabItem("Image Detection", selected=True):
+        with gr.TabItem("Image Detection"):
             gr.Markdown("### Upload an image for instant AI-powered object detection")
             
             # Upload Panel at Top - with integrated upload functionality

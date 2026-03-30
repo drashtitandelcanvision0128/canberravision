@@ -8279,7 +8279,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
 # Create simplified Gradio app without complex CSS/JS
 demo = gr.Blocks(
-    title="YOLO26 AI Vision",
+    title="Canberra Vision",
     theme=gr.themes.Soft()
 )
 
@@ -8292,14 +8292,14 @@ with demo:
             f"""
             <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #10b981 0%, #059669 100%); 
                  border-radius: 12px; margin-bottom: 20px; color: white;">
-                <h2 style="margin: 0; font-size: 24px;">🚀 GPU Acceleration Active</h2>
+                <h2 style="margin: 0; font-size: 24px;">GPU Acceleration Active</h2>
                 <p style="margin: 5px 0 0 0; opacity: 0.9;">Processing on {torch.cuda.get_device_name(0)}</p>
             </div>
             """
         )
         
-    # Simple header
-    gr.Markdown("# 🚀 Canberra Vision AI Platform")
+    # Professional header
+    gr.Markdown("# Canberra Vision")
     gr.Markdown("Advanced AI Vision Detection System")
     
     with gr.Tabs():
@@ -8310,14 +8310,14 @@ with demo:
             # Upload Panel at Top - with integrated upload functionality
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### 📁 Upload Image")
+                    gr.Markdown("### Upload Image")
                     img_input = gr.Image(type="pil", label="Upload Image", show_label=True)
                 with gr.Column(scale=2):
                     img_output = gr.Image(type="pil", label="Detection Result", show_label=True)
             
             with gr.Row():
                 with gr.Column(scale=1):
-                    gr.Markdown("### 🤖 AI Model")
+                    gr.Markdown("### AI Model")
                     
                     img_model = gr.Radio(
                         choices=MODEL_CHOICES, 
@@ -8326,15 +8326,15 @@ with demo:
                     )
                     
                     # Detect Button - Exact Match
-                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg")
+                    img_btn = gr.Button("Detect Objects", variant="primary", size="lg")
                     
                     # Advanced Settings - Exact Match
-                    with gr.Accordion("⚙️ Advanced Settings", open=False):
-                        img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="🎯 Confidence Threshold")
-                        img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="📏 IoU Threshold")
-                        img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="📐 Image Size", value=640)
-                        img_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        img_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
+                    with gr.Accordion("Advanced Settings", open=False):
+                        img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence Threshold")
+                        img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU Threshold")
+                        img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
+                        img_labels = gr.Checkbox(value=True, label="Show Labels")
+                        img_conf_show = gr.Checkbox(value=True, label="Show Confidence")
                         
                         # Hidden controls (always enabled)
                         img_resnet = gr.Checkbox(value=True, visible=False)
@@ -8342,7 +8342,7 @@ with demo:
                         img_ocr = gr.Checkbox(value=True, visible=False)
                         
                 with gr.Column(scale=2):
-                    gr.Markdown("### 📊 Detection Results")
+                    gr.Markdown("### Detection Results")
                     img_summary = gr.Code(label="JSON Results", language="json", lines=15, value="{}")
 
             img_btn.click(
@@ -8368,24 +8368,24 @@ with demo:
             
             with gr.Row():
                 with gr.Column(scale=1):
-                    vid_input = gr.Video(label="📹 Upload Video")
+                    vid_input = gr.Video(label="Upload Video")
                     
                     with gr.Row():
-                        vid_model = gr.Radio(choices=MODEL_CHOICES, label="🤖 AI Model", value="yolo26n")
+                        vid_model = gr.Radio(choices=MODEL_CHOICES, label="AI Model", value="yolo26n")
                     
-                    vid_btn = gr.Button("🚀 Process Video", variant="primary", size="lg")
+                    vid_btn = gr.Button("Process Video", variant="primary", size="lg")
                     
                     # Advanced settings (collapsible)
-                    with gr.Accordion("⚙️ Advanced Settings", open=False):
+                    with gr.Accordion("Advanced Settings", open=False):
                         # Video Processing Speed Selection
                         vid_speed_mode = gr.Radio(
                             choices=[
-                                ("⚡ Ultra-Fast (3-4 min)", "ultra_fast"),
-                                ("🚀 Fast (5-8 min)", "fast"), 
-                                ("⚖️ Balanced (8-12 min)", "balanced"),
-                                ("🐌 Original (50+ min)", "original")
+                                ("Ultra-Fast (3-4 min)", "ultra_fast"),
+                                ("Fast (5-8 min)", "fast"), 
+                                ("Balanced (8-12 min)", "balanced"),
+                                ("Original (50+ min)", "original")
                             ],
-                            label="🚀 Processing Speed Mode",
+                            label="Processing Speed Mode",
                             value="fast"
                         )
                         

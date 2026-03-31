@@ -8920,78 +8920,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 demo = gr.Blocks(
     title="Canberra Vision",
     theme=gr.themes.Soft(),
-    css="""
-    /* Hide all footer elements completely */
-    .footer, .app-footer, .gradio-footer {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        min-height: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    
-    /* Hide specific footer buttons and links */
-    .footer a, .app-footer a, .gradio-footer a,
-    .footer button, .app-footer button, .gradio-footer button {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    
-    /* Remove bottom spacing that might show footer */
-    .gradio-container, .main-container, .app-container {
-        padding-bottom: 0 !important;
-        margin-bottom: 0 !important;
-    }
-    
-    /* Hide any elements with footer-related classes */
-    [class*="footer"], [id*="footer"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    
-    /* Hide the very bottom section where these buttons appear */
-    .gradio-app > div:last-child,
-    .container > div:last-child,
-    .app > div:last-child {
-        display: none !important;
-    }
-    
-    /* Additional aggressive footer hiding */
-    .gradio-container-3-5-0 > div:last-child,
-    .gradio-app > div:last-child > div,
-    .gradio-container > div:last-child > div {
-        display: none !important;
-        visibility: hidden !important;
-        height: 0 !important;
-        overflow: hidden !important;
-    }
-    
-    /* Hide any elements containing specific text */
-    div:has(> a[href*="gradio"]),
-    div:has(> button:contains("Settings")),
-    div:has(> a:contains("API")) {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    
-    /* Hide bottom navigation/toolbar */
-    .gradio-toolbar,
-    .gradio-nav,
-    .bottom-nav,
-    .app-toolbar {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    
-    /* Force hide any remaining bottom elements */
-    body > div:last-child,
-    .gradio-app > div:last-child,
-    [style*="position: fixed"][style*="bottom"] {
-        display: none !important;
-        visibility: hidden !important;
-    }
-    """
 )
 
 with demo:
@@ -9013,7 +8941,7 @@ with demo:
     gr.Markdown("# Canberra Vision")
     gr.Markdown("Advanced AI Vision Detection System")
     
-    with gr.Tabs():
+    with gr.Tabs(selected=0):
         # Image Detection Tab - Exact Match from Image
         with gr.TabItem("Image Detection"):
             gr.Markdown("### Upload an image for instant AI-powered object detection")

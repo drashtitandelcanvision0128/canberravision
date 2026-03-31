@@ -8941,7 +8941,7 @@ with demo:
     gr.Markdown("# Canberra Vision")
     gr.Markdown("Advanced AI Vision Detection System")
     
-    with gr.Tabs():
+    with gr.Tabs(selected=0):
         # Image Detection Tab - Exact Match from Image
         with gr.TabItem("Image Detection"):
             gr.Markdown("### Upload an image for instant AI-powered object detection")

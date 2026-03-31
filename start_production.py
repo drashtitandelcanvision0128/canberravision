@@ -131,6 +131,11 @@ def main():
         logger.info("✅ Application starting successfully")
         logger.info(f"🌐 Server will be available at: http://{os.environ['GRADIO_SERVER_NAME']}:{os.environ['GRADIO_SERVER_PORT']}")
         
+        # Get root path from environment (empty string for most reverse proxies)
+        _root_path = os.environ.get('GRADIO_ROOT_PATH', '')
+        logger.info(f"🌐 Server configuration: {os.environ['GRADIO_SERVER_NAME']}:{os.environ['GRADIO_SERVER_PORT']}")
+        logger.info(f"🌐 Root path: '{_root_path}'")
+        
         # Launch with production settings
         demo.launch(
             share=False,
@@ -140,7 +145,9 @@ def main():
             server_name=os.environ['GRADIO_SERVER_NAME'],
             server_port=int(os.environ['GRADIO_SERVER_PORT']),
             allowed_paths=['.'],
-            prevent_thread_lock=False
+            prevent_thread_lock=False,
+            root_path=_root_path if _root_path else None,
+            ssl_verify=False
         )
         
     except Exception as e:

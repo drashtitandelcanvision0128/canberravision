@@ -41,12 +41,14 @@ def health_check():
     urls_to_try = [
         f"http://127.0.0.1:{server_port}/",
         f"http://localhost:{server_port}/",
+        f"http://127.0.0.1:{server_port}/config",
+        f"http://localhost:{server_port}/config",
     ]
     
     for url in urls_to_try:
         try:
             print(f"[HEALTH_CHECK] Trying: {url}")
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=5, allow_redirects=True)
             
             if response.status_code == 200:
                 print(f"[HEALTH_CHECK] SUCCESS: Application is healthy at {url}")
@@ -54,9 +56,15 @@ def health_check():
                 print(f"[HEALTH_CHECK] Response length: {len(response.content)} bytes")
                 return True
             elif response.status_code == 404:
-                print(f"[HEALTH_CHECK] WARNING: Got 404 from {url} - app is running but no content")
-                # Consider 404 as "healthy" since the app is running
-                return True
+                print(f"[HEALTH_CHECK] WARNING: Got 404 from {url}")
+                # Try to check if it's a Gradio 404 (app running but page not found)
+                # or a real failure
+                if len(response.content) > 0:
+                    content_sample = response.text[:200]
+                    print(f"[HEALTH_CHECK] Response content sample: {content_sample}")
+                # Return False for 404 as the app should serve content on root
+                print(f"[HEALTH_CHECK] 404 on root path indicates app not fully ready")
+                return False
             else:
                 print(f"[HEALTH_CHECK] WARNING: Got status code {response.status_code} from {url}")
                 

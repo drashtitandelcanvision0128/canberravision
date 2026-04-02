@@ -9,9 +9,9 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV APP_ENV=production
+ENV PORT=7860
 ENV GRADIO_SERVER_PORT=7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
-ENV GRADIO_ROOT_PATH=
 
 WORKDIR /app
 
@@ -116,6 +116,10 @@ RUN chmod -R 755 /app
 
 # Expose Gradio port
 EXPOSE 7860
+
+# Health check for Coolify (simple port check)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=5 \
+    CMD curl -f http://localhost:7860/ || exit 1
 
 # Use production startup script for Coolify
 CMD ["python", "start_production.py"]

@@ -29,12 +29,15 @@ except ImportError:
     PPE_AVAILABLE = False
     print("[WARNING] PPE detection not available")
 
-try:
-    from modules.parking_detection import ParkingDetector
-    PARKING_AVAILABLE = True
-except ImportError:
-    PARKING_AVAILABLE = False
-    print("[WARNING] Parking detection not available")
+# try:
+#     from modules.parking_detection import ParkingDetector
+#     PARKING_AVAILABLE = True
+# except ImportError:
+#     PARKING_AVAILABLE = False
+#     print("[WARNING] Parking detection not available")
+
+# Parking detection commented out as requested
+PARKING_AVAILABLE = False
 
 try:
     from src.ocr.license_plate_detector import LicensePlateDetector
@@ -78,14 +81,16 @@ class PlateInfo:
     associated_vehicle_id: Optional[str] = None
 
 
-@dataclass
-class ParkingSlotInfo:
-    """Parking slot detection data"""
-    slot_id: int
-    occupied: bool
-    confidence: float
-    bbox: List[float]
-    associated_vehicle_id: Optional[str] = None
+# @dataclass
+# class ParkingSlotInfo:
+#     """Parking slot detection data"""
+#     slot_id: int
+#     occupied: bool
+#     confidence: float
+#     bbox: List[float]
+#     associated_vehicle_id: Optional[str] = None
+
+# Parking detection data class commented out as requested
 
 
 @dataclass
@@ -97,7 +102,7 @@ class UnifiedDetectionResult:
     ppe_detections: List[PPEInfo] = field(default_factory=list)
     vehicle_detections: List[VehicleInfo] = field(default_factory=list)
     plate_detections: List[PlateInfo] = field(default_factory=list)
-    parking_detections: List[ParkingSlotInfo] = field(default_factory=list)
+    # parking_detections: List[ParkingSlotInfo] = field(default_factory=list)  # Commented out parking detection
     processing_time_ms: float = 0.0
 
 
@@ -133,7 +138,8 @@ class UnifiedDetector:
                  enable_ppe: bool = True,
                  enable_vehicles: bool = True,
                  enable_plates: bool = True,
-                 enable_parking: bool = True):
+                 # enable_parking: bool = True  # Commented out parking detection
+                 ):
         """
         Initialize Unified Detector
         
@@ -143,7 +149,7 @@ class UnifiedDetector:
             enable_ppe: Enable PPE detection
             enable_vehicles: Enable vehicle detection
             enable_plates: Enable number plate recognition
-            enable_parking: Enable parking slot detection
+            # enable_parking: Enable parking slot detection  # Commented out parking detection
         """
         self.model_path = model_path
         self.use_gpu = use_gpu and torch.cuda.is_available()
@@ -153,13 +159,14 @@ class UnifiedDetector:
         self.enable_ppe = enable_ppe and PPE_AVAILABLE
         self.enable_vehicles = enable_vehicles
         self.enable_plates = enable_plates and PLATE_AVAILABLE
-        self.enable_parking = enable_parking and PARKING_AVAILABLE
+        # self.enable_parking = enable_parking and PARKING_AVAILABLE  # Commented out parking detection
+        self.enable_parking = False  # Force disabled
         
         # Initialize components
         self.model = None
         self.ppe_detector = None
         self.plate_detector = None
-        self.parking_detector = None
+        # self.parking_detector = None  # Commented out parking detection
         
         # Tracking for consistency across frames
         self.vehicle_trackers = {}
@@ -175,7 +182,7 @@ class UnifiedDetector:
             'total_vehicles_detected': 0,
             'total_persons_detected': 0,
             'total_plates_recognized': 0,
-            'total_parking_slots': 0,
+            # 'total_parking_slots': 0,  # Commented out parking detection
             'avg_processing_time_ms': 0
         }
         
@@ -186,7 +193,8 @@ class UnifiedDetector:
         print(f"[INFO] PPE: {'Enabled' if self.enable_ppe else 'Disabled'}")
         print(f"[INFO] Vehicles: {'Enabled' if self.enable_vehicles else 'Disabled'}")
         print(f"[INFO] Plates: {'Enabled' if self.enable_plates else 'Disabled'}")
-        print(f"[INFO] Parking: {'Enabled' if self.enable_parking else 'Disabled'}")
+        # print(f"[INFO] Parking: {'Enabled' if self.enable_parking else 'Disabled'}")  # Commented out parking detection
+        print(f"[INFO] Parking: Disabled (commented out)")
     
     def _initialize_components(self):
         """Initialize all detection components"""
@@ -219,14 +227,14 @@ class UnifiedDetector:
                 print(f"[ERROR] Failed to initialize plate detector: {e}")
                 self.plate_detector = None
         
-        # Initialize parking detector
-        if self.enable_parking:
-            try:
-                self.parking_detector = ParkingDetector()
-                print("[INFO] Parking detector initialized")
-            except Exception as e:
-                print(f"[ERROR] Failed to initialize parking detector: {e}")
-                self.parking_detector = None
+        # Initialize parking detector - Commented out as requested
+        # if self.enable_parking:
+        #     try:
+        #         self.parking_detector = ParkingDetector()
+        #         print("[INFO] Parking detector initialized")
+        #     except Exception as e:
+        #         print(f"[ERROR] Failed to initialize parking detector: {e}")
+        #         self.parking_detector = None
     
     def detect_frame(self, frame: np.ndarray, frame_number: int = 0, 
                      source: str = "unknown") -> UnifiedDetectionResult:
@@ -274,14 +282,14 @@ class UnifiedDetector:
             plates = self._detect_plates(frame, vehicles)
             result.plate_detections = plates
         
-        # Step 6: Detect parking slots
-        parking_slots = []
-        if self.enable_parking and self.parking_detector:
-            parking_slots = self._detect_parking(frame, vehicles)
-            result.parking_detections = parking_slots
+        # Step 6: Detect parking slots - Commented out as requested
+        # parking_slots = []
+        # if self.enable_parking and self.parking_detector:
+        #     parking_slots = self._detect_parking(frame, vehicles)
+        #     result.parking_detections = parking_slots
         
-        # Step 7: Associate parking slots with vehicles
-        self._associate_parking_with_vehicles(parking_slots, vehicles)
+        # Step 7: Associate parking slots with vehicles - Commented out as requested
+        # self._associate_parking_with_vehicles(parking_slots, vehicles)
         
         # Calculate processing time
         result.processing_time_ms = (time.time() - start_time) * 1000
@@ -542,52 +550,52 @@ class UnifiedDetector:
         
         return plates
     
-    def _detect_parking(self, frame: np.ndarray, vehicles: List[VehicleInfo]) -> List[ParkingSlotInfo]:
-        """Detect parking slots and their occupancy"""
-        slots = []
-        
-        try:
-            parking_result = self.parking_detector.detect(frame)
-            
-            if hasattr(parking_result, 'slots'):
-                for i, slot in enumerate(parking_result.slots):
-                    occupied = slot.get('occupied', False)
-                    
-                    # Check if any vehicle is in this slot
-                    associated_vehicle = None
-                    slot_bbox = slot.get('bbox', [0, 0, 0, 0])
-                    
-                    for vehicle in vehicles:
-                        vehicle_center = self._get_bbox_center(vehicle.bbox)
-                        if self._is_point_in_bbox(vehicle_center, slot_bbox):
-                            associated_vehicle = vehicle.vehicle_id
-                            occupied = True
-                            break
-                    
-                    slot_info = ParkingSlotInfo(
-                        slot_id=i + 1,
-                        occupied=occupied,
-                        confidence=slot.get('confidence', 0.5),
-                        bbox=slot.get('bbox', [0, 0, 0, 0]),
-                        associated_vehicle_id=associated_vehicle
-                    )
-                    slots.append(slot_info)
-        
-        except Exception as e:
-            print(f"[ERROR] Parking detection failed: {e}")
-        
-        return slots
+    # def _detect_parking(self, frame: np.ndarray, vehicles: List[VehicleInfo]) -> List[ParkingSlotInfo]:
+    #     """Detect parking slots and their occupancy - Commented out as requested"""
+    #     slots = []
+    #     
+    #     try:
+    #         parking_result = self.parking_detector.detect(frame)
+    #         
+    #         if hasattr(parking_result, 'slots'):
+    #             for i, slot in enumerate(parking_result.slots):
+    #                 occupied = slot.get('occupied', False)
+    #                 
+    #                 # Check if any vehicle is in this slot
+    #                 associated_vehicle = None
+    #                 slot_bbox = slot.get('bbox', [0, 0, 0, 0])
+    #                 
+    #                 for vehicle in vehicles:
+    #                     vehicle_center = self._get_bbox_center(vehicle.bbox)
+    #                     if self._is_point_in_bbox(vehicle_center, slot_bbox):
+    #                         associated_vehicle = vehicle.vehicle_id
+    #                         occupied = True
+    #                         break
+    #                 
+    #                 slot_info = ParkingSlotInfo(
+    #                     slot_id=i + 1,
+    #                     occupied=occupied,
+    #                     confidence=slot.get('confidence', 0.5),
+    #                     bbox=slot.get('bbox', [0, 0, 0, 0]),
+    #                     associated_vehicle_id=associated_vehicle
+    #                 )
+    #                 slots.append(slot_info)
+    #     
+    #     except Exception as e:
+    #         print(f"[ERROR] Parking detection failed: {e}")
+    #     
+    #     return slots
     
-    def _associate_parking_with_vehicles(self, slots: List[ParkingSlotInfo], vehicles: List[VehicleInfo]):
-        """Associate parking slots with vehicles inside them"""
-        for slot in slots:
-            if slot.occupied and not slot.associated_vehicle_id:
-                # Find vehicle in this slot
-                for vehicle in vehicles:
-                    vehicle_center = self._get_bbox_center(vehicle.bbox)
-                    if self._is_point_in_bbox(vehicle_center, slot.bbox):
-                        slot.associated_vehicle_id = vehicle.vehicle_id
-                        break
+    # def _associate_parking_with_vehicles(self, slots: List[ParkingSlotInfo], vehicles: List[VehicleInfo]):
+    #     """Associate parking slots with vehicles inside them - Commented out as requested"""
+    #     for slot in slots:
+    #         if slot.occupied and not slot.associated_vehicle_id:
+    #             # Find vehicle in this slot
+    #             for vehicle in vehicles:
+    #                 vehicle_center = self._get_bbox_center(vehicle.bbox)
+    #                 if self._is_point_in_bbox(vehicle_center, slot.bbox):
+    #                     slot.associated_vehicle_id = vehicle.vehicle_id
+    #                     break
     
     def _infer_vehicle_type_from_position(self, person_bbox: List[float], 
                                           vehicles: List[VehicleInfo]) -> str:
@@ -682,7 +690,7 @@ class UnifiedDetector:
         self.stats['total_vehicles_detected'] += len(result.vehicle_detections)
         self.stats['total_persons_detected'] += len(result.ppe_detections)
         self.stats['total_plates_recognized'] += len(result.plate_detections)
-        self.stats['total_parking_slots'] += len(result.parking_detections)
+        # self.stats['total_parking_slots'] += len(result.parking_detections)  # Commented out parking detection
         
         # Update average processing time
         n = self.stats['total_frames_processed']
@@ -722,5 +730,6 @@ if __name__ == "__main__":
     print("[INFO] Available components:")
     print(f"  - YOLO: {YOLO_AVAILABLE}")
     print(f"  - PPE: {PPE_AVAILABLE}")
-    print(f"  - Parking: {PARKING_AVAILABLE}")
+    # print(f"  - Parking: {PARKING_AVAILABLE}")  # Commented out parking detection
+    print("  - Parking: Disabled (commented out)")
     print(f"  - Plates: {PLATE_AVAILABLE}")

@@ -584,33 +584,33 @@ def create_interface():
         def on_input_type_change(choice):
             if choice == "Image":
                 return {
-                    image_input: gr.Image(visible=True),
-                    video_input: gr.Video(visible=False),
-                    webcam_input: gr.Image(visible=False),
-                    process_image_btn: gr.Button(visible=True),
-                    process_video_btn: gr.Button(visible=False),
-                    output_image: gr.Image(visible=True),
-                    output_video: gr.Video(visible=False)
+                    image_input: gr.update(visible=True),
+                    video_input: gr.update(visible=False),
+                    webcam_input: gr.update(visible=False),
+                    process_image_btn: gr.update(visible=True),
+                    process_video_btn: gr.update(visible=False),
+                    output_image: gr.update(visible=True),
+                    output_video: gr.update(visible=False)
                 }
             elif choice == "Video":
                 return {
-                    image_input: gr.Image(visible=False),
-                    video_input: gr.Video(visible=True),
-                    webcam_input: gr.Image(visible=False),
-                    process_image_btn: gr.Button(visible=False),
-                    process_video_btn: gr.Button(visible=True),
-                    output_image: gr.Image(visible=False),
-                    output_video: gr.Video(visible=True)
+                    image_input: gr.update(visible=False),
+                    video_input: gr.update(visible=True),
+                    webcam_input: gr.update(visible=False),
+                    process_image_btn: gr.update(visible=False),
+                    process_video_btn: gr.update(visible=True),
+                    output_image: gr.update(visible=False),
+                    output_video: gr.update(visible=True)
                 }
             else:  # Webcam
                 return {
-                    image_input: gr.Image(visible=False),
-                    video_input: gr.Video(visible=False),
-                    webcam_input: gr.Image(visible=True, streaming=True),
-                    process_image_btn: gr.Button(visible=True),
-                    process_video_btn: gr.Button(visible=False),
-                    output_image: gr.Image(visible=True),
-                    output_video: gr.Video(visible=False)
+                    image_input: gr.update(visible=False),
+                    video_input: gr.update(visible=False),
+                    webcam_input: gr.update(visible=True, streaming=True),
+                    process_image_btn: gr.update(visible=True),
+                    process_video_btn: gr.update(visible=False),
+                    output_image: gr.update(visible=True),
+                    output_video: gr.update(visible=False)
                 }
         
         input_type.change(

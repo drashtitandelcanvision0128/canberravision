@@ -1375,17 +1375,20 @@ observer.observe(document.body, {
 });
 """
 
-# Import parking detection system
-try:
-    from modules.parking_detection import ParkingDetector
-    from modules.real_time_parking import ParkingDashboard
-    from modules.enhanced_parking_detection import EnhancedParkingDetector, ParkingAnalysis, SlotStatus, SlotCategory, ParkingType
-    PARKING_DETECTION_AVAILABLE = True
-    print("[INFO] Parking detection system loaded")
-    print("[INFO] Enhanced parking detection with classification available")
-except ImportError as e:
-    PARKING_DETECTION_AVAILABLE = False
-    print(f"[WARNING] Parking detection system not available: {e}")
+# Import parking detection system - Commented out as requested
+# try:
+#     from modules.parking_detection import ParkingDetector
+#     from modules.real_time_parking import ParkingDashboard
+#     from modules.enhanced_parking_detection import EnhancedParkingDetector, ParkingAnalysis, SlotStatus, SlotCategory, ParkingType
+#     PARKING_DETECTION_AVAILABLE = True
+#     print("[INFO] Parking detection system loaded")
+#     print("[INFO] Enhanced parking detection with classification available")
+# except Exception as e:
+#     PARKING_DETECTION_AVAILABLE = False
+#     print(f"[WARNING] Parking detection system not available: {e}")
+
+# Parking detection commented out as requested
+PARKING_DETECTION_AVAILABLE = False
 
 # Import PPE (Personal Protective Equipment) detection system
 try:
@@ -1438,7 +1441,8 @@ if UNIFIED_DETECTION_AVAILABLE:
             try:
                 import json
                 from datetime import datetime
-                from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PPEInfo, PlateInfo, ParkingSlotInfo
+                # from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PPEInfo, PlateInfo, ParkingSlotInfo  # Commented out parking detection
+                from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PPEInfo, PlateInfo  # Removed ParkingSlotInfo
                 
                 # Parse JSON to get detections
                 data = json.loads(json_output)
@@ -1483,14 +1487,14 @@ if UNIFIED_DETECTION_AVAILABLE:
                         bbox=p.get('bbox', [0,0,0,0])
                     ))
                 
-                # Add parking detections
-                for s in detections.get('parking', []):
-                    db_result.parking_detections.append(ParkingSlotInfo(
-                        slot_id=s.get('slot_id', 0),
-                        occupied=s.get('occupied', False),
-                        confidence=s.get('confidence', 0),
-                        bbox=s.get('bbox', [0,0,0,0])
-                    ))
+                # Add parking detections - Commented out as requested
+                # for s in detections.get('parking', []):
+                #     db_result.parking_detections.append(ParkingSlotInfo(
+                #         slot_id=s.get('slot_id', 0),
+                #         occupied=s.get('occupied', False),
+                #         confidence=s.get('confidence', 0),
+                #         bbox=s.get('bbox', [0,0,0,0])
+                #     ))
                 
                 # Save to database
                 _db_service.save_detection(db_result)
@@ -5373,7 +5377,7 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
         min_distance = float('inf')
         
         for obj in extraction["all_objects"]:
-            if obj["class_name"].lower() in ['car', 'truck', 'bus', 'motorcycle']:
+            if obj["class_name"].lower() in ['car', 'truck', 'bus', 'motorcycle', 'scooter', 'bike', 'rickshaw', 'auto', 'autorickshaw']:
                 obj_bbox = obj["bounding_box"]
                 # Calculate distance between centers
                 plate_center_x = (plate_bbox["x1"] + plate_bbox["x2"]) / 2
@@ -5500,6 +5504,161 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
     return annotated
 
 
+def create_anpr_side_panel(detections, all_results, json_text_results):
+    """
+    Create ANPR-style side panel HTML with vehicle information.
+    
+    Args:
+        detections: List of detection dictionaries
+        all_results: YOLO results
+        json_text_results: JSON text extraction results
+        
+    Returns:
+        HTML string for the side panel
+    """
+    current_time = datetime.now().strftime('%H:%M:%S')
+    current_date = datetime.now().strftime('%d/%m/%Y')
+    
+    # Extract vehicle information
+    vehicles = []
+    vehicle_count = 0
+    
+    # Get vehicle info from detections
+    for det in detections:
+        class_name = det.get('class_name', 'Unknown')
+        if class_name in ['car', 'truck', 'bus', 'motorcycle', 'scooter', 'bike', 'rickshaw', 'auto', 'autorickshaw']:
+            vehicle_count += 1
+            vehicle_info = {
+                'type': class_name.title(),
+                'plate': det.get('license_plate', 'N/A'),
+                'color': det.get('color', 'Unknown'),
+                'confidence': det.get('confidence', 0),
+                'bbox': det.get('bbox', [0, 0, 0, 0])
+            }
+            vehicles.append(vehicle_info)
+    
+    # Get plates from JSON results
+    plates_from_json = []
+    if json_text_results and isinstance(json_text_results, dict):
+        extraction = json_text_results.get("text_extraction", {})
+        license_plates = extraction.get("license_plates", [])
+        for plate_info in license_plates:
+            if plate_info.get("plate_text"):
+                plates_from_json.append({
+                    'plate': plate_info.get("plate_text", "N/A"),
+                    'confidence': plate_info.get("confidence", 0)
+                })
+    
+    # Create main vehicle info section
+    main_vehicle_html = ""
+    if vehicles:
+        main_v = vehicles[0]
+        main_vehicle_html = f"""
+        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+                    padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
+            <h3 style="margin: 0 0 10px 0; font-size: 18px;">🚗 Vehicle Detection</h3>
+            <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+                <div style="font-size: 24px; font-weight: bold; margin-bottom: 5px;">{main_v['plate']}</div>
+                <div style="font-size: 12px; color: #fbbf24;">License Plate</div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
+                    <div style="font-size: 14px; font-weight: bold;">{main_v['type']}</div>
+                    <div style="font-size: 10px; color: #94a3b8;">Vehicle Type</div>
+                </div>
+                <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
+                    <div style="font-size: 14px; font-weight: bold;">{main_v['color'].title()}</div>
+                    <div style="font-size: 10px; color: #94a3b8;">Color</div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>⏰ {current_time}</span>
+                    <span>📅 {current_date}</span>
+                </div>
+            </div>
+        </div>
+        """
+    
+    # Create recent detections list
+    recent_html = ""
+    if len(vehicles) > 1 or plates_from_json:
+        recent_items = ""
+        # Add vehicles
+        for i, v in enumerate(vehicles[1:5], 1):  # Show up to 4 additional vehicles
+            recent_items += f"""
+            <div style="display: flex; align-items: center; padding: 8px; 
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            margin-right: 10px; font-size: 18px;">🚗</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{v['plate']}</div>
+                    <div style="font-size: 11px; color: #94a3b8;">{v['type']} • {v['color'].title()}</div>
+                </div>
+                <div style="font-size: 11px; color: #64748b;">{int(v['confidence']*100)}%</div>
+            </div>
+            """
+        
+        # Add plates from JSON if available
+        for plate in plates_from_json[:3]:
+            if plate['plate'] not in [v['plate'] for v in vehicles]:
+                recent_items += f"""
+                <div style="display: flex; align-items: center; padding: 8px; 
+                            background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                    <div style="width: 40px; height: 40px; background: #fbbf24; border-radius: 5px; 
+                                display: flex; align-items: center; justify-content: center; 
+                                margin-right: 10px; font-size: 18px;">📝</div>
+                    <div style="flex: 1;">
+                        <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{plate['plate']}</div>
+                        <div style="font-size: 11px; color: #94a3b8;">License Plate Detected</div>
+                    </div>
+                    <div style="font-size: 11px; color: #64748b;">{int(plate['confidence']*100)}%</div>
+                </div>
+                """
+        
+        if recent_items:
+            recent_html = f"""
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+                        padding: 15px; border-radius: 10px; color: white;">
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;">Recent Detections</h3>
+                {recent_items}
+            </div>
+            """
+    
+    # Stats section
+    stats_html = f"""
+    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%); 
+                padding: 12px; border-radius: 10px; margin-top: 15px; color: white;">
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 20px; font-weight: bold;">{vehicle_count}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Vehicles</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{len(plates_from_json)}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Plates</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{len(vehicles)}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Detections</div>
+            </div>
+        </div>
+    </div>
+    """
+    
+    # Combine all sections
+    full_html = f"""
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 350px;">
+        {main_vehicle_html}
+        {recent_html}
+        {stats_html}
+    </div>
+    """
+    
+    return full_html
+
+
 def predict_image(
     img,
     conf_threshold,
@@ -5514,7 +5673,7 @@ def predict_image(
 ):
     """Predicts objects in an image using enhanced YOLO detector with vehicle classification."""
     if img is None:
-        return None, "Please upload an image first"
+        return None, "Please upload an image first", "{}"
 
     try:
         # Use the enhanced YOLO detector with vehicle classification
@@ -5569,25 +5728,18 @@ def predict_image(
                     if result_image is None:
                         result_image = Image.new('RGB', (640, 480), color='black')
                     
-                    return result_image, "No objects detected"
+                    return result_image, "No objects detected", "{}"
                 except Exception as e:
                     print(f"[ERROR] Failed to convert image in early return: {e}")
                     # Last resort: create a blank image
-                    return Image.new('RGB', (640, 480), color='black'), "No objects detected"
-        else:
-            # Use enhanced detector
-            if hasattr(img, 'convert'):  # PIL Image
-                frame_bgr = np.array(img.convert('RGB'))
-                frame_bgr = cv2.cvtColor(frame_bgr, cv2.COLOR_RGB2BGR)
-            elif isinstance(img, np.ndarray):
-                if img.dtype != np.uint8:
+                    return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
                     img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
                 if len(img.shape) == 3 and img.shape[2] == 3:
                     frame_bgr = img
                 else:
-                    return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Invalid image format"
+                    return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Invalid image format", "{}"
             else:
-                return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Unsupported image format"
+                return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Unsupported image format", "{}"
 
             # Use enhanced detection with vehicle classification
             try:
@@ -5649,10 +5801,10 @@ def predict_image(
                         if result_image is None:
                             result_image = Image.new('RGB', (640, 480), color='black')
                         
-                        return result_image, "No objects detected"
+                        return result_image, "No objects detected", "{}"
                     except Exception as e:
                         print(f"[ERROR] Failed to convert image in enhanced detector: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected"
+                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
                     
             except Exception as e:
                 print(f"[ERROR] Enhanced detection failed: {e}")
@@ -5699,10 +5851,10 @@ def predict_image(
                         if result_image is None:
                             result_image = Image.new('RGB', (640, 480), color='black')
                         
-                        return result_image, "No objects detected"
+                        return result_image, "No objects detected", "{}"
                     except Exception as e:
                         print(f"[ERROR] Failed to convert image in fallback: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected"
+                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
 
         # Convert to BGR for OpenCV operations with defensive checks
         if hasattr(img, 'convert'):  # PIL Image
@@ -5737,6 +5889,12 @@ def predict_image(
             print(f"[DEBUG] Starting JSON-based text extraction for image {image_id}")
             json_text_results = extract_text_from_image_json(frame_bgr, image_id)
             print(f"[DEBUG] Text extraction completed for {image_id}")
+        
+        # Initialize all_results to prevent UnboundLocalError
+        all_results = []
+        
+        # Initialize detections to prevent UnboundLocalError
+        detections = []
         
         # Use professional annotation system to prevent overlapping labels
         try:
@@ -5995,7 +6153,58 @@ def predict_image(
             # Create a new blank image if corrupted
             result_image = Image.new('RGB', (640, 480), color='black')
         
-        return result_image, summary
+        # Create ANPR-style info text for image detection (similar to video detection)
+        info_lines = []
+        current_time = datetime.now().strftime('%H:%M:%S')
+        current_date = datetime.now().strftime('%d/%m/%Y')
+        info_lines.append(f"📅 Date: {current_date}")
+        info_lines.append(f"⏰ Time: {current_time}")
+        
+        # Count vehicles and extract plate info
+        vehicle_count = 0
+        plate_list = []
+        color_list = []
+        
+        for result in all_results:
+            if hasattr(result, 'boxes') and result.boxes is not None:
+                boxes = result.boxes
+                for i, box in enumerate(boxes):
+                    cls_id = int(box.cls.item()) if hasattr(box.cls, 'item') else int(box.cls[0])
+                    class_name = result.names.get(cls_id, f"class_{cls_id}")
+                    
+                    # Check if it's a vehicle
+                    if class_name in ['car', 'truck', 'bus', 'motorcycle', 'scooter', 'bike', 'rickshaw', 'auto', 'autorickshaw']:
+                        vehicle_count += 1
+                        
+                    # Get color if available from detections
+                    for det in detections:
+                        if det.get('class_name') == class_name:
+                            if det.get('color'):
+                                color_list.append(det.get('color'))
+                            if det.get('license_plate'):
+                                plate_list.append(det.get('license_plate'))
+        
+        if vehicle_count > 0:
+            info_lines.append(f"🚗 Vehicles Detected: {vehicle_count}")
+        
+        # Add unique plates
+        unique_plates = list(set(plate_list)) if plate_list else []
+        if unique_plates:
+            info_lines.append(f"📝 Plates: {', '.join(unique_plates[:5])}")
+            if len(unique_plates) > 5:
+                info_lines.append(f"   ... and {len(unique_plates) - 5} more")
+        
+        # Add colors detected
+        unique_colors = list(set(color_list)) if color_list else []
+        if unique_colors:
+            info_lines.append(f"🎨 Colors: {', '.join(unique_colors[:3])}")
+        
+        info_text = "\n".join(info_lines) if info_lines else "✅ Processing Complete!"
+        
+        # Generate ANPR-style side panel HTML
+        side_panel_html = create_anpr_side_panel(detections, all_results, json_text_results)
+        
+        return result_image, info_text, summary, side_panel_html
         
     except Exception as e:
         error_msg = f"Error in predict_image: {str(e)}"
@@ -6019,9 +6228,9 @@ def predict_image(
             if img_pil is None:
                 img_pil = Image.new('RGB', (640, 480), color='black')
                 
-            return img_pil, f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details."
+            return img_pil, f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details.", "{}", ""
         except Exception as e2:
-            return None, f"❌ **Critical Error**\n\n{str(e2)}\n\nPlease restart the application."
+            return None, f"❌ **Critical Error**\n\n{str(e2)}\n\nPlease restart the application.", "{}", ""
 
 
 def predict_video(
@@ -7903,611 +8112,305 @@ def predict_webcam(
         return frame, f"❌ **Error:** {str(e)}"
 
 
-# Global parking detector instance to avoid repeated initialization
-_global_parking_detector = None
+# Global parking detector instance to avoid repeated initialization - Commented out as requested
+# _global_parking_detector = None
 
-def get_parking_detector():
-    """Get or create global parking detector instance"""
-    global _global_parking_detector
-    if _global_parking_detector is None:
-        _global_parking_detector = ParkingDetector("parking_dataset/config/parking_zones.yaml")
-        print("[INFO] Global parking detector initialized")
-    return _global_parking_detector
+# def get_parking_detector():
+#     """Get or create global parking detector instance"""
+#     global _global_parking_detector
+#     if _global_parking_detector is None:
+#         _global_parking_detector = ParkingDetector("parking_dataset/config/parking_zones.yaml")
+#         print("[INFO] Global parking detector initialized")
+#     return _global_parking_detector
 
-def reset_parking_detector():
-    """Reset the global parking detector to reload configuration"""
-    global _global_parking_detector
-    _global_parking_detector = None
-    print("[INFO] Parking detector reset - will reload on next use")
+# def reset_parking_detector():
+#     """Reset the global parking detector to reload configuration"""
+#     global _global_parking_detector
+#     _global_parking_detector = None
+#     print("[INFO] Parking detector reset - will reload on next use")
 
-# ==================== PARKING DETECTION FUNCTION ====================
+# ==================== PARKING DETECTION FUNCTION ====================  # Commented out as requested
+# def process_parking_detection(image, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True):
+#     """
+#     Process parking detection on uploaded image
+#     """
+#     try:
+#         if not PARKING_DETECTION_AVAILABLE:
+#             return image, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
+#         
+#         if image is None:
+#             return None, "📸 **Please upload an image**\n\nUpload an image to start parking detection analysis."
+#         
+#         # Use global detector instance
+#         detector = get_parking_detector()
+#         
+#         # Convert PIL to numpy if needed
+#         if hasattr(image, 'convert'):
+#             image_array = np.array(image.convert('RGB'))
+#         else:
+#             image_array = image
+#             
+#         # Convert BGR to RGB for processing
+#         if len(image_array.shape) == 3 and image_array.shape[2] == 3:
+#             # Assume RGB input, convert to BGR for OpenCV processing
+#             frame_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+#         else:
+#             frame_bgr = image_array
+#             
+#         # Create mock camera input for single frame processing
+#         frames = {'parking_cam': frame_bgr}
+#         
+#         # Process parking detection with comprehensive car detection
+#         results = {}
+#         
+#         # Use comprehensive detection to find ALL spots (both occupied and empty) in the parking lot
+#         try:
+#             # Try to detect from all configured zones
+#             all_detections = []
+#             
+#             # First try with "all" to get all zones
+#             all_detections = detector.process_all_detections(frame_bgr, "main", "all")
+#             
+#             # If no detections, try individual zones
+#             if not all_detections and detector.config.get('zones'):
+#                 for zone_id in detector.config['zones'].keys():
+#                     zone_config = detector.config['zones'][zone_id]
+#                     for camera_id in zone_config.get('camera_ids', []):
+#                         try:
+#                             zone_detections = detector.process_all_detections(frame_bgr, camera_id, zone_id)
+#                             if zone_detections:
+#                                 all_detections.extend(zone_detections)
+#                                 break
+#                         except Exception as e:
+#                             continue
+#                     if all_detections:
+#                         break
+#             
+#             # Create a mock zone result for all detections
+#             if all_detections:
+#                 from modules.parking_detection import ZoneResult
+#                 from datetime import datetime
+#                 
+#                 occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
+#                 empty_count = len([s for s in all_detections if s.status == "EMPTY"])
+#                 
+#                 zone_result = ZoneResult(
+#                     zone_id="comprehensive",
+#                     zone_name="Complete Parking Lot",
+#                     total_spots=len(all_detections),
+#                     occupied_spots=occupied_count,
+#                     empty_spots=empty_count,
+#                     occupancy_rate=(occupied_count / len(all_detections) * 100) if all_detections else 0,
+#                     spot_details=all_detections,
+#                     timestamp=datetime.now().isoformat()
+#                 )
+#                 results["comprehensive"] = zone_result
+#                 print(f"[INFO] Detection complete: {occupied_count} occupied, {empty_count} empty spots")
+#                 
+#         except Exception as e:
+#             print(f"[ERROR] Comprehensive detection failed: {e}")
+#             import traceback
+#             traceback.print_exc()
+#         
+#         # Draw parking detection results on frame
+#         output_frame = frame_bgr.copy()
+#         
+#         # Draw zone information
+#         y_offset = 30
+#         for zone_id, zone_result in results.items():
+#             # Zone header
+#             zone_text = f"Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)"
+#             cv2.putText(output_frame, zone_text, (10, y_offset), 
+#                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+#             y_offset += 30
+#             
+#             # Draw individual parking spots
+#             for spot in zone_result.spot_details:
+#                 if spot.bounding_box:
+#                     x1, y1, x2, y2 = spot.bounding_box
+#                     
+#                     # Color based on status (FIXED: Red for occupied, Green for empty)
+#                     if spot.status == 'OCCUPIED':
+#                         box_color = (0, 0, 255)  # Red for occupied box
+#                         text_color = (0, 0, 255)  # Red text for occupied
+#                     else:
+#                         box_color = (0, 255, 0)  # Green for empty box
+#                         text_color = (0, 255, 0)  # Green text for empty
+#                     
+#                     # For occupied spots, draw bounding box around the car/vehicle
+#                     if spot.status == 'OCCUPIED':
+#                         # Draw red bounding box directly around the detected vehicle
+#                         cv2.rectangle(output_frame, (x1, y1), (x2, y2), box_color, 4)
+#                         
+#                         # Draw "OCCUPIED" label directly on top of the car in RED
+#                         occupied_label = "OCCUPIED"
+#                         font_scale = 1.2  # Increased from 0.6 for better readability
+#                         thickness = 3
+#                         label_size = cv2.getTextSize(occupied_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+#                         
+#                         # Position label directly on top of the car
+#                         label_x = x1 + 5
+#                         label_y = y1 - 10
+#                         if label_y < 25:
+#                             label_y = y1 + label_size[1] + 10
+#                         
+#                         # Draw red background for occupied label
+#                         cv2.rectangle(output_frame, 
+#                                      (label_x - 2, label_y - label_size[1] - 2), 
+#                                      (label_x + label_size[0] + 2, label_y + 2), 
+#                                      box_color, -1)
+#                         
+#                         # Draw red "OCCUPIED" text on car
+#                         cv2.putText(output_frame, occupied_label, (label_x, label_y), 
+#                                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+#                         
+#                         # Also draw spot ID in smaller text
+#                         spot_label = f"{spot.spot_id}"
+#                         if spot.vehicle_type:
+#                             spot_label += f" ({spot.vehicle_type})"
+#                         
+#                         small_font = 0.6
+#                         small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
+#                         spot_label_y = label_y + label_size[1] + 15
+#                         if spot_label_y > output_frame.shape[0] - 20:
+#                             spot_label_y = y2 - 20
+#                         
+#                         cv2.putText(output_frame, spot_label, (x1 + 5, spot_label_y), 
+#                                    cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
+#                                
+#                     else:
+#                         # For empty spots, draw prominent GREEN box and label
+#                         box_padding = 30  # Increased padding for better visibility
+#                         x1_padded = max(0, x1 - box_padding)
+#                         y1_padded = max(0, y1 - box_padding)
+#                         x2_padded = min(output_frame.shape[1], x2 + box_padding)
+#                         y2_padded = min(output_frame.shape[0], y2 + box_padding)
+#                             
+#                         # Draw thick green bounding box for empty parking spot
+#                         cv2.rectangle(output_frame, (x1_padded, y1_padded), (x2_padded, y2_padded), box_color, 8)
+#                         
+#                         # Draw prominent "EMPTY" label for empty spots (similar to occupied)
+#                         empty_label = "EMPTY"
+#                         font_scale = 1.0  # Larger font for empty spots
+#                         thickness = 4      # Thicker text for better visibility
+#                         label_size = cv2.getTextSize(empty_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
+#                         
+#                         # Position label at the top of the empty spot (similar to occupied positioning)
+#                         label_x = x1_padded + 5
+#                         label_y = y1_padded - 10
+#                         if label_y < 25:
+#                             label_y = y1_padded + label_size[1] + 10
+#                         
+#                         # Draw prominent green background for empty label
+#                         cv2.rectangle(output_frame, 
+#                                      (label_x - 3, label_y - label_size[1] - 3), 
+#                                      (label_x + label_size[0] + 3, label_y + 3), 
+#                                      box_color, -1)
+#                         
+#                         # Draw green "EMPTY" text with white color for contrast
+#                         cv2.putText(output_frame, empty_label, (label_x, label_y), 
+#                                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
+#                         
+#                         # Also draw spot ID below the EMPTY label
+#                         spot_label = f"{spot.spot_id}"
+#                         if show_confidence:
+#                             spot_label += f" ({spot.confidence:.2f})"
+#                         
+#                         small_font = 0.7
+#                         small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
+#                         spot_label_y = label_y + label_size[1] + 20
+#                         if spot_label_y > output_frame.shape[0] - 20:
+#                             spot_label_y = y2_padded - 20
+#                         
+#                         # Draw spot ID in green
+#                         cv2.putText(output_frame, spot_label, (x1_padded + 5, spot_label_y), 
+#                                    cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
+#                         
+#                         # Add "UNOCCUPIED" text at the bottom for extra clarity
+#                         unocc_label = "UNOCCUPIED"
+#                         unocc_size = cv2.getTextSize(unocc_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+#                         unocc_x = (x1_padded + x2_padded) // 2 - (unocc_size[0] // 2)
+#                         unocc_y = y2_padded - 10
+#                         
+#                         cv2.putText(output_frame, unocc_label, (unocc_x, unocc_y), 
+#                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2)
+#         
+#         # Convert back to RGB for display
+#         if len(output_frame.shape) == 3 and output_frame.shape[2] == 3:
+#             output_rgb = cv2.cvtColor(output_frame, cv2.COLOR_BGR2RGB)
+#         else:
+#             output_rgb = output_frame
+#         
+#         # Generate summary information
+#         total_spots = sum(zone.total_spots for zone in results.values())
+#         occupied_spots = sum(zone.occupied_spots for zone in results.values())
+#         empty_spots = sum(zone.empty_spots for zone in results.values())
+#         overall_occupancy = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
+#         
+#         summary = f"""## 🅿️ Parking Detection Results
+# 
+# ### 📊 Overall Status
+# - **Total Spots:** {total_spots}
+# - **Occupied:** {occupied_spots} 🔴
+# - **Empty:** {empty_spots} 🟢
+# - **Occupancy Rate:** {overall_occupancy:.1f}%
+# 
+# ### 📍 Zone Details
+# """
+#         
+#         for zone_id, zone_result in results.items():
+#             summary += f"""
+# **Zone {zone_id}:**
+# - Spots: {zone_result.occupied_spots}/{zone_result.total_spots}
+# - Rate: {zone_result.occupancy_rate:.1f}%
+# """
+#         
+#         # Generate JSON output for slot counting
+#         json_output = detector.get_json_output(results)
+#         
+#         summary += f"""
+# ### ⚙️ Settings
+# - **Model:** {model_name}
+# - **Confidence:** {confidence_threshold}
+# - **Processing Time:** Real-time
+# 
+# ### 📋 JSON Output
+# ```json
+# {json_output}
+# ```
+# 
+# ✅ **Detection completed successfully!**
+# """
+#         
+#         return output_rgb, summary
+#         
+#     except Exception as e:
+#         print(f"[ERROR] Parking detection failed: {e}")
+#         return image, f"❌ **Error:** {str(e)}\n\nPlease check the image and try again."
+
+
+# Parking detection functions commented out as requested - Creating stub functions to prevent errors
+
 def process_parking_detection(image, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True):
-    """
-    Process parking detection on uploaded image
-    """
-    try:
-        if not PARKING_DETECTION_AVAILABLE:
-            return image, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
-        
-        if image is None:
-            return None, "📸 **Please upload an image**\n\nUpload an image to start parking detection analysis."
-        
-        # Use global detector instance
-        detector = get_parking_detector()
-        
-        # Convert PIL to numpy if needed
-        if hasattr(image, 'convert'):
-            image_array = np.array(image.convert('RGB'))
-        else:
-            image_array = image
-            
-        # Convert BGR to RGB for processing
-        if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-            # Assume RGB input, convert to BGR for OpenCV processing
-            frame_bgr = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
-        else:
-            frame_bgr = image_array
-            
-        # Create mock camera input for single frame processing
-        frames = {'parking_cam': frame_bgr}
-        
-        # Process parking detection with comprehensive car detection
-        results = {}
-        
-        # Use comprehensive detection to find ALL spots (both occupied and empty) in the parking lot
-        try:
-            # Try to detect from all configured zones
-            all_detections = []
-            
-            # First try with "all" to get all zones
-            all_detections = detector.process_all_detections(frame_bgr, "main", "all")
-            
-            # If no detections, try individual zones
-            if not all_detections and detector.config.get('zones'):
-                for zone_id in detector.config['zones'].keys():
-                    zone_config = detector.config['zones'][zone_id]
-                    for camera_id in zone_config.get('camera_ids', []):
-                        try:
-                            zone_detections = detector.process_all_detections(frame_bgr, camera_id, zone_id)
-                            if zone_detections:
-                                all_detections.extend(zone_detections)
-                                break
-                        except Exception as e:
-                            continue
-                    if all_detections:
-                        break
-            
-            # Create a mock zone result for all detections
-            if all_detections:
-                from modules.parking_detection import ZoneResult
-                from datetime import datetime
-                
-                occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
-                empty_count = len([s for s in all_detections if s.status == "EMPTY"])
-                
-                zone_result = ZoneResult(
-                    zone_id="comprehensive",
-                    zone_name="Complete Parking Lot",
-                    total_spots=len(all_detections),
-                    occupied_spots=occupied_count,
-                    empty_spots=empty_count,
-                    occupancy_rate=(occupied_count / len(all_detections) * 100) if all_detections else 0,
-                    spot_details=all_detections,
-                    timestamp=datetime.now().isoformat()
-                )
-                results["comprehensive"] = zone_result
-                print(f"[INFO] Detection complete: {occupied_count} occupied, {empty_count} empty spots")
-                
-        except Exception as e:
-            print(f"[ERROR] Comprehensive detection failed: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        # Draw parking detection results on frame
-        output_frame = frame_bgr.copy()
-        
-        # Draw zone information
-        y_offset = 30
-        for zone_id, zone_result in results.items():
-            # Zone header
-            zone_text = f"Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)"
-            cv2.putText(output_frame, zone_text, (10, y_offset), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            y_offset += 30
-            
-            # Draw individual parking spots
-            for spot in zone_result.spot_details:
-                if spot.bounding_box:
-                    x1, y1, x2, y2 = spot.bounding_box
-                    
-                    # Color based on status (FIXED: Red for occupied, Green for empty)
-                    if spot.status == 'OCCUPIED':
-                        box_color = (0, 0, 255)  # Red for occupied box
-                        text_color = (0, 0, 255)  # Red text for occupied
-                    else:
-                        box_color = (0, 255, 0)  # Green for empty box
-                        text_color = (0, 255, 0)  # Green text for empty
-                    
-                    # For occupied spots, draw bounding box around the car/vehicle
-                    if spot.status == 'OCCUPIED':
-                        # Draw red bounding box directly around the detected vehicle
-                        cv2.rectangle(output_frame, (x1, y1), (x2, y2), box_color, 4)
-                        
-                        # Draw "OCCUPIED" label directly on top of the car in RED
-                        occupied_label = "OCCUPIED"
-                        font_scale = 0.9  # Larger font for occupied cars
-                        thickness = 3
-                        label_size = cv2.getTextSize(occupied_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
-                        
-                        # Position label directly on top of the car
-                        label_x = x1 + 5
-                        label_y = y1 - 10
-                        if label_y < 25:
-                            label_y = y1 + label_size[1] + 10
-                        
-                        # Draw red background for occupied label
-                        cv2.rectangle(output_frame, 
-                                     (label_x - 2, label_y - label_size[1] - 2), 
-                                     (label_x + label_size[0] + 2, label_y + 2), 
-                                     box_color, -1)
-                        
-                        # Draw red "OCCUPIED" text on car
-                        cv2.putText(output_frame, occupied_label, (label_x, label_y), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
-                        
-                        # Also draw spot ID in smaller text
-                        spot_label = f"{spot.spot_id}"
-                        if spot.vehicle_type:
-                            spot_label += f" ({spot.vehicle_type})"
-                        
-                        small_font = 0.6
-                        small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
-                        spot_label_y = label_y + label_size[1] + 15
-                        if spot_label_y > output_frame.shape[0] - 20:
-                            spot_label_y = y2 - 20
-                        
-                        cv2.putText(output_frame, spot_label, (x1 + 5, spot_label_y), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
-                               
-                    else:
-                        # For empty spots, draw prominent GREEN box and label
-                        box_padding = 30  # Increased padding for better visibility
-                        x1_padded = max(0, x1 - box_padding)
-                        y1_padded = max(0, y1 - box_padding)
-                        x2_padded = min(output_frame.shape[1], x2 + box_padding)
-                        y2_padded = min(output_frame.shape[0], y2 + box_padding)
-                            
-                        # Draw thick green bounding box for empty parking spot
-                        cv2.rectangle(output_frame, (x1_padded, y1_padded), (x2_padded, y2_padded), box_color, 8)
-                        
-                        # Draw prominent "EMPTY" label for empty spots (similar to occupied)
-                        empty_label = "EMPTY"
-                        font_scale = 1.0  # Larger font for empty spots
-                        thickness = 4      # Thicker text for better visibility
-                        label_size = cv2.getTextSize(empty_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
-                        
-                        # Position label at the top of the empty spot (similar to occupied positioning)
-                        label_x = x1_padded + 5
-                        label_y = y1_padded - 10
-                        if label_y < 25:
-                            label_y = y1_padded + label_size[1] + 10
-                        
-                        # Draw prominent green background for empty label
-                        cv2.rectangle(output_frame, 
-                                     (label_x - 3, label_y - label_size[1] - 3), 
-                                     (label_x + label_size[0] + 3, label_y + 3), 
-                                     box_color, -1)
-                        
-                        # Draw green "EMPTY" text with white color for contrast
-                        cv2.putText(output_frame, empty_label, (label_x, label_y), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
-                        
-                        # Also draw spot ID below the EMPTY label
-                        spot_label = f"{spot.spot_id}"
-                        if show_confidence:
-                            spot_label += f" ({spot.confidence:.2f})"
-                        
-                        small_font = 0.7
-                        small_label_size = cv2.getTextSize(spot_label, cv2.FONT_HERSHEY_SIMPLEX, small_font, 2)[0]
-                        spot_label_y = label_y + label_size[1] + 20
-                        if spot_label_y > output_frame.shape[0] - 20:
-                            spot_label_y = y2_padded - 20
-                        
-                        # Draw spot ID in green
-                        cv2.putText(output_frame, spot_label, (x1_padded + 5, spot_label_y), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
-                        
-                        # Add "UNOCCUPIED" text at the bottom for extra clarity
-                        unocc_label = "UNOCCUPIED"
-                        unocc_size = cv2.getTextSize(unocc_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                        unocc_x = (x1_padded + x2_padded) // 2 - (unocc_size[0] // 2)
-                        unocc_y = y2_padded - 10
-                        
-                        cv2.putText(output_frame, unocc_label, (unocc_x, unocc_y), 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2)
-        
-        # Convert back to RGB for display
-        if len(output_frame.shape) == 3 and output_frame.shape[2] == 3:
-            output_rgb = cv2.cvtColor(output_frame, cv2.COLOR_BGR2RGB)
-        else:
-            output_rgb = output_frame
-        
-        # Generate summary information
-        total_spots = sum(zone.total_spots for zone in results.values())
-        occupied_spots = sum(zone.occupied_spots for zone in results.values())
-        empty_spots = sum(zone.empty_spots for zone in results.values())
-        overall_occupancy = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
-        
-        summary = f"""## 🅿️ Parking Detection Results
-
-### 📊 Overall Status
-- **Total Spots:** {total_spots}
-- **Occupied:** {occupied_spots} 🔴
-- **Empty:** {empty_spots} 🟢
-- **Occupancy Rate:** {overall_occupancy:.1f}%
-
-### 📍 Zone Details
-"""
-        
-        for zone_id, zone_result in results.items():
-            summary += f"""
-**Zone {zone_id}:**
-- Spots: {zone_result.occupied_spots}/{zone_result.total_spots}
-- Rate: {zone_result.occupancy_rate:.1f}%
-"""
-        
-        # Generate JSON output for slot counting
-        json_output = detector.get_json_output(results)
-        
-        summary += f"""
-### ⚙️ Settings
-- **Model:** {model_name}
-- **Confidence:** {confidence_threshold}
-- **Processing Time:** Real-time
-
-### 📋 JSON Output
-```json
-{json_output}
-```
-
-✅ **Detection completed successfully!**
-"""
-        
-        return output_rgb, summary
-        
-    except Exception as e:
-        print(f"[ERROR] Parking detection failed: {e}")
-        return image, f"❌ **Error:** {str(e)}\n\nPlease check the image and try again."
-
+    """Parking detection has been disabled as requested"""
+    if image is None:
+        return None, "📸 **Please upload an image**\n\nUpload an image to start analysis."
+    
+    return image, "❌ **Parking Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 def process_parking_video(video, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
-    """Process parking detection in uploaded video"""
-    try:
-        if not PARKING_DETECTION_AVAILABLE:
-            return None, None, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
-        
-        if video is None:
-            return None, None, "📹 **Please upload a video**\n\nUpload a video to start parking space analysis."
-        
-        # Create temporary files in project directory to avoid permission issues
-        import tempfile
-        import os
-        import uuid
-        
-        # Use project's directory for output (not temp directory to avoid permission issues)
-        output_dir = os.getcwd()
-        unique_id = str(uuid.uuid4())[:8]
-        temp_input_path = os.path.join(output_dir, f"temp_input_{unique_id}.mp4")
-        temp_output_path = os.path.join(output_dir, f"parking_output_{unique_id}.avi")
-        
-        try:
-            # Save uploaded video to temp file with proper error handling
-            if hasattr(video, 'name'):
-                # File-like object from Gradio
-                try:
-                    with open(temp_input_path, 'wb') as f:
-                        video.seek(0)  # Reset file pointer
-                        f.write(video.read())
-                except PermissionError:
-                    # Try alternative location if permission denied
-                    temp_input_path = os.path.join(output_dir, f"input_{unique_id}.mp4")
-                    with open(temp_input_path, 'wb') as f:
-                        video.seek(0)
-                        f.write(video.read())
-            elif isinstance(video, str):
-                # Path string - copy to our temp directory
-                try:
-                    import shutil
-                    shutil.copy2(video, temp_input_path)
-                except PermissionError:
-                    # Use the original path if copy fails
-                    temp_input_path = video
-            else:
-                return None, None, "❌ **Error:** Invalid video format"
-            
-            print(f"[INFO] Video saved to: {temp_input_path}")
-            
-            # Verify file exists and is accessible
-            if not os.path.exists(temp_input_path):
-                return None, None, "❌ **Error:** Video file not found after saving"
-            
-            # Process video with parking detection
-            detector = get_parking_detector()
-            cap = cv2.VideoCapture(temp_input_path)
-            
-            if not cap.isOpened():
-                return None, None, "❌ **Error:** Cannot open video file"
-            
-            # Get video properties
-            fps = int(cap.get(cv2.CAP_PROP_FPS))
-            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            
-            print(f"[INFO] Video info: {total_frames} frames, {fps} FPS, {width}x{height}")
-            
-            # Setup video writer - save directly to output path in project directory
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')  # More compatible than mp4v
-            out = cv2.VideoWriter(temp_output_path, fourcc, fps, (width, height))
-            
-            if not out.isOpened():
-                return None, None, "❌ **Error:** Cannot create output video file"
-            
-            frame_count = 0
-            processed_frames = 0
-            occupancy_data = []
-            total_spots_detected = 0
-            
-            print(f"[INFO] Starting video processing...")
-            
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                
-                frame_count += 1
-                
-                # Process every Nth frame to reduce processing time
-                if frame_count % every_n == 0:
-                    # Use the first available camera from zone configuration
-                    frames = {}
-                    
-                    # Try each zone and use the first camera
-                    for zone_id in detector.config['zones'].keys():
-                        zone_config = detector.config['zones'][zone_id]
-                        if zone_config.get('camera_ids'):
-                            # Use the first camera from this zone
-                            camera_id = zone_config['camera_ids'][0]
-                            frames[camera_id] = frame
-                            break
-                    
-                    if not frames:
-                        # Fallback to parking_cam if no zones configured
-                        frames = {'parking_cam': frame}
-                    
-                    # Process parking detection with comprehensive detection
-                    results = {}
-                    try:
-                        # Use comprehensive detection to find ALL spots (occupied + empty)
-                        all_detections = detector.process_all_detections(frame, "main", "all")
-                        
-                        # If no detections, try individual zones
-                        if not all_detections and detector.config.get('zones'):
-                            for zone_id in detector.config['zones'].keys():
-                                zone_config = detector.config['zones'][zone_id]
-                                for camera_id in zone_config.get('camera_ids', []):
-                                    try:
-                                        zone_detections = detector.process_all_detections(frame, camera_id, zone_id)
-                                        if zone_detections:
-                                            all_detections.extend(zone_detections)
-                                            break
-                                    except Exception as e:
-                                        continue
-                                if all_detections:
-                                    break
-                        
-                        # Create a mock zone result for all detections
-                        if all_detections:
-                            from modules.parking_detection import ZoneResult
-                            from datetime import datetime
-                            
-                            occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
-                            empty_count = len([s for s in all_detections if s.status == "EMPTY"])
-                            
-                            zone_result = ZoneResult(
-                                zone_id="comprehensive",
-                                zone_name="Complete Parking Lot",
-                                total_spots=len(all_detections),
-                                occupied_spots=occupied_count,
-                                empty_spots=empty_count,
-                                occupancy_rate=(occupied_count / len(all_detections) * 100) if all_detections else 0,
-                                spot_details=all_detections,
-                                timestamp=datetime.now().isoformat()
-                            )
-                            results["comprehensive"] = zone_result
-                            print(f"[INFO] Frame {frame_count}: {occupied_count} occupied, {empty_count} empty spots")
-                        
-                    except Exception as e:
-                        print(f"[ERROR] Frame {frame_count} comprehensive detection failed: {e}")
-                    
-                    # Draw results on frame
-                    all_spots = []
-                    for zone_result in results.values():
-                        all_spots.extend(zone_result.spot_details)
-                    
-                    if all_spots:
-                        annotated_frame = detector.draw_detections(frame, all_spots)
-                        total_spots_detected = len(all_spots)
-                        print(f"[INFO] Frame {frame_count}: Detected {total_spots_detected} spots")
-                    else:
-                        annotated_frame = frame.copy()
-                        # Add info text when no spots detected
-                        cv2.putText(annotated_frame, "Scanning for parking spots...", 
-                                  (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                        total_spots_detected = 0
-                    
-                    # Calculate occupancy statistics
-                    total_spots = sum(zone.total_spots for zone in results.values())
-                    occupied_spots = sum(zone.occupied_spots for zone in results.values())
-                    occupancy_rate = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
-                    
-                    # Add frame info overlay
-                    info_text = f"Frame: {frame_count} | Spots: {occupied_spots}/{total_spots} ({occupancy_rate:.1f}%)"
-                    cv2.putText(annotated_frame, info_text, 
-                              (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                    
-                    occupancy_data.append({
-                        'frame': frame_count,
-                        'occupied': occupied_spots,
-                        'empty': total_spots - occupied_spots,
-                        'rate': occupancy_rate
-                    })
-                    
-                    processed_frames += 1
-                    out.write(annotated_frame)
-                    
-                    # Add progress indicator
-                    if frame_count % 100 == 0:
-                        progress = (frame_count / total_frames) * 100
-                        print(f"[INFO] Progress: {progress:.1f}% ({frame_count}/{total_frames})")
-                else:
-                    # Write original frame
-                    out.write(frame)
-            
-            # Release resources
-            cap.release()
-            out.release()
-            
-            # Calculate overall statistics
-            if occupancy_data:
-                avg_occupancy = sum(d['rate'] for d in occupancy_data) / len(occupancy_data)
-                max_occupied = max(d['occupied'] for d in occupancy_data)
-                min_occupied = min(d['occupied'] for d in occupancy_data)
-            else:
-                avg_occupancy = max_occupied = min_occupied = 0
-            
-            summary = f"""## 🎥 Parking Video Analysis Complete
-
-### 📊 Processing Results:
-- **Total Frames:** {total_frames}
-- **Processed Frames:** {processed_frames} (every {every_n}th frame)
-- **Video FPS:** {fps}
-- **Resolution:** {width}x{height}
-
-### 🅿️ Occupancy Statistics:
-- **Average Occupancy:** {avg_occupancy:.1f}%
-- **Max Occupied Spots:** {max_occupied}
-- **Min Occupied Spots:** {min_occupied}
-
-### 🎯 Features Applied:
-✅ Frame-by-frame parking detection
-✅ Occupied spots shown in **RED**
-✅ Empty spots shown in **GREEN**
-✅ Spot IDs and confidence scores
-✅ Real-time statistics overlay
-
-**📹 Video processed successfully!**
-"""
-            
-            print(f"[INFO] Video processing complete: {temp_output_path}")
-            
-            # Verify output file exists and has content
-            if os.path.exists(temp_output_path) and os.path.getsize(temp_output_path) > 1000:
-                # Return the output file directly (already in project directory)
-                print(f"[INFO] Output ready: {temp_output_path}")
-                return temp_output_path, temp_output_path, summary
-            else:
-                return None, None, "❌ **Error:** Output video file was not created properly"
-            
-        except Exception as e:
-            print(f"[ERROR] Video processing error: {e}")
-            import traceback
-            traceback.print_exc()
-            return video, None, f"❌ **Error:** {str(e)}\n\nVideo processing failed."
-        finally:
-            # Cleanup temp files after some delay to allow Gradio to serve them
-            try:
-                import threading
-                import time
-                
-                def cleanup_files():
-                    time.sleep(60)  # Wait 60 seconds before cleanup (increased from 30)
-                    try:
-                        # Clean up input file
-                        if os.path.exists(temp_input_path):
-                            try:
-                                os.remove(temp_input_path)
-                            except PermissionError:
-                                print(f"[WARNING] Could not remove input file (in use): {temp_input_path}")
-                        
-                        # Clean up output file
-                        if os.path.exists(temp_output_path):
-                            try:
-                                os.remove(temp_output_path)
-                            except PermissionError:
-                                print(f"[WARNING] Could not remove output file (in use): {temp_output_path}")
-                        
-                        # Clean up safe output file
-                        safe_output_path = os.path.join(os.getcwd(), f"parking_result_{unique_id}.avi")
-                        if os.path.exists(safe_output_path):
-                            try:
-                                os.remove(safe_output_path)
-                            except PermissionError:
-                                print(f"[WARNING] Could not remove safe output file (in use): {safe_output_path}")
-                        
-                        print(f"[INFO] Cleanup completed for {unique_id}")
-                    except Exception as cleanup_error:
-                        print(f"[WARNING] Cleanup error: {cleanup_error}")
-                
-                # Start cleanup thread
-                cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
-                cleanup_thread.start()
-                
-            except Exception as e:
-                print(f"[WARNING] Cleanup setup failed: {e}")
-        
-    except Exception as e:
-        print(f"[ERROR] Parking video processing failed: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None, f"❌ **Error:** {str(e)}\n\nPlease check the video and try again."
-
+    """Parking video detection has been disabled as requested"""
+    if video is None:
+        return None, None, "📹 **Please upload a video**\n\nUpload a video to start analysis."
+    
+    return None, None, "❌ **Parking Video Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
-    """Process parking detection in live webcam"""
-    try:
-        if not PARKING_DETECTION_AVAILABLE:
-            return frame, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
-        
-        if frame is None:
-            return frame, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera at a parking area to start detection."
-        
-        # Use the same logic as image detection but for webcam
-        result_frame, result_summary = process_parking_detection(
-            frame, confidence_threshold, model_name, show_labels, show_confidence
-        )
-        
-        # Add webcam-specific info
-        webcam_info = f"""📹 **Status:** Live Detection Active
-
-🅿️ **Real-time Parking Analysis:**
-{result_summary}
-
-**🎯 Instructions:**
-1. Point camera at parking area
-2. Ensure good lighting
-3. Adjust camera angle for best results
-4. Watch real-time detection!
-
-⚡ **Processing:** Live webcam feed
-🔄 **Updates:** Real-time
-"""
-        
-        return result_frame, webcam_info
-        
-    except Exception as e:
-        print(f"[ERROR] Parking webcam processing failed: {e}")
-        return frame, f"❌ **Error:** {str(e)}\n\nPlease check camera and try again."
+    """Parking webcam detection has been disabled as requested"""
+    if frame is None:
+        return None, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera to start detection."
+    
+    return frame, "❌ **Parking Webcam Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 
 # ==================== PPE DETECTION FUNCTIONS ====================
@@ -8700,20 +8603,193 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         
         summary = "\n".join(summary_lines)
         
+        # Generate PPE side panel HTML
+        side_panel_html = create_ppe_side_panel(result)
+        
         print(f"[INFO] PPE detection completed: {result.total_persons} persons ({two_wheelers} 2-wheelers, {four_wheelers} 4-wheelers, {unknown_vehicles} unknown)")
         if two_wheelers > 0:
             print(f"[INFO] 2-Wheeler safety: {result.helmet_detected} helmets, {result.no_helmet} no helmets")
         if four_wheelers > 0:
             print(f"[INFO] 4-Wheeler safety: {result.seatbelt_detected} seatbelts, {result.no_seatbelt} no seatbelts")
         
-        return output_image, summary
+        return output_image, summary, side_panel_html
         
     except Exception as e:
         print(f"[ERROR] PPE detection failed: {e}")
         import traceback
         traceback.print_exc()
         # Return original image with error info instead of failing
-        return image, f"⚠️ **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image."
+        return image, f"⚠️ **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image.", ""
+
+
+def create_ppe_side_panel(result):
+    """
+    Create ANPR-style side panel HTML for PPE detection results.
+    
+    Args:
+        result: PPEResult object with detection information
+        
+    Returns:
+        HTML string for the side panel
+    """
+    current_time = datetime.now().strftime('%H:%M:%S')
+    current_date = datetime.now().strftime('%d/%m/%Y')
+    
+    # Count vehicle types
+    two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
+    four_wheelers = sum(1 for p in result.persons if p.vehicle_type == "4-wheeler")
+    unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
+    
+    # Calculate compliance
+    compliant_count = sum(1 for p in result.persons if p.status == 'compliant')
+    violation_count = len(result.persons) - compliant_count
+    
+    # Main detection info section
+    main_html = f"""
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+                padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
+        <h3 style="margin: 0 0 10px 0; font-size: 18px;">🦺 PPE Detection</h3>
+        <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
+            <div style="font-size: 24px; font-weight: bold; margin-bottom: 5px;">{result.total_persons}</div>
+            <div style="font-size: 12px; color: #fbbf24;">Persons Detected</div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 14px; font-weight: bold;">{compliant_count}</div>
+                <div style="font-size: 10px; color: #94a3b8;">✅ Compliant</div>
+            </div>
+            <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
+                <div style="font-size: 14px; font-weight: bold; color: #f87171;">{violation_count}</div>
+                <div style="font-size: 10px; color: #94a3b8;">❌ Violations</div>
+            </div>
+        </div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
+            <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                <span>⏰ {current_time}</span>
+                <span>📅 {current_date}</span>
+            </div>
+        </div>
+    </div>
+    """
+    
+    # Safety equipment section
+    safety_html = ""
+    if result.persons:
+        safety_items = ""
+        
+        # Helmets info
+        if two_wheelers > 0 or result.helmet_detected > 0:
+            safety_items += f"""
+            <div style="display: flex; align-items: center; padding: 8px; 
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                <div style="width: 40px; height: 40px; background: #10b981; border-radius: 5px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            margin-right: 10px; font-size: 18px;">🪖</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Helmets: {result.helmet_detected}/{two_wheelers}</div>
+                    <div style="font-size: 11px; color: #94a3b8;">2-Wheeler Safety</div>
+                </div>
+            </div>
+            """
+        
+        # Seatbelts info
+        if four_wheelers > 0 or result.seatbelt_detected > 0:
+            safety_items += f"""
+            <div style="display: flex; align-items: center; padding: 8px; 
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            margin-right: 10px; font-size: 18px;">🚗</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Seatbelts: {result.seatbelt_detected}/{four_wheelers}</div>
+                    <div style="font-size: 11px; color: #94a3b8;">4-Wheeler Safety</div>
+                </div>
+            </div>
+            """
+        
+        if safety_items:
+            safety_html = f"""
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+                        padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;">🛡️ Safety Equipment</h3>
+                {safety_items}
+            </div>
+            """
+    
+    # Vehicle types section
+    vehicle_html = ""
+    if two_wheelers > 0 or four_wheelers > 0:
+        vehicle_items = ""
+        
+        if two_wheelers > 0:
+            vehicle_items += f"""
+            <div style="display: flex; align-items: center; padding: 8px; 
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 5px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            margin-right: 10px; font-size: 18px;">🏍️</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{two_wheelers} Bikes/Scooters</div>
+                    <div style="font-size: 11px; color: #94a3b8;">2-Wheelers</div>
+                </div>
+            </div>
+            """
+        
+        if four_wheelers > 0:
+            vehicle_items += f"""
+            <div style="display: flex; align-items: center; padding: 8px; 
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+                <div style="width: 40px; height: 40px; background: #8b5cf6; border-radius: 5px; 
+                            display: flex; align-items: center; justify-content: center; 
+                            margin-right: 10px; font-size: 18px;">🚙</div>
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{four_wheelers} Cars/Trucks</div>
+                    <div style="font-size: 11px; color: #94a3b8;">4-Wheelers</div>
+                </div>
+            </div>
+            """
+        
+        if vehicle_items:
+            vehicle_html = f"""
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+                        padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;">🚗 Vehicles</h3>
+                {vehicle_items}
+            </div>
+            """
+    
+    # Stats section
+    stats_html = f"""
+    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%); 
+                padding: 12px; border-radius: 10px; color: white;">
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 20px; font-weight: bold;">{result.total_persons}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Persons</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{result.helmet_detected}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Helmets</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{result.seatbelt_detected}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Seatbelts</div>
+            </div>
+        </div>
+    </div>
+    """
+    
+    # Combine all sections
+    full_html = f"""
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 350px;">
+        {main_html}
+        {safety_html}
+        {vehicle_html}
+        {stats_html}
+    </div>
+    """
+    
+    return full_html
 
 
 def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
@@ -8943,505 +9019,303 @@ with demo:
     
     with gr.Tabs(selected=0):
         # Image Detection Tab - Exact Match from Image
-        with gr.TabItem("Image Detection"):
-            gr.Markdown("### Upload an image for instant AI-powered object detection")
+        # Image Detection, Video Processing, and Live Webcam tabs merged into Vehicle Detection tab below
+        # Commented out as requested - now part of Vehicle Detection tab
+        
+        # Vehicle Detection Tab - New unified tab with Image, Video, Webcam side by side
+        with gr.TabItem("Vehicle Detection"):
+            gr.Markdown("### Vehicle Detection System")
+            gr.Markdown("Detect vehicles, license plates, and objects in images, videos, or live webcam feeds.")
             
-            # Upload Panel at Top - with integrated upload functionality
+            # All three sections in one row - side by side
             with gr.Row():
+                # Column 1: Image Upload
                 with gr.Column(scale=1):
-                    gr.Markdown("### Upload Image")
-                    img_input = gr.Image(type="pil", label="Upload Image", show_label=True)
-                with gr.Column(scale=2):
-                    img_output = gr.Image(type="pil", label="Detection Result", show_label=True)
-            
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### AI Model")
+                    gr.Markdown("#### 📁 Image")
+                    img_input = gr.Image(type="pil", label="Upload Image", show_label=True, height=200)
                     
-                    img_model = gr.Radio(
-                        choices=MODEL_CHOICES, 
-                        label="Select Model", 
-                        value="yolo26n"
-                    )
+                    img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+                    img_btn = gr.Button("Detect", variant="primary")
                     
-                    # Detect Button - Exact Match
-                    img_btn = gr.Button("Detect Objects", variant="primary", size="lg")
-                    
-                    # Advanced Settings - Exact Match
-                    with gr.Accordion("Advanced Settings", open=False):
-                        img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence Threshold")
-                        img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU Threshold")
-                        img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
-                        img_labels = gr.Checkbox(value=True, label="Show Labels")
-                        img_conf_show = gr.Checkbox(value=True, label="Show Confidence")
-                        
-                        # Hidden controls (always enabled)
+                    with gr.Accordion("Settings", open=False):
+                        img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
+                        img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
+                        img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=640)
+                        img_labels = gr.Checkbox(value=True, label="Labels")
+                        img_conf_show = gr.Checkbox(value=True, label="Confidence Scores")
                         img_resnet = gr.Checkbox(value=True, visible=False)
                         img_max_boxes = gr.Number(value=10, visible=False)
                         img_ocr = gr.Checkbox(value=True, visible=False)
-                        
-                with gr.Column(scale=2):
-                    gr.Markdown("### Detection Results")
-                    img_summary = gr.Code(label="JSON Results", language="json", lines=15, value="{}")
-
-            img_btn.click(
-                predict_image,
-                inputs=[
-                    img_input,
-                    img_conf,
-                    img_iou,
-                    img_model,
-                    img_labels,
-                    img_conf_show,
-                    img_size,
-                    img_resnet,
-                    img_max_boxes,
-                    img_ocr,
-                ],
-                outputs=[img_output, img_summary],
-            )
-
-        # Video Processing Tab - Exact Match from Image
-        with gr.TabItem("Video Processing"):
-            gr.Markdown("### Upload a video for AI-powered object detection and tracking")
-            
-            with gr.Row():
+                    
+                    img_progress = gr.Textbox(label="Status", value="⏳ Ready...", interactive=False)
+                    img_output = gr.Image(type="pil", label="Result", show_label=True, height=250)
+                    
+                    # ANPR-style side panel for vehicle info
+                    gr.Markdown("#### 📊 Vehicle Info Panel")
+                    img_side_panel = gr.HTML(label="Vehicle Details", value="<div style='padding: 20px; text-align: center; color: #666;'>📸 Upload an image to see vehicle details</div>")
+                    
+                    img_info = gr.Textbox(label="Detection Info", interactive=False, visible=True, lines=8, value="📸 Upload an image to start detection")
+                    img_summary = gr.Code(label="JSON", language="json", lines=8, value="{}")
+                
+                # Column 2: Video Upload
                 with gr.Column(scale=1):
-                    vid_input = gr.Video(label="Upload Video")
+                    gr.Markdown("#### 🎥 Video")
+                    vid_input = gr.Video(label="Upload Video", height=200)
                     
-                    with gr.Row():
-                        vid_model = gr.Radio(choices=MODEL_CHOICES, label="AI Model", value="yolo26n")
+                    vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+                    vid_btn = gr.Button("Process", variant="primary")
                     
-                    vid_btn = gr.Button("Process Video", variant="primary", size="lg")
-                    
-                    # Advanced settings (collapsible)
-                    with gr.Accordion("Advanced Settings", open=False):
-                        # Video Processing Speed Selection
+                    with gr.Accordion("Settings", open=False):
                         vid_speed_mode = gr.Radio(
-                            choices=[
-                                ("Ultra-Fast (2-3 min) ⚡", "ultra_fast"),
-                                ("Fast (3-5 min) 🚀", "fast"), 
-                                ("Balanced (5-8 min) ⚖️", "balanced"),
-                                ("Original (50+ min) 🐌", "original")
-                            ],
-                            label="Processing Speed Mode",
-                            value="ultra_fast"  # DEFAULT to ultra_fast for maximum speed
+                            choices=[("Ultra-Fast ⚡", "ultra_fast"), ("Fast 🚀", "fast"), ("Balanced ⚖️", "balanced"), ("Original 🐌", "original")],
+                            label="Speed",
+                            value="ultra_fast"
                         )
-                        
-                        vid_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="🎯 Confidence Threshold")
-                        vid_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="📏 IoU Threshold")
-                        vid_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="📐 Image Size", value=640)
-                        vid_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        vid_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="📦 Max Boxes per Frame")
-                        vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
-                        
-                        # Hidden controls (always enabled)
+                        vid_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
+                        vid_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
+                        vid_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=640)
+                        vid_labels = gr.Checkbox(value=True, label="Labels")
+                        vid_conf_show = gr.Checkbox(value=True, label="Confidence")
+                        vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="Max Boxes")
+                        vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Every N Frames")
                         vid_resnet = gr.Checkbox(value=True, visible=False)
                         vid_ocr = gr.Checkbox(value=True, visible=False)
                         vid_ocr_every_n = gr.Number(value=5, visible=False)
                     
-                    # Progress indicator
-                    vid_progress = gr.Textbox(label="📊 Status", value="⏳ Ready to process video...", interactive=False)
-                    
-                with gr.Column(scale=2):
-                    vid_output = gr.Video(label="🎯 Processed Video", visible=True)
-                    vid_download = gr.File(label="💾 Download Result", visible=True)
-                    vid_info = gr.Markdown(label="📋 Video Info", value="📹 Upload a video to see processing information")
-                    vid_info = gr.Textbox(label="Detection Info", interactive=False, visible=True, lines=3)
-
-            def process_video_with_status(video, conf, iou, model, labels, conf_show, imgsz, enable_resnet, max_boxes, every_n, enable_ocr, ocr_every_n, speed_mode):
-                """Wrapper function to provide status updates"""
-                if video is None:
-                    return None, None, "Please upload a video first", "No video provided"
+                    vid_progress = gr.Textbox(label="Status", value="⏳ Ready...", interactive=False)
+                    vid_output = gr.Video(label="Result", visible=True, height=400, width="100%")
+                    vid_info = gr.Textbox(label="Info", interactive=False, visible=True, lines=3)
                 
-                try:
-                    # Update status based on speed mode
-                    if speed_mode == "ultra_fast":
-                        status = "⚡ Starting ULTRA-FAST video processing (3-4 minutes)..."
-                    elif speed_mode == "fast":
-                        status = "🚀 Starting FAST video processing (5-8 minutes)..."
-                    elif speed_mode == "balanced":
-                        status = "⚖️ Starting BALANCED video processing (8-12 minutes)..."
-                    else:
-                        status = "🐌 Starting ORIGINAL video processing (50+ minutes)..."
-                    
-                    return None, None, status, "Initializing AI models..."
-                    
-                except Exception as e:
-                    return None, None, f"Error: {str(e)}", f"Processing failed: {str(e)}"
-
-            def process_video_complete(video, conf, iou, model, labels, conf_show, imgsz, enable_resnet, max_boxes, every_n, enable_ocr, ocr_every_n, speed_mode):
-                """Complete video processing function"""
-                if video is None:
-                    return None, None, "Please upload a video first", "No video provided"
-                
-                try:
-                    print(f"[DEBUG] Starting video processing for input: {video}")
-                    
-                    # Process video
-                    result_path, detection_summary, json_results = predict_video(video, conf, iou, model, labels, conf_show, imgsz, enable_resnet, max_boxes, every_n, enable_ocr, ocr_every_n, speed_mode)
-                    print(f"[DEBUG] Video processing completed. Result path: {result_path}")
-                    print(f"[DEBUG] JSON results: {json_results[:200] if json_results else 'None'}...")
-                    
-                    if result_path and os.path.exists(result_path):
-                        print(f"[DEBUG] Output file exists, size: {os.path.getsize(result_path)} bytes")
-                        
-                        # Get video info
-                        cap = cv2.VideoCapture(result_path)
-                        if cap.isOpened():
-                            frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                            fps = cap.get(cv2.CAP_PROP_FPS)
-                            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                            duration = frames / fps if fps > 0 else 0
-                            cap.release()
-                            
-                            info = f"✅ Processed: {frames} frames | Size: {width}x{height} | FPS: {fps:.1f} | Duration: {duration:.1f}s"
-                            print(f"[INFO] {info}")
-                            
-                            # Use detection summary for detailed info
-                            if detection_summary:
-                                detailed_info = f"{info}\n\n{detection_summary}"
-                            else:
-                                detailed_info = info
-                            
-                            # Add JSON results to detection info
-                            if json_results:
-                                detailed_info = f"{detailed_info}\n\n📋 **Detected Text (JSON):**\n```json\n{json_results}\n```"
-                            
-                            timestamp = int(time.time())
-                            permanent_name = f"processed_video_{timestamp}.mp4"
-                            permanent_path = os.path.join(os.getcwd(), permanent_name)
-                            
-                            try:
-                                # Copy the processed video to a permanent location
-                                shutil.copy2(result_path, permanent_path)
-                                print(f"[DEBUG] Copied video to permanent path: {permanent_path}")
-                                
-                                # Verify the copied file exists and is accessible
-                                if os.path.exists(permanent_path) and os.path.getsize(permanent_path) > 0:
-                                    print(f"[DEBUG] Permanent video file verified: {os.path.getsize(permanent_path)} bytes")
-
-                                    ffmpeg = shutil.which("ffmpeg")
-                                    compatible_name = f"compatible_video_{timestamp}.mp4"
-                                    compatible_path = os.path.join(os.getcwd(), compatible_name)
-                                    transcoded = _transcode_to_browser_mp4(permanent_path, compatible_path)
-                                    if transcoded:
-                                        print(f"[DEBUG] Created browser-compatible version: {transcoded}")
-                                        return transcoded, transcoded, "🎉 Processing complete!", detailed_info
-
-                                    print("[WARNING] Could not create browser-compatible H.264 mp4; returning original output")
-                                    return permanent_path, permanent_path, "🎉 Processing complete!", detailed_info
-                                else:
-                                    print("[ERROR] Permanent video file is not accessible")
-                                    return result_path, result_path, "⚠️ Processing complete but display issues", detailed_info
-                            except Exception as copy_error:
-                                print(f"[ERROR] Failed to copy video: {copy_error}")
-                                return result_path, result_path, "⚠️ Processing complete but copy failed", detailed_info
-                        else:
-                            print("[ERROR] Could not open processed video for verification")
-                            return result_path, result_path, "⚠️ Processing complete but verification failed", detection_summary or "Video processed but could not verify output"
-                    else:
-                        error_msg = f"❌ Processing failed - No output file created. Result path: {result_path}"
-                        print(error_msg)
-                        return None, None, "Processing failed", error_msg
-                        
-                except Exception as e:
-                    error_msg = f"❌ Processing failed: {str(e)}"
-                    print(f"[ERROR] {error_msg}")
-                    import traceback
-                    traceback.print_exc()
-                    return None, None, f"Error: {str(e)}", error_msg
-
-            # First update status, then process
-            vid_btn.click(
-                process_video_with_status,
-                inputs=[vid_input, vid_conf, vid_iou, vid_model, vid_labels, vid_conf_show, vid_size, vid_resnet, vid_max_boxes, vid_every_n, vid_ocr, vid_ocr_every_n, vid_speed_mode],
-                outputs=[vid_output, vid_download, vid_progress, vid_info],
-            ).then(
-                process_video_complete,
-                inputs=[vid_input, vid_conf, vid_iou, vid_model, vid_labels, vid_conf_show, vid_size, vid_resnet, vid_max_boxes, vid_every_n, vid_ocr, vid_ocr_every_n, vid_speed_mode],
-                outputs=[vid_output, vid_download, vid_progress, vid_info],
-            )
-
-        # Webcam Tab - Simplified
-        with gr.TabItem("📸 Live Webcam"):
-            gr.Markdown("### Real-time object detection with your webcam")
-            
-            with gr.Row():
+                # Column 3: Live Webcam
                 with gr.Column(scale=1):
-                    gr.Markdown("#### 🎛️ Control Panel")
+                    gr.Markdown("#### 📸 Webcam")
                     
-                    with gr.Row():
-                        webcam_model = gr.Radio(choices=MODEL_CHOICES, label="🤖 AI Model", value="yolov8s")
+                    webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
                     
-                    # Advanced settings (collapsible)
-                    with gr.Accordion("⚙️ Advanced Settings", open=False):
-                        webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="🎯 Confidence Threshold")
-                        webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="📏 IoU Threshold")
-                        webcam_enable_color = gr.Checkbox(value=True, label="🎨 Enable Color Detection")
-                        webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="📐 Image Size", value=320)
-                        webcam_labels = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        webcam_conf_show = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="📦 Max Boxes per Frame")
-                        webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="⏱️ Process Every N Frames")
-                        
-                        # Hidden controls (always enabled) - using hidden components to avoid schema issues
+                    with gr.Accordion("Settings", open=False):
+                        webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")
+                        webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
+                        webcam_enable_color = gr.Checkbox(value=True, label="Color Detection")
+                        webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=320)
+                        webcam_labels = gr.Checkbox(value=True, label="Labels")
+                        webcam_conf_show = gr.Checkbox(value=True, label="Confidence")
+                        webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="Max Boxes")
+                        webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Every N Frames")
                         webcam_resnet = gr.Checkbox(value=False, visible=False)
                         webcam_enable_ocr = gr.Checkbox(value=True, visible=False)
                         webcam_ocr_every_n = gr.Number(value=5, visible=False)
                     
-                    gr.Markdown("#### 📹 Webcam Feed")
                     webcam_input = gr.Image(
                         sources=["webcam"],
                         type="numpy",
-                        label="📸 Live Camera",
+                        label="Live Camera",
                         streaming=True,
-                        height=420
+                        height=200
                     )
                     
-                with gr.Column(scale=2):
-                    gr.Markdown("#### 🎯 Live Detection")
-                    webcam_output = gr.Image(type="numpy", label="🔍 Real-time Results", height=620)
-                    
-                    gr.Markdown("#### 📊 Detection Info")
-                    webcam_info = gr.Textbox(label="Detection Info", interactive=False, lines=10, value="📹 **Status:** Ready to start\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!")
-
-            def update_webcam_info():
-                """Update webcam info with latest JSON data"""
-                try:
-                    global _webcam_stream_state
-                    if _webcam_stream_state.get("last_json"):
-                        json_data = _webcam_stream_state["last_json"]
-                        return f"📹 **Status:** Live Detection Active\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!\n\n📋 **Detected Text (JSON):**\n```json\n{json_data}\n```"
-                    else:
-                        return "📹 **Status:** Live Detection Active\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!"
-                except Exception:
-                    return "📹 **Status:** Live Detection Active\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!"
+                    webcam_output = gr.Image(type="numpy", label="Detection", height=250)
+                    webcam_info = gr.Textbox(label="Info", interactive=False, lines=5, value="📹 Ready! Allow camera access.")
+            
+            # Button click handlers
+            img_btn.click(
+                predict_image,
+                inputs=[img_input, img_conf, img_iou, img_model, img_labels, img_conf_show, img_size, img_resnet, img_max_boxes, img_ocr],
+                outputs=[img_output, img_info, img_summary, img_side_panel],
+            )
+            
+            vid_btn.click(
+                predict_video,
+                inputs=[vid_input, vid_conf, vid_iou, vid_model, vid_labels, vid_conf_show, vid_size, vid_resnet, vid_max_boxes, vid_every_n, vid_ocr, vid_ocr_every_n, vid_speed_mode],
+                outputs=[vid_output, vid_info]
+            )
             
             webcam_input.stream(
                 predict_webcam,
-                inputs=[
-                    webcam_input,
-                    webcam_conf,
-                    webcam_iou,
-                    webcam_model,
-                    webcam_labels,
-                    webcam_conf_show,
-                    webcam_enable_color,
-                    webcam_size,
-                    webcam_resnet,
-                    webcam_max_boxes,
-                    webcam_every_n,
-                    webcam_enable_ocr,
-                    webcam_ocr_every_n,
-                ],
+                inputs=[webcam_input, webcam_conf, webcam_iou, webcam_model, webcam_labels, webcam_conf_show, webcam_enable_color, webcam_size, webcam_resnet, webcam_max_boxes, webcam_every_n, webcam_enable_ocr, webcam_ocr_every_n],
                 outputs=[webcam_output, webcam_info],
                 show_progress=False,
             )
-            
-            # Timer to update webcam info with JSON - disabled for Gradio compatibility
-            # gr.Timer is only available in Gradio 4.32.0+, using alternative approach
-            # webcam_timer = gr.Timer(2.0)
-            # webcam_timer.tick(update_webcam_info, outputs=webcam_info)
-            # Note: JSON updates happen automatically via predict_webcam output
+        
+        # with gr.TabItem("Parking Detection"):
+        #     gr.Markdown("### Smart Parking Space Detection System")
+        #     gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
+        #     
+        #     # Image Upload Section
+        #     gr.Markdown("#### 📁 Image Upload")
+        #     with gr.Row():
+        #         with gr.Column(scale=1):
+        #             parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
+        #             parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+        #             
+        #             with gr.Accordion("⚙️ Settings", open=False):
+        #                 parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+        #                 parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
+        #                 parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+        #             
+        #             parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
+        #             
+        #         with gr.Column(scale=2):
+        #             parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
+        #             parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
+        #
+        #     gr.Markdown("---")
+        #     
+        #     # Video Upload Section  
+        #     gr.Markdown("#### 🎥 Video Upload")
+        #     with gr.Row():
+        #         with gr.Column(scale=1):
+        #             parking_video_input = gr.Video(label="🎥 Upload Parking Video")
+        #             parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+        #             
+        #             with gr.Accordion("⚙️ Settings", open=False):
+        #                 parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+        #                 parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
+        #                 parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
+        #                 parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+        #             
+        #             parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
+        #             
+        #         with gr.Column(scale=2):
+        #             parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
+        #             parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
+        #             parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
+        #
+        #     gr.Markdown("---")
+        #     
+        #     # Live Webcam Section
+        #     gr.Markdown("#### 📸 Live Webcam")
+        #     with gr.Row():
+        #         with gr.Column(scale=1):
+        #             gr.Markdown("##### 🎛️ Control Panel")
+        #             
+        #             parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+        #             
+        #             with gr.Accordion("⚙️ Settings", open=False):
+        #                 parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
+        #                 parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
+        #                 parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
+        #                 parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+        #             
+        #             gr.Markdown("##### 📹 Webcam Feed")
+        #             parking_webcam_input = gr.Image(
+        #                 sources=["webcam"],
+        #                 type="numpy",
+        #                 label="📸 Live Camera",
+        #                 streaming=True,
+        #                 height=420,
+        #             )
+        #             
+        #         with gr.Column(scale=2):
+        #             gr.Markdown("##### 🎯 Live Parking Detection")
+        #             parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
+        #             
+        #             gr.Markdown("##### 📊 Live Statistics")
+        #             parking_webcam_info = gr.Textbox(
+        #                 label="Detection Info", 
+        #                 interactive=False, 
+        #                 lines=8, 
+        #                 value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
+        #             )
+        #
+        #     # Connect all components
+        #     parking_btn_img.click(
+        #         process_parking_detection,
+        #         inputs=[parking_input, parking_conf_img, parking_model_img, parking_labels_img, parking_conf_show_img],
+        #         outputs=[parking_output_img, parking_summary_img],
+        #     )
+        #     
+        #     parking_btn_vid.click(
+        #         process_parking_video,
+        #         inputs=[parking_video_input, parking_conf_vid, parking_model_vid, parking_labels_vid, parking_conf_show_vid, parking_every_n_vid],
+        #         outputs=[parking_video_output, parking_video_download, parking_summary_vid],
+        #     )
+        #     
+        #     parking_webcam_input.stream(
+        #         process_parking_webcam,
+        #         inputs=[parking_webcam_input, parking_conf_cam, parking_model_cam, parking_labels_cam, parking_conf_show_cam, parking_every_n_cam],
+        #         outputs=[parking_webcam_output, parking_webcam_info],
+        #         show_progress=False,
+        #     )
 
-        # Parking Detection Tab - Flattened structure to avoid nested tabs
-        with gr.TabItem("Parking Detection"):
-            gr.Markdown("### Smart Parking Space Detection System")
-            gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
-            
-            # Image Upload Section
-            gr.Markdown("#### 📁 Image Upload")
-            with gr.Row():
-                with gr.Column(scale=1):
-                    parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
-                    parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                    
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                        parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
-                    
-                    parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
-                    
-                with gr.Column(scale=2):
-                    parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
-                    parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
-
-            gr.Markdown("---")
-            
-            # Video Upload Section  
-            gr.Markdown("#### 🎥 Video Upload")
-            with gr.Row():
-                with gr.Column(scale=1):
-                    parking_video_input = gr.Video(label="🎥 Upload Parking Video")
-                    parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                    
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                        parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                    
-                    parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
-                    
-                with gr.Column(scale=2):
-                    parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
-                    parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
-                    parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
-
-            gr.Markdown("---")
-            
-            # Live Webcam Section
-            gr.Markdown("#### 📸 Live Webcam")
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("##### 🎛️ Control Panel")
-                    
-                    parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-                    
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-                        parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-                    
-                    gr.Markdown("##### 📹 Webcam Feed")
-                    parking_webcam_input = gr.Image(
-                        sources=["webcam"],
-                        type="numpy",
-                        label="📸 Live Camera",
-                        streaming=True,
-                        height=420,
-                    )
-                    
-                with gr.Column(scale=2):
-                    gr.Markdown("##### 🎯 Live Parking Detection")
-                    parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
-                    
-                    gr.Markdown("##### 📊 Live Statistics")
-                    parking_webcam_info = gr.Textbox(
-                        label="Detection Info", 
-                        interactive=False, 
-                        lines=8, 
-                        value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
-                    )
-
-            # Connect all components
-            parking_btn_img.click(
-                process_parking_detection,
-                inputs=[parking_input, parking_conf_img, parking_model_img, parking_labels_img, parking_conf_show_img],
-                outputs=[parking_output_img, parking_summary_img],
-            )
-            
-            parking_btn_vid.click(
-                process_parking_video,
-                inputs=[parking_video_input, parking_conf_vid, parking_model_vid, parking_labels_vid, parking_conf_show_vid, parking_every_n_vid],
-                outputs=[parking_video_output, parking_video_download, parking_summary_vid],
-            )
-            
-            parking_webcam_input.stream(
-                process_parking_webcam,
-                inputs=[parking_webcam_input, parking_conf_cam, parking_model_cam, parking_labels_cam, parking_conf_show_cam, parking_every_n_cam],
-                outputs=[parking_webcam_output, parking_webcam_info],
-                show_progress=False,
-            )
-
-        # PPE Detection Tab - Flattened structure to avoid nested tabs
+        # PPE Detection Tab - Side by side layout like Vehicle Detection
         with gr.TabItem("PPE Detection"):
             gr.Markdown("### PPE (Personal Protective Equipment) Detection System")
             gr.Markdown("Detect safety equipment compliance on workers in images, videos, or live webcam feeds.")
             
-            # Image Upload Section
-            gr.Markdown("#### 📁 Image Upload")
+            # All three sections in one row - side by side
             with gr.Row():
+                # Column 1: Image Upload
                 with gr.Column(scale=1):
-                    ppe_input = gr.Image(type="pil", label="📁 Upload Image")
-                    ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    gr.Markdown("#### 📁 Image")
+                    ppe_input = gr.Image(type="pil", label="Upload Image", show_label=True, height=200)
                     
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                        ppe_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        ppe_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
+                    ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
+                    ppe_btn_img = gr.Button("Detect PPE", variant="primary")
                     
-                    ppe_btn_img = gr.Button("🦺 Detect PPE", variant="primary")
+                    with gr.Accordion("Settings", open=False):
+                        ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
+                        ppe_labels_img = gr.Checkbox(value=True, label="Labels")
+                        ppe_conf_show_img = gr.Checkbox(value=True, label="Confidence Scores")
                     
-                with gr.Column(scale=2):
-                    ppe_output_img = gr.Image(type="pil", label="🦺 PPE Analysis", height=400)
-                    ppe_summary_img = gr.Markdown("## 📸 Upload an image to start PPE detection")
-
-            gr.Markdown("---")
-            
-            # Video Upload Section  
-            gr.Markdown("#### 🎥 Video Upload")
-            with gr.Row():
+                    ppe_output_img = gr.Image(type="pil", label="Result", show_label=True, height=250)
+                    
+                    # ANPR-style side panel for PPE info
+                    gr.Markdown("#### 📊 PPE Info Panel")
+                    ppe_side_panel = gr.HTML(label="PPE Details", value="<div style='padding: 20px; text-align: center; color: #666;'>📸 Upload an image to see PPE details</div>")
+                    
+                    ppe_summary_img = gr.Markdown("## Upload an image to start PPE detection")
+                
+                # Column 2: Video Upload
                 with gr.Column(scale=1):
-                    ppe_video_input = gr.Video(label="🎥 Upload Video")
-                    ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    gr.Markdown("#### 🎥 Video")
+                    ppe_video_input = gr.Video(label="Upload Video", height=200)
                     
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                        ppe_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        ppe_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
+                    ppe_btn_vid = gr.Button("Analyze Video", variant="primary")
                     
-                    ppe_btn_vid = gr.Button("🦺 Analyze Video", variant="primary")
+                    with gr.Accordion("Settings", open=False):
+                        ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
+                        ppe_labels_vid = gr.Checkbox(value=True, label="Labels")
+                        ppe_conf_show_vid = gr.Checkbox(value=True, label="Confidence")
+                        ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="Every N Frames")
                     
-                with gr.Column(scale=2):
-                    ppe_video_output = gr.Video(label="🦺 Video Analysis", height=400)
-                    ppe_video_download = gr.File(label="📥 Download Processed Video", visible=False)
-                    ppe_summary_vid = gr.Markdown("## 🎥 Upload a video to start PPE detection")
-
-            gr.Markdown("---")
-            
-            # Live Webcam Section
-            gr.Markdown("#### 📸 Live Webcam")
-            with gr.Row():
+                    ppe_video_output = gr.Video(label="Result", visible=True, height=400, width="100%")
+                    ppe_summary_vid = gr.Markdown("## Upload a video to start PPE detection")
+                
+                # Column 3: Live Webcam
                 with gr.Column(scale=1):
-                    gr.Markdown("##### 🎛️ Control Panel")
+                    gr.Markdown("#### 📸 Webcam")
                     
-                    ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
+                    ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
                     
-                    with gr.Accordion("⚙️ Settings", open=False):
-                        ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="🎯 Confidence Threshold")
-                        ppe_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
-                        ppe_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
-                        ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
+                    with gr.Accordion("Settings", open=False):
+                        ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
+                        ppe_labels_cam = gr.Checkbox(value=True, label="Labels")
+                        ppe_conf_show_cam = gr.Checkbox(value=True, label="Confidence")
+                        ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="Every N Frames")
                     
-                    gr.Markdown("##### 📹 Webcam Feed")
                     ppe_webcam_input = gr.Image(
                         sources=["webcam"],
                         type="numpy",
-                        label="📸 Live Camera",
+                        label="Live Camera",
                         streaming=True,
-                        height=420,
+                        height=200
                     )
                     
-                with gr.Column(scale=2):
-                    gr.Markdown("##### 🎯 Live PPE Detection")
-                    ppe_webcam_output = gr.Image(type="numpy", label="🦺 Real-time Results", height=420)
-                    
-                    gr.Markdown("##### 📊 Live Statistics")
-                    ppe_webcam_info = gr.Textbox(
-                        label="Detection Info", 
-                        interactive=False, 
-                        lines=8, 
-                        value="📹 **Status:** Ready to start\n\n🦺 Point camera at workers for PPE detection!"
-                    )
-
+                    ppe_webcam_output = gr.Image(type="numpy", label="Detection", height=250)
+                    ppe_webcam_info = gr.Textbox(label="Info", interactive=False, lines=5, value="📹 Ready! Point camera at workers for PPE detection!")
+            
             # Connect all PPE components
             ppe_btn_img.click(
                 process_ppe_detection,
                 inputs=[ppe_input, ppe_conf_img, ppe_model_img, ppe_labels_img, ppe_conf_show_img],
-                outputs=[ppe_output_img, ppe_summary_img],
+                outputs=[ppe_output_img, ppe_summary_img, ppe_side_panel],
             )
             
             ppe_btn_vid.click(
                 process_ppe_video,
                 inputs=[ppe_video_input, ppe_conf_vid, ppe_model_vid, ppe_labels_vid, ppe_conf_show_vid, ppe_every_n_vid],
-                outputs=[ppe_video_output, ppe_video_download, ppe_summary_vid],
+                outputs=[ppe_video_output, ppe_summary_vid],
             )
             
             ppe_webcam_input.stream(

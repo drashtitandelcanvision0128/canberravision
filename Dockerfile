@@ -117,9 +117,5 @@ RUN chmod -R 755 /app
 # Expose Gradio port
 EXPOSE 7860
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=15s --start-period=180s --retries=3 \
-    CMD python health_check.py || exit 1
-
 # Use production startup script for Coolify
 CMD ["python", "start_production.py"]

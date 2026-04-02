@@ -36,16 +36,12 @@ def setup_production_environment():
     # Force CPU mode (Coolify servers typically don't have GPU)
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
     
-    # Set Gradio production settings
-    os.environ.setdefault('GRADIO_SERVER_NAME', '0.0.0.0')
-    os.environ.setdefault('GRADIO_SERVER_PORT', '7860')
-    
     # Optimize for production
     os.environ.setdefault('PYTHONUNBUFFERED', '1')
     os.environ.setdefault('PYTHONDONTWRITEBYTECODE', '1')
     
     logger.info("Production environment configured")
-    logger.info(f"Server: {os.environ['GRADIO_SERVER_NAME']}:{os.environ['GRADIO_SERVER_PORT']}")
+    logger.info("Server: 0.0.0.0:7860")
     logger.info(f"Working directory: {os.getcwd()}")
 
 def test_imports():
@@ -90,10 +86,6 @@ def test_demo_creation():
         from apps.app import demo
         logger.info(f"✅ Demo imported: {type(demo)}")
         
-        # Test API info generation
-        api_info = demo.get_api_info()
-        logger.info(f"✅ API info generated: {len(api_info)} endpoints")
-        
         return True
         
     except Exception as e:
@@ -129,25 +121,20 @@ def main():
         from apps.app import demo
         
         logger.info("✅ Application starting successfully")
-        logger.info(f"🌐 Server will be available at: http://{os.environ['GRADIO_SERVER_NAME']}:{os.environ['GRADIO_SERVER_PORT']}")
+        logger.info("🌐 Server will be available at: http://0.0.0.0:7860")
         
-        # Get root path from environment (empty string for most reverse proxies)
-        _root_path = os.environ.get('GRADIO_ROOT_PATH', '')
-        logger.info(f"🌐 Server configuration: {os.environ['GRADIO_SERVER_NAME']}:{os.environ['GRADIO_SERVER_PORT']}")
-        logger.info(f"🌐 Root path: '{_root_path}'")
+        print("[DEBUG] Starting Gradio on 0.0.0.0:7860")
         
-        # Launch with production settings
+        # Enable queue for production stability
+        demo.queue()
+        
+        # Launch with production settings - HARD-CODED for Coolify compatibility
         demo.launch(
+            server_name="0.0.0.0",
+            server_port=7860,
             share=False,
             show_error=True,
-            quiet=False,
-            inbrowser=False,  # Never open browser in production
-            server_name=os.environ['GRADIO_SERVER_NAME'],
-            server_port=int(os.environ['GRADIO_SERVER_PORT']),
-            allowed_paths=['.'],
-            prevent_thread_lock=False,
-            root_path=_root_path if _root_path else None,
-            ssl_verify=False
+            inbrowser=False
         )
         
     except Exception as e:

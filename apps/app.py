@@ -6227,76 +6227,18 @@ def predict_image(
             
         # Convert BGR to RGB for PIL
         if len(annotated_bgr.shape) == 3 and annotated_bgr.shape[2] == 3:
-            print(f"[DEBUG] Converting BGR to RGB")
             annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
         else:
-            print(f"[DEBUG] Using annotated_bgr as-is (not 3-channel)")
             annotated_rgb = annotated_bgr
         
-        print(f"[DEBUG] Creating PIL Image from array shape: {annotated_rgb.shape}")
-        try:
-            result_image = Image.fromarray(annotated_rgb)
-            print(f"[DEBUG] PIL Image created: {result_image.size}, mode: {result_image.mode}")
-        except Exception as e:
-            print(f"[ERROR] Failed to create PIL Image: {e}")
-            # Fallback: try to convert original image
-            try:
-                if hasattr(img, 'convert'):
-                    result_image = img.convert('RGB')
-                elif isinstance(img, np.ndarray):
-                    if len(img.shape) == 3 and img.shape[2] == 3:
-                        # If it's BGR, convert to RGB
-                        if img.dtype == np.uint8:
-                            result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                        else:
-                            result_image = Image.fromarray(img)
-                    else:
-                        result_image = Image.fromarray(img)
-                else:
-                    result_image = Image.fromarray(np.array(img))
-                print(f"[DEBUG] Fallback PIL Image created: {result_image.size}, mode: {result_image.mode}")
-            except Exception as e2:
-                print(f"[ERROR] Fallback also failed: {e2}")
-                # Last resort: create a blank image
-                result_image = Image.new('RGB', (640, 480), color='black')
-                print(f"[DEBUG] Created blank fallback image")
+        # Create PIL Image directly
+        result_image = Image.fromarray(annotated_rgb)
         
-        # Ensure the image is valid before returning
-        if result_image is None:
-            print(f"[ERROR] result_image is None, creating blank image")
-            result_image = Image.new('RGB', (640, 480), color='black')
-        
-        # Convert the final image to RGB if it's not already, as Gradio expects RGB
+        # Ensure RGB mode
         if result_image.mode != 'RGB':
-            print(f"[DEBUG] Converting image from {result_image.mode} to RGB")
             result_image = result_image.convert('RGB')
         
-        # Final validation
-        print(f"[DEBUG] Final image - Size: {result_image.size}, Mode: {result_image.mode}, Type: {type(result_image)}")
-        
-        # Test if we can save the image (to verify it's valid)
-        try:
-            test_path = "test_output_image.jpg"
-            result_image.save(test_path)
-            print(f"[DEBUG] Successfully saved test image to {test_path}")
-            os.remove(test_path)  # Clean up
-        except Exception as e:
-            print(f"[ERROR] Could not save test image: {e}")
-        
-        # Ensure the image is in RGB mode and proper format
-        if result_image.mode != 'RGB':
-            print(f"[DEBUG] Converting image from {result_image.mode} to RGB")
-            result_image = result_image.convert('RGB')
-        
-        # Make sure the image is not corrupted
-        try:
-            # Verify the image can be loaded
-            result_image.load()
-            print(f"[DEBUG] Image successfully loaded and verified")
-        except Exception as e:
-            print(f"[ERROR] Image load failed: {e}")
-            # Create a new blank image if corrupted
-            result_image = Image.new('RGB', (640, 480), color='black')
+        print(f"[DEBUG] Final image - Size: {result_image.size}, Mode: {result_image.mode}")
         
         # Create ANPR-style info text for image detection (similar to video detection)
         info_lines = []
@@ -9020,6 +8962,12 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         cap.release()
         out.release()
         
+        # Calculate compliance rate
+        total_ppe = total_helmets + total_seatbelts
+        total_violations = total_no_helmets + total_no_seatbelts
+        total_detected = total_ppe + total_violations
+        compliance_rate = (total_ppe / total_detected * 100) if total_detected > 0 else 0
+        
         # Priority-based summary
         summary_md = f"""## 🦺 PPE Video Analysis Results
 
@@ -9039,11 +8987,71 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 - Processed Every: {every_n} frames
 """
         
-        return output_path, output_path, summary_md
+        # Create dashboard HTML for video
+        dashboard_html = f"""
+        <div style="background: linear-gradient(145deg, #1a1f2e 0%, #0d1117 100%); border-radius: 12px; border: 1px solid #30363d; padding: 16px;">
+            <div style="text-align: center; margin-bottom: 16px;">
+                <div style="background: #f59e0b; color: #000; font-weight: 700; font-size: 18px; padding: 8px 16px; border-radius: 6px; display: inline-block;">
+                    🛡️ PPE VIDEO SYSTEM
+                </div>
+            </div>
+            
+            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Video Status</div>
+                <div style="color: #10b981; font-size: 14px; font-weight: 600;">✅ Analysis Complete</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+                    <div style="font-size: 24px;">🪖</div>
+                    <div style="color: #7d8590; font-size: 10px;">HELMETS</div>
+                    <div style="color: #10b981; font-size: 18px; font-weight: 700;">{total_helmets}</div>
+                </div>
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+                    <div style="font-size: 24px;">🚗</div>
+                    <div style="color: #7d8590; font-size: 10px;">SEATBELTS</div>
+                    <div style="color: #3b82f6; font-size: 18px; font-weight: 700;">{total_seatbelts}</div>
+                </div>
+            </div>
+            
+            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 8px;">Video Stats</div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span style="color: #fff; font-size: 12px;">Frames Processed</span>
+                    <span style="color: #58a6ff; font-size: 12px; font-weight: 600;">{processed_count}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <span style="color: #fff; font-size: 12px;">PPE Detections</span>
+                    <span style="color: #58a6ff; font-size: 12px; font-weight: 600;">{total_ppe}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #fff; font-size: 12px;">Compliance Rate</span>
+                    <span style="color: {'#10b981' if compliance_rate >= 80 else '#f59e0b' if compliance_rate >= 50 else '#ef4444'}; font-size: 12px; font-weight: 600;">{compliance_rate:.1f}%</span>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+                    <div style="color: #7d8590; font-size: 10px;">NO HELMETS</div>
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_helmets}</div>
+                </div>
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+                    <div style="color: #7d8590; font-size: 10px;">NO SEATBELTS</div>
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_seatbelts}</div>
+                </div>
+            </div>
+            
+            <div style="background: {'#238636' if compliance_rate >= 80 else '#f59e0b' if compliance_rate >= 50 else '#dc2626'}; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+                {'✅ SAFE - High Compliance' if compliance_rate >= 80 else '⚠️ WARNING - Review Needed' if compliance_rate >= 50 else '❌ CRITICAL - Violations Detected'}
+            </div>
+        </div>
+        """
+        
+        return output_path, summary_md, dashboard_html
         
     except Exception as e:
         print(f"[ERROR] PPE video processing failed: {e}")
-        return None, None, f"⚠️ **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again."
+        return None, f"⚠️ **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
 
 
 def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
@@ -9360,8 +9368,8 @@ with demo:
         with gr.TabItem("PPE Detection"):
             # Live Feed Section with Upload Areas
             with gr.Row():
-                # Left: Main Upload/Preview Area (full width now)
-                with gr.Column(scale=3):
+                # Left: Main Upload/Preview Area
+                with gr.Column(scale=2):
                     # Main content tabs for Image/Video/Webcam
                     with gr.Tabs():
                         with gr.TabItem("📂 Image"):
@@ -9410,18 +9418,85 @@ with demo:
                             
                             ppe_webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
                             ppe_webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Point camera at workers for PPE detection!")
+                
+                # Right: ANPR-Style PPE Detection Dashboard
+                with gr.Column(scale=1):
+                    ppe_dashboard_html = gr.HTML("""
+                    <div style="background: linear-gradient(145deg, #1a1f2e 0%, #0d1117 100%); border-radius: 12px; border: 1px solid #30363d; padding: 16px;">
+                        <div style="text-align: center; margin-bottom: 16px;">
+                            <div style="background: #f59e0b; color: #000; font-weight: 700; font-size: 18px; padding: 8px 16px; border-radius: 6px; display: inline-block;">
+                                🛡️ PPE DETECTION SYSTEM
+                            </div>
+                        </div>
+                        
+                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Detection Status</div>
+                            <div style="color: #fff; font-size: 14px; font-weight: 600;">🟢 Active Monitoring</div>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+                                <div style="font-size: 24px;">👤</div>
+                                <div style="color: #7d8590; font-size: 10px;">PERSONS</div>
+                                <div id="ppe-persons-count" style="color: #58a6ff; font-size: 18px; font-weight: 700;">0</div>
+                            </div>
+                            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+                                <div style="font-size: 24px;">🚗</div>
+                                <div style="color: #7d8590; font-size: 10px;">VEHICLES</div>
+                                <div id="ppe-vehicles-count" style="color: #58a6ff; font-size: 18px; font-weight: 700;">0</div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 8px;">PPE Status</div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="color: #fff; font-size: 12px;">🪖 Helmets</span>
+                                <span id="ppe-helmets" style="color: #10b981; font-size: 12px; font-weight: 600;">0/0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="color: #fff; font-size: 12px;">🚗 Seatbelts</span>
+                                <span id="ppe-seatbelts" style="color: #10b981; font-size: 12px; font-weight: 600;">0/0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #fff; font-size: 12px;">✅ Compliant</span>
+                                <span id="ppe-compliant" style="color: #10b981; font-size: 12px; font-weight: 600;">0%</span>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
+                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 8px;">Detected Persons</div>
+                            <div id="ppe-detected-list" style="max-height: 200px; overflow-y: auto;">
+                                <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #161b22; border-radius: 6px; margin-bottom: 4px;">
+                                    <div style="width: 40px; height: 40px; background: #30363d; border-radius: 4px; display: flex; align-items: center; justify-content: center;">👤</div>
+                                    <div style="flex: 1;">
+                                        <div style="color: #fff; font-size: 12px;">Person #1</div>
+                                        <div style="color: #7d8590; font-size: 10px;">Status: Waiting...</div>
+                                    </div>
+                                    <div style="color: #f59e0b; font-size: 11px; font-weight: 600;">--%</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background: #238636; color: #fff; text-align: center; padding: 8px; border-radius: 6px; margin-top: 12px; font-size: 12px; font-weight: 600;">
+                            🟢 NO ALERT - All Safe
+                        </div>
+                    </div>
+                    """)
+                    
+                    # Hidden outputs to update the dashboard
+                    ppe_dashboard_data = gr.JSON(label="", value={"persons": 0, "vehicles": 0, "helmets": 0, "seatbelts": 0}, visible=False)
             
             # Connect all PPE components
             ppe_btn_img.click(
                 process_ppe_detection,
                 inputs=[ppe_input, ppe_conf_img, ppe_model_img, ppe_labels_img, ppe_conf_show_img],
-                outputs=[ppe_output_img, ppe_summary_img],
+                outputs=[ppe_output_img, ppe_summary_img, ppe_dashboard_html],
             )
             
             ppe_btn_vid.click(
                 process_ppe_video,
                 inputs=[ppe_video_input, ppe_conf_vid, ppe_model_vid, ppe_labels_vid, ppe_conf_show_vid, ppe_every_n_vid],
-                outputs=[ppe_video_output, ppe_summary_vid],
+                outputs=[ppe_video_output, ppe_summary_vid, ppe_dashboard_html],
             )
             
             ppe_webcam_input.stream(

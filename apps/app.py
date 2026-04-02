@@ -9198,7 +9198,7 @@ with demo:
                                 img_max_boxes = gr.Number(value=10, visible=False)
                                 img_ocr = gr.Checkbox(value=True, visible=False)
                             
-                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=350)
+                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=300)
                             img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
                             img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
                             img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")

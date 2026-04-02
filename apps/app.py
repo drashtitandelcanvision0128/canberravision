@@ -680,571 +680,716 @@ except ImportError:
     GENDER_MODEL_AVAILABLE = False
     print("[WARNING] Gender detection model not available")
 
-# Custom CSS for Exact C-Vision Theme from Image
+# Custom CSS for Obsidian Vision Professional Theme
 CUSTOM_CSS = """
-/* Global Theme Variables - Exact Match from Image */
+/* ===== OBSIDIAN VISION - PROFESSIONAL DARK THEME ===== */
 :root {
-    /* C-Vision Dark Theme */
-    --primary-color: #3b82f6;
-    --primary-hover: #2563eb;
-    --secondary-color: #1e40af;
-    --accent-color: #60a5fa;
-    --background-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-    --background-color: #0f172a;
-    --surface-color: #1e293b;
-    --card-color: #334155;
-    --text-primary: #ffffff;
-    --text-secondary: #e2e8f0;
-    --text-muted: #94a3b8;
-    --border-color: #475569;
-    --success-color: #10b981;
-    --warning-color: #f59e0b;
-    --error-color: #ef4444;
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --glow-color: rgba(59, 130, 246, 0.5);
+    --obsidian-bg: #0a0f1a;
+    --obsidian-surface: #111827;
+    --obsidian-card: #1f2937;
+    --obsidian-border: #374151;
+    --obsidian-text: #f9fafb;
+    --obsidian-text-muted: #9ca3af;
+    --obsidian-accent: #6366f1;
+    --obsidian-accent-hover: #4f46e5;
+    --obsidian-success: #10b981;
+    --obsidian-warning: #f59e0b;
+    --obsidian-danger: #ef4444;
+    --obsidian-purple: #8b5cf6;
+    --obsidian-blue: #3b82f6;
 }
 
-/* Main Container - Exact Background Match */
+/* Global Container */
 .gradio-container {
-    background: var(--background-gradient) !important;
-    color: var(--text-primary) !important;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    background: var(--obsidian-bg) !important;
+    color: var(--obsidian-text) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     min-height: 100vh;
 }
 
-/* Header - C-Vision Branding */
-.gradio-container > div:first-child {
-    background: var(--surface-color) !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    padding: 15px 20px !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-}
-
-/* C-Vision Logo and Title */
-.c-vision-header {
+/* ===== HEADER - OBSIDIAN STYLE ===== */
+.obsidian-header {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    gap: 10px !important;
-    color: var(--text-primary) !important;
-    font-size: 24px !important;
-    font-weight: 700 !important;
-    padding: 15px 20px !important;
+    padding: 16px 24px !important;
+    background: var(--obsidian-surface) !important;
+    border-bottom: 1px solid var(--obsidian-border) !important;
+    margin: -20px -20px 20px -20px !important;
 }
 
-/* Settings Button */
-.settings-button {
-    background: var(--primary-color) !important;
-    border: 1px solid var(--primary-color) !important;
-    color: white !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    cursor: pointer !important;
-    transition: all 0.3s ease !important;
+.obsidian-logo {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 12px !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: var(--obsidian-text) !important;
 }
 
-.settings-button:hover {
-    background: var(--primary-hover) !important;
-    border-color: var(--primary-hover) !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 0 15px var(--glow-color) !important;
-}
-
-/* Settings Dropdown */
-.settings-dropdown {
-    position: relative !important;
-    display: inline-block !important;
-}
-
-.settings-menu {
-    display: none !important;
-    position: absolute !important;
-    right: 0 !important;
-    top: 100% !important;
-    background: var(--surface-color) !important;
-    border: 1px solid var(--border-color) !important;
+.obsidian-logo-icon {
+    width: 32px !important;
+    height: 32px !important;
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
     border-radius: 8px !important;
-    box-shadow: 0 0 20px var(--shadow-color) !important;
-    z-index: 1000 !important;
-    min-width: 150px !important;
-    margin-top: 5px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
 }
 
-.settings-menu a {
-    display: block !important;
-    padding: 10px 15px !important;
-    color: var(--text-secondary) !important;
-    text-decoration: none !important;
-    border-bottom: 1px solid var(--border-color) !important;
-    transition: all 0.3s ease !important;
-    font-size: 14px !important;
+.obsidian-menu-btn {
+    background: transparent !important;
+    border: 1px solid var(--obsidian-border) !important;
+    color: var(--obsidian-text-muted) !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
 }
 
-.settings-menu a:last-child {
-    border-bottom: none !important;
-}
-
-.settings-menu a:hover {
-    background: var(--card-color) !important;
-    color: var(--text-primary) !important;
-}
-
-.settings-menu a:first-child:hover {
-    background: var(--card-color) !important;
-    color: var(--text-primary) !important;
-}
-
-/* Navigation Tabs - Exact Match */
+/* ===== NAVIGATION TABS ===== */
 .tabs {
     background: transparent !important;
     border: none !important;
-    margin: 20px 0 !important;
+    margin: 0 0 24px 0 !important;
+    padding: 0 8px !important;
 }
 
-/* Force tab visibility in production */
 .tabs button,
 .tabs [role="tab"],
-.tab-item,
-button[aria-selected] {
-    background: var(--card-color) !important;
-    color: var(--text-secondary) !important;
-    border: 1px solid var(--border-color) !important;
-    padding: 10px 20px !important;
-    margin-right: 5px !important;
-    border-radius: 8px !important;
-    cursor: pointer !important;
-    display: block !important;
-    visibility: visible !important;
-    pointer-events: auto !important;
-    opacity: 1 !important;
+.tab-item {
+    background: var(--obsidian-card) !important;
+    color: var(--obsidian-text-muted) !important;
+    border: 1px solid var(--obsidian-border) !important;
+    padding: 12px 24px !important;
+    margin-right: 8px !important;
+    border-radius: 10px !important;
     font-size: 14px !important;
+    font-weight: 500 !important;
     transition: all 0.3s ease !important;
 }
 
-/* Ensure first tab is shown by default */
-.tabs button:first-child,
-.tabs [role="tab"]:first-child,
-.tab-item:first-child {
-    background: var(--primary-color) !important;
+.tabs button:hover,
+.tabs [role="tab"]:hover {
+    background: var(--obsidian-surface) !important;
+    color: var(--obsidian-text) !important;
+    border-color: var(--obsidian-accent) !important;
+}
+
+.tabs button.selected,
+.tabs [role="tab"][aria-selected="true"] {
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
     color: white !important;
-    box-shadow: 0 0 20px var(--glow-color) !important;
+    border-color: transparent !important;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
 }
 
-/* Tab panels visibility */
-[role="tabpanel"],
-.tab-panel {
-    display: none !important;
-    visibility: hidden !important;
-}
-
-[role="tabpanel"]:first-child,
-.tab-panel:first-child {
-    display: block !important;
-    visibility: visible !important;
-}
-
-.tabs button:hover {
-    background: var(--card-color) !important;
-    color: var(--text-primary) !important;
-}
-
-.tabs button.selected {
-    background: var(--primary-color) !important;
-    color: white !important;
-    box-shadow: 0 0 20px var(--glow-color) !important;
-}
-
-/* Main Content Area */
-.main-content {
-    padding: 0 20px !important;
-}
-
-/* Section Headers */
-.section-header {
-    color: var(--text-primary) !important;
-    font-size: 20px !important;
-    font-weight: 600 !important;
-    margin-bottom: 20px !important;
-    text-align: center !important;
-}
-
-/* Upload Panel - Exact Match */
-.upload-panel {
-    background: var(--surface-color) !important;
-    border: 2px solid var(--border-color) !important;
-    border-radius: 12px !important;
-    padding: 8px !important;
-    text-align: center !important;
+/* ===== LIVE FEED SECTION ===== */
+.obsidian-feed-container {
     position: relative !important;
-    transition: all 0.3s ease !important;
-    min-height: 60px !important;
-}
-
-.upload-panel:hover {
-    border-color: var(--primary-color) !important;
-    box-shadow: 0 0 30px var(--glow-color) !important;
-}
-
-.upload-panel h3 {
-    color: var(--text-primary) !important;
-    margin-bottom: 5px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-}
-
-/* Image Upload Area - Exact Match */
-.upload-area {
-    border: 2px dashed var(--border-color) !important;
-    border-radius: 12px !important;
-    padding: 40px 20px !important;
-    background: var(--card-color) !important;
-    transition: all 0.3s ease !important;
-    cursor: pointer !important;
-}
-
-.upload-area:hover {
-    border-color: var(--primary-color) !important;
-    background: var(--surface-color) !important;
-}
-
-.upload-icon {
-    font-size: 48px !important;
-    color: var(--primary-color) !important;
-    margin-bottom: 15px !important;
-}
-
-.upload-text {
-    color: var(--text-secondary) !important;
-    font-size: 16px !important;
-    margin-bottom: 10px !important;
-}
-
-.upload-subtext {
-    color: var(--text-muted) !important;
-    font-size: 14px !important;
-}
-
-/* Result Panel - Exact Match */
-.result-panel {
-    background: var(--surface-color) !important;
-    border: 2px solid var(--border-color) !important;
+    background: var(--obsidian-surface) !important;
     border-radius: 16px !important;
-    padding: 20px !important;
-    min-height: 400px !important;
-    position: relative !important;
+    overflow: hidden !important;
+    border: 1px solid var(--obsidian-border) !important;
+    margin-bottom: 24px !important;
 }
 
-.result-panel h3 {
-    color: var(--text-primary) !important;
-    margin-bottom: 15px !important;
-    font-size: 18px !important;
+.obsidian-feed-badge {
+    position: absolute !important;
+    top: 16px !important;
+    left: 16px !important;
+    background: rgba(239, 68, 68, 0.9) !important;
+    color: white !important;
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    z-index: 10 !important;
+}
+
+.obsidian-feed-badge::before {
+    content: "" !important;
+    width: 8px !important;
+    height: 8px !important;
+    background: white !important;
+    border-radius: 50% !important;
+    animation: pulse 2s infinite !important;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.obsidian-confidence-badge {
+    position: absolute !important;
+    top: 16px !important;
+    right: 16px !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: var(--obsidian-bg) !important;
+    padding: 6px 12px !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    z-index: 10 !important;
+}
+
+/* ===== TRAFFIC INSIGHTS PANEL ===== */
+.obsidian-insights {
+    background: var(--obsidian-surface) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    border: 1px solid var(--obsidian-border) !important;
+    margin-bottom: 24px !important;
+}
+
+.obsidian-insights-title {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    margin-bottom: 20px !important;
+}
+
+.obsidian-stats-row {
+    display: flex !important;
+    gap: 24px !important;
+    margin-bottom: 20px !important;
+}
+
+.obsidian-stat {
+    flex: 1 !important;
+}
+
+.obsidian-stat-label {
+    font-size: 11px !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 4px !important;
+}
+
+.obsidian-stat-value {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    color: var(--obsidian-text) !important;
+    line-height: 1 !important;
+}
+
+.obsidian-stat-sub {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+}
+
+.obsidian-trend-up {
+    color: var(--obsidian-success) !important;
+    font-size: 12px !important;
     font-weight: 600 !important;
 }
 
-/* Result Image Container - Inside the panel */
-.result-image-container {
-    background: var(--card-color) !important;
-    border: 1px solid var(--border-color) !important;
+.obsidian-status {
+    font-size: 11px !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+}
+
+/* ===== SLOT AVAILABILITY GRID ===== */
+.obsidian-slots {
+    background: var(--obsidian-surface) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    border: 1px solid var(--obsidian-border) !important;
+    margin-bottom: 24px !important;
+}
+
+.obsidian-slots-title {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    margin-bottom: 20px !important;
+}
+
+.obsidian-slots-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+}
+
+.obsidian-slot {
+    background: var(--obsidian-card) !important;
     border-radius: 12px !important;
-    padding: 10px !important;
-    margin-top: 0 !important;
-    position: relative !important;
+    padding: 16px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border: 1px solid var(--obsidian-border) !important;
 }
 
-.result-image-container img {
+.obsidian-slot-name {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--obsidian-text) !important;
+}
+
+.obsidian-slot-status {
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+}
+
+.obsidian-slot-available {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: var(--obsidian-success) !important;
+}
+
+.obsidian-slot-occupied {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: var(--obsidian-danger) !important;
+}
+
+/* ===== INTELLIGENCE LOG ===== */
+.obsidian-log {
+    background: var(--obsidian-surface) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    border: 1px solid var(--obsidian-border) !important;
+    margin-bottom: 24px !important;
+}
+
+.obsidian-log-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 20px !important;
+}
+
+.obsidian-log-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    color: var(--obsidian-text) !important;
+}
+
+.obsidian-log-title-icon {
+    width: 28px !important;
+    height: 28px !important;
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
+    border-radius: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+}
+
+.obsidian-export-btn {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    font-size: 12px !important;
+    color: var(--obsidian-text-muted) !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+
+.obsidian-log-table {
     width: 100% !important;
-    height: auto !important;
-    border-radius: 8px !important;
 }
 
-.result-placeholder {
+.obsidian-log-header-row {
+    display: grid !important;
+    grid-template-columns: 100px 1fr 120px !important;
+    gap: 16px !important;
+    padding: 12px 0 !important;
+    border-bottom: 1px solid var(--obsidian-border) !important;
+    font-size: 11px !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+.obsidian-log-row {
+    display: grid !important;
+    grid-template-columns: 100px 1fr 120px !important;
+    gap: 16px !important;
+    padding: 16px 0 !important;
+    border-bottom: 1px solid var(--obsidian-border) !important;
+    align-items: center !important;
+}
+
+.obsidian-log-row:last-child {
+    border-bottom: none !important;
+}
+
+.obsidian-log-time {
+    font-size: 12px !important;
+    color: var(--obsidian-text-muted) !important;
+}
+
+.obsidian-log-detection {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.obsidian-log-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+}
+
+.obsidian-log-icon-vehicle {
+    background: rgba(99, 102, 241, 0.2) !important;
+    color: var(--obsidian-accent) !important;
+}
+
+.obsidian-log-icon-plate {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: var(--obsidian-blue) !important;
+}
+
+.obsidian-log-icon-person {
+    background: rgba(245, 158, 11, 0.2) !important;
+    color: var(--obsidian-warning) !important;
+}
+
+.obsidian-log-text {
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    color: var(--obsidian-text) !important;
+}
+
+.obsidian-log-meta {
+    font-size: 12px !important;
+    color: var(--obsidian-text-muted) !important;
+}
+
+.obsidian-log-meta-tag {
+    display: inline-block !important;
+    background: var(--obsidian-card) !important;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    margin-right: 4px !important;
+}
+
+/* ===== BOTTOM NAVIGATION ===== */
+.obsidian-nav {
+    display: flex !important;
+    justify-content: space-around !important;
+    background: var(--obsidian-surface) !important;
+    border-radius: 20px !important;
+    padding: 12px !important;
+    border: 1px solid var(--obsidian-border) !important;
+    margin-top: 24px !important;
+}
+
+.obsidian-nav-item {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
-    justify-content: center !important;
-    height: 300px !important;
-    color: var(--text-muted) !important;
-}
-
-.result-placeholder-icon {
-    font-size: 64px !important;
-    color: var(--text-muted) !important;
-    margin-bottom: 20px !important;
-    opacity: 0.5 !important;
-}
-
-/* AI Model Selection - Exact Match */
-.model-selection {
-    background: var(--surface-color) !important;
-    border: 1px solid var(--border-color) !important;
+    gap: 6px !important;
+    padding: 12px 24px !important;
     border-radius: 12px !important;
-    padding: 20px !important;
-    margin-top: 20px !important;
-}
-
-.model-selection h4 {
-    color: var(--text-primary) !important;
-    margin-bottom: 15px !important;
-    font-size: 16px !important;
-    font-weight: 600 !important;
-}
-
-/* Radio Button Groups - Exact Match */
-.gradio-container .gr-radio-group {
-    display: flex !important;
-    gap: 10px !important;
-    flex-wrap: wrap !important;
-}
-
-.gradio-container .gr-radio-group label {
-    background: var(--card-color) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    padding: 8px 16px !important;
-    color: var(--text-secondary) !important;
     cursor: pointer !important;
     transition: all 0.3s ease !important;
-    margin: 0 !important;
 }
 
-.gradio-container .gr-radio-group label:hover {
-    background: var(--surface-color) !important;
-    color: var(--text-primary) !important;
+.obsidian-nav-item:hover {
+    background: var(--obsidian-card) !important;
 }
 
-.gradio-container .gr-radio-group input[type="radio"]:checked + label {
-    background: var(--primary-color) !important;
+.obsidian-nav-item.active {
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
+}
+
+.obsidian-nav-icon {
+    width: 24px !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+}
+
+.obsidian-nav-label {
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: var(--obsidian-text-muted) !important;
+}
+
+.obsidian-nav-item.active .obsidian-nav-label {
     color: white !important;
-    border-color: var(--primary-color) !important;
-    box-shadow: 0 0 15px var(--glow-color) !important;
 }
 
-/* Detect Button - Exact Match */
-.detect-button {
-    background: var(--primary-color) !important;
-    border: 2px solid var(--primary-color) !important;
-    color: white !important;
+/* ===== UPLOAD AREAS ===== */
+.obsidian-upload {
+    background: var(--obsidian-card) !important;
+    border: 2px dashed var(--obsidian-border) !important;
     border-radius: 12px !important;
-    padding: 15px 30px !important;
-    font-size: 16px !important;
+    padding: 40px 20px !important;
+    text-align: center !important;
+    transition: all 0.3s ease !important;
+}
+
+.obsidian-upload:hover {
+    border-color: var(--obsidian-accent) !important;
+    background: var(--obsidian-surface) !important;
+}
+
+.obsidian-upload-icon {
+    font-size: 32px !important;
+    margin-bottom: 12px !important;
+}
+
+.obsidian-upload-text {
+    font-size: 14px !important;
+    color: var(--obsidian-text) !important;
+    font-weight: 500 !important;
+    margin-bottom: 4px !important;
+}
+
+.obsidian-upload-subtext {
+    font-size: 12px !important;
+    color: var(--obsidian-text-muted) !important;
+}
+
+/* ===== BUTTONS ===== */
+.obsidian-btn {
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px 24px !important;
+    font-size: 14px !important;
     font-weight: 600 !important;
     cursor: pointer !important;
     transition: all 0.3s ease !important;
     width: 100% !important;
-    margin-top: 20px !important;
-    box-shadow: 0 0 20px var(--glow-color) !important;
 }
 
-.detect-button:hover {
-    background: var(--primary-hover) !important;
-    border-color: var(--primary-hover) !important;
+.obsidian-btn:hover {
     transform: translateY(-2px) !important;
-    box-shadow: 0 0 30px var(--glow-color) !important;
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4) !important;
 }
 
-/* Advanced Settings - Exact Match */
-.advanced-settings {
-    margin-top: 20px !important;
+.obsidian-btn-secondary {
+    background: var(--obsidian-card) !important;
+    border: 1px solid var(--obsidian-border) !important;
+    color: var(--obsidian-text) !important;
 }
 
-.advanced-settings .gr-accordion {
-    background: var(--surface-color) !important;
-    border: 1px solid var(--border-color) !important;
-    border-radius: 12px !important;
+.obsidian-btn-secondary:hover {
+    background: var(--obsidian-surface) !important;
+    border-color: var(--obsidian-accent) !important;
 }
 
-.advanced-settings .gr-accordion button {
-    background: transparent !important;
-    color: var(--text-secondary) !important;
-    border: none !important;
-    padding: 15px !important;
-    font-weight: 500 !important;
-}
-
-/* Features Section - Exact Match */
-.features-section {
-    background: var(--surface-color) !important;
-    border: 1px solid var(--border-color) !important;
+/* ===== CARDS & PANELS ===== */
+.obsidian-card {
+    background: var(--obsidian-surface) !important;
     border-radius: 16px !important;
-    padding: 25px !important;
-    margin-top: 20px !important;
+    padding: 20px !important;
+    border: 1px solid var(--obsidian-border) !important;
 }
 
-.features-header {
-    color: var(--text-primary) !important;
-    font-size: 18px !important;
+.obsidian-card-title {
+    font-size: 12px !important;
     font-weight: 600 !important;
-    margin-bottom: 15px !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    margin-bottom: 16px !important;
 }
 
-.ready-message {
-    color: var(--success-color) !important;
-    font-size: 16px !important;
-    font-weight: 500 !important;
-    margin-bottom: 10px !important;
-}
-
-.instructions {
-    color: var(--text-secondary) !important;
-    font-size: 14px !important;
-    margin-bottom: 20px !important;
-    line-height: 1.5 !important;
-}
-
-.features-list {
-    list-style: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-.features-list li {
-    color: var(--text-secondary) !important;
-    padding: 8px 0 !important;
-    font-size: 14px !important;
+/* ===== MODEL SELECTION ===== */
+.obsidian-model-select {
     display: flex !important;
-    align-items: center !important;
-    gap: 10px !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
 }
 
-.features-list li::before {
-    content: "✓" !important;
-    color: var(--success-color) !important;
-    font-weight: bold !important;
+.obsidian-model-chip {
+    background: var(--obsidian-card) !important;
+    border: 1px solid var(--obsidian-border) !important;
+    border-radius: 20px !important;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    color: var(--obsidian-text-muted) !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
 }
 
-/* GPU Graphics - Exact Match */
-.gpu-graphics {
-    position: absolute !important;
-    bottom: 20px !important;
-    right: 20px !important;
-    width: 80px !important;
-    height: 80px !important;
-    background: var(--card-color) !important;
-    border: 2px solid var(--primary-color) !important;
+.obsidian-model-chip:hover {
+    border-color: var(--obsidian-accent) !important;
+    color: var(--obsidian-text) !important;
+}
+
+.obsidian-model-chip.active {
+    background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
+    color: white !important;
+    border-color: transparent !important;
+}
+
+/* ===== SETTINGS ACCORDION ===== */
+.obsidian-accordion {
+    background: var(--obsidian-card) !important;
+    border: 1px solid var(--obsidian-border) !important;
     border-radius: 12px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 24px !important;
-    font-weight: bold !important;
-    color: var(--primary-color) !important;
-    box-shadow: 0 0 20px var(--glow-color) !important;
+    overflow: hidden !important;
 }
 
-/* Override all Gradio defaults */
-.gradio-container .gr-block,
-.gradio-container .gr-box,
-.gradio-container .gr-panel {
+.obsidian-accordion-header {
+    padding: 16px !important;
     background: transparent !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
+    color: var(--obsidian-text) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    cursor: pointer !important;
 }
 
-/* Hide Gradio footer */
+/* ===== HIDE GRADIO DEFAULTS ===== */
 .gradio-container .footer,
 .gradio-container .gr-footer,
 footer {
     display: none !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
 }
 
-/* Hide any bottom links or options */
-.gradio-container > div:last-child,
-.gradio-container .gradio-footer,
-.gradio-container .gradio-app-footer {
-    display: none !important;
-}
-
-.gradio-container .gr-button {
-    background: var(--primary-color) !important;
-    border: 1px solid var(--primary-color) !important;
-    color: white !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    transition: all 0.3s ease !important;
-}
-
-.gradio-container .gr-button:hover {
-    background: var(--primary-hover) !important;
-    border-color: var(--primary-hover) !important;
-}
-
-.gradio-container .gr-image,
-.gradio-container .gr-plot {
-    border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    background: var(--card-color) !important;
-}
-
-.gradio-container .gr-markdown {
-    color: var(--text-primary) !important;
-}
-
-.gradio-container .gr-markdown h1,
-.gradio-container .gr-markdown h2,
-.gradio-container .gr-markdown h3 {
-    color: var(--text-primary) !important;
-}
-
-.gradio-container .gr-markdown p,
-.gradio-container .gr-markdown span,
-.gradio-container .gr-markdown div {
-    color: var(--text-secondary) !important;
-}
-
-.gradio-container .gr-slider {
-    background: var(--card-color) !important;
-}
-
-.gradio-container .gr-slider input[type="range"] {
-    background: var(--primary-color) !important;
-}
-
-.gradio-container .gr-textbox,
-.gradio-container .gr-number {
-    background: var(--card-color) !important;
-    border: 1px solid var(--border-color) !important;
-    color: var(--text-primary) !important;
-    border-radius: 8px !important;
-}
-
-.gradio-container label {
-    color: var(--text-secondary) !important;
-    font-weight: 500 !important;
-}
-
-/* Remove all unwanted margins and padding */
-.gradio-container > div {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Custom scrollbar */
+/* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--surface-color);
+    background: var(--obsidian-surface);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--primary-color);
+    background: var(--obsidian-border);
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-hover);
+    background: var(--obsidian-text-muted);
+}
+
+/* ===== GRADIO COMPONENT OVERRIDES ===== */
+.gradio-container .gr-slider {
+    background: var(--obsidian-card) !important;
+}
+
+.gradio-container .gr-slider input[type="range"] {
+    background: var(--obsidian-accent) !important;
+}
+
+.gradio-container .gr-checkbox,
+.gradio-container .gr-radio {
+    color: var(--obsidian-text) !important;
+}
+
+.gradio-container .gr-textbox,
+.gradio-container .gr-number {
+    background: var(--obsidian-card) !important;
+    border: 1px solid var(--obsidian-border) !important;
+    color: var(--obsidian-text) !important;
+    border-radius: 8px !important;
+}
+
+.gradio-container label {
+    color: var(--obsidian-text-muted) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* ===== PPE SPECIFIC STYLES ===== */
+.obsidian-ppe-badge-helmet {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: var(--obsidian-success) !important;
+    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+}
+
+.obsidian-ppe-badge-violation {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: var(--obsidian-danger) !important;
+    padding: 4px 10px !important;
+    border-radius: 20px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+}
+
+.obsidian-ppe-stats {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+}
+
+.obsidian-ppe-stat-item {
+    background: var(--obsidian-card) !important;
+    border-radius: 12px !important;
+    padding: 16px !important;
+    text-align: center !important;
+}
+
+.obsidian-ppe-stat-icon {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 20px !important;
+    margin: 0 auto 8px !important;
+}
+
+.obsidian-ppe-stat-icon-helmet {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: var(--obsidian-success) !important;
+}
+
+.obsidian-ppe-stat-icon-seatbelt {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: var(--obsidian-blue) !important;
+}
+
+.obsidian-ppe-stat-icon-violation {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: var(--obsidian-danger) !important;
+}
+
+.obsidian-ppe-stat-value {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: var(--obsidian-text) !important;
+}
+
+.obsidian-ppe-stat-label {
+    font-size: 11px !important;
+    color: var(--obsidian-text-muted) !important;
+    text-transform: uppercase !important;
 }
 """
 
@@ -9022,99 +9167,85 @@ with demo:
         # Image Detection, Video Processing, and Live Webcam tabs merged into Vehicle Detection tab below
         # Commented out as requested - now part of Vehicle Detection tab
         
-        # Vehicle Detection Tab - New unified tab with Image, Video, Webcam side by side
+        # Vehicle Detection Tab - Clean Layout (without header, insights, and bottom nav)
         with gr.TabItem("Vehicle Detection"):
-            gr.Markdown("### Vehicle Detection System")
-            gr.Markdown("Detect vehicles, license plates, and objects in images, videos, or live webcam feeds.")
-            
-            # All three sections in one row - side by side
+            # Live Feed Section with Upload Areas
             with gr.Row():
-                # Column 1: Image Upload
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 📁 Image")
-                    img_input = gr.Image(type="pil", label="Upload Image", show_label=True, height=200)
-                    
-                    img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                    img_btn = gr.Button("Detect", variant="primary")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
-                        img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
-                        img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=640)
-                        img_labels = gr.Checkbox(value=True, label="Labels")
-                        img_conf_show = gr.Checkbox(value=True, label="Confidence Scores")
-                        img_resnet = gr.Checkbox(value=True, visible=False)
-                        img_max_boxes = gr.Number(value=10, visible=False)
-                        img_ocr = gr.Checkbox(value=True, visible=False)
-                    
-                    img_progress = gr.Textbox(label="Status", value="⏳ Ready...", interactive=False)
-                    img_output = gr.Image(type="pil", label="Result", show_label=True, height=250)
-                    
-                    # ANPR-style side panel for vehicle info
-                    gr.Markdown("#### 📊 Vehicle Info Panel")
-                    img_side_panel = gr.HTML(label="Vehicle Details", value="<div style='padding: 20px; text-align: center; color: #666;'>📸 Upload an image to see vehicle details</div>")
-                    
-                    img_info = gr.Textbox(label="Detection Info", interactive=False, visible=True, lines=8, value="📸 Upload an image to start detection")
-                    img_summary = gr.Code(label="JSON", language="json", lines=8, value="{}")
-                
-                # Column 2: Video Upload
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 🎥 Video")
-                    vid_input = gr.Video(label="Upload Video", height=200)
-                    
-                    vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                    vid_btn = gr.Button("Process", variant="primary")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        vid_speed_mode = gr.Radio(
-                            choices=[("Ultra-Fast ⚡", "ultra_fast"), ("Fast 🚀", "fast"), ("Balanced ⚖️", "balanced"), ("Original 🐌", "original")],
-                            label="Speed",
-                            value="ultra_fast"
-                        )
-                        vid_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
-                        vid_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
-                        vid_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=640)
-                        vid_labels = gr.Checkbox(value=True, label="Labels")
-                        vid_conf_show = gr.Checkbox(value=True, label="Confidence")
-                        vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="Max Boxes")
-                        vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Every N Frames")
-                        vid_resnet = gr.Checkbox(value=True, visible=False)
-                        vid_ocr = gr.Checkbox(value=True, visible=False)
-                        vid_ocr_every_n = gr.Number(value=5, visible=False)
-                    
-                    vid_progress = gr.Textbox(label="Status", value="⏳ Ready...", interactive=False)
-                    vid_output = gr.Video(label="Result", visible=True, height=400, width="100%")
-                    vid_info = gr.Textbox(label="Info", interactive=False, visible=True, lines=3)
-                
-                # Column 3: Live Webcam
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 📸 Webcam")
-                    
-                    webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")
-                        webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
-                        webcam_enable_color = gr.Checkbox(value=True, label="Color Detection")
-                        webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Size", value=320)
-                        webcam_labels = gr.Checkbox(value=True, label="Labels")
-                        webcam_conf_show = gr.Checkbox(value=True, label="Confidence")
-                        webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="Max Boxes")
-                        webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Every N Frames")
-                        webcam_resnet = gr.Checkbox(value=False, visible=False)
-                        webcam_enable_ocr = gr.Checkbox(value=True, visible=False)
-                        webcam_ocr_every_n = gr.Number(value=5, visible=False)
-                    
-                    webcam_input = gr.Image(
-                        sources=["webcam"],
-                        type="numpy",
-                        label="Live Camera",
-                        streaming=True,
-                        height=200
-                    )
-                    
-                    webcam_output = gr.Image(type="numpy", label="Detection", height=250)
-                    webcam_info = gr.Textbox(label="Info", interactive=False, lines=5, value="📹 Ready! Allow camera access.")
+                # Left: Main Upload/Preview Area (full width now)
+                with gr.Column(scale=3):
+                    # Main content tabs for Image/Video/Webcam
+                    with gr.Tabs():
+                        with gr.TabItem("📂 Image"):
+                            img_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
+                            img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+                            img_btn = gr.Button("🔍 Detect Vehicles", variant="primary", elem_classes=["obsidian-btn"])
+                            
+                            with gr.Accordion("⚙️ Advanced Settings", open=False):
+                                img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence Threshold")
+                                img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU Threshold")
+                                img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
+                                img_labels = gr.Checkbox(value=True, label="Show Labels")
+                                img_conf_show = gr.Checkbox(value=True, label="Show Confidence")
+                                img_resnet = gr.Checkbox(value=True, visible=False)
+                                img_max_boxes = gr.Number(value=10, visible=False)
+                                img_ocr = gr.Checkbox(value=True, visible=False)
+                            
+                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=350)
+                            img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
+                            img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
+                            img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")
+                        
+                        with gr.TabItem("🎬 Video"):
+                            vid_input = gr.Video(label="", show_label=False, height=300)
+                            vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+                            vid_btn = gr.Button("🎬 Process Video", variant="primary", elem_classes=["obsidian-btn"])
+                            
+                            with gr.Accordion("⚙️ Video Settings", open=False):
+                                vid_speed_mode = gr.Radio(
+                                    choices=[("Ultra-Fast ⚡", "ultra_fast"), ("Fast 🚀", "fast"), ("Balanced ⚖️", "balanced")],
+                                    label="Processing Speed",
+                                    value="ultra_fast"
+                                )
+                                vid_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
+                                vid_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
+                                vid_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
+                                vid_labels = gr.Checkbox(value=True, label="Show Labels")
+                                vid_conf_show = gr.Checkbox(value=True, label="Show Confidence")
+                                vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="Max Boxes")
+                                vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
+                                vid_resnet = gr.Checkbox(value=True, visible=False)
+                                vid_ocr = gr.Checkbox(value=True, visible=False)
+                                vid_ocr_every_n = gr.Number(value=5, visible=False)
+                            
+                            vid_output = gr.Video(label="Processed Video", visible=True, height=350)
+                            vid_info = gr.Textbox(label="Video Status", interactive=False, lines=2)
+                        
+                        with gr.TabItem("📷 Webcam"):
+                            webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
+                            
+                            with gr.Accordion("⚙️ Camera Settings", open=False):
+                                webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")
+                                webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
+                                webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=320)
+                                webcam_labels = gr.Checkbox(value=True, label="Show Labels")
+                                webcam_conf_show = gr.Checkbox(value=True, label="Show Confidence")
+                                webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="Max Boxes")
+                                webcam_enable_color = gr.Checkbox(value=True, label="Enable Color Detection")
+                                webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
+                                webcam_resnet = gr.Checkbox(value=False, visible=False)
+                                webcam_enable_ocr = gr.Checkbox(value=True, visible=False)
+                                webcam_ocr_every_n = gr.Number(value=5, visible=False)
+                            
+                            webcam_input = gr.Image(
+                                sources=["webcam"],
+                                type="numpy",
+                                label="Live Camera Feed",
+                                streaming=True,
+                                height=300
+                            )
+                            
+                            webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
+                            webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Allow camera access.")
             
             # Button click handlers
             img_btn.click(
@@ -9226,90 +9357,65 @@ with demo:
         #     
         #     parking_btn_vid.click(
         #         process_parking_video,
-        #         inputs=[parking_video_input, parking_conf_vid, parking_model_vid, parking_labels_vid, parking_conf_show_vid, parking_every_n_vid],
-        #         outputs=[parking_video_output, parking_video_download, parking_summary_vid],
-        #     )
-        #     
-        #     parking_webcam_input.stream(
-        #         process_parking_webcam,
-        #         inputs=[parking_webcam_input, parking_conf_cam, parking_model_cam, parking_labels_cam, parking_conf_show_cam, parking_every_n_cam],
-        #         outputs=[parking_webcam_output, parking_webcam_info],
-        #         show_progress=False,
-        #     )
-
-        # PPE Detection Tab - Side by side layout like Vehicle Detection
         with gr.TabItem("PPE Detection"):
-            gr.Markdown("### PPE (Personal Protective Equipment) Detection System")
-            gr.Markdown("Detect safety equipment compliance on workers in images, videos, or live webcam feeds.")
-            
-            # All three sections in one row - side by side
+            # Live Feed Section with Upload Areas
             with gr.Row():
-                # Column 1: Image Upload
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 📁 Image")
-                    ppe_input = gr.Image(type="pil", label="Upload Image", show_label=True, height=200)
-                    
-                    ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                    ppe_btn_img = gr.Button("Detect PPE", variant="primary")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
-                        ppe_labels_img = gr.Checkbox(value=True, label="Labels")
-                        ppe_conf_show_img = gr.Checkbox(value=True, label="Confidence Scores")
-                    
-                    ppe_output_img = gr.Image(type="pil", label="Result", show_label=True, height=250)
-                    
-                    # ANPR-style side panel for PPE info
-                    gr.Markdown("#### 📊 PPE Info Panel")
-                    ppe_side_panel = gr.HTML(label="PPE Details", value="<div style='padding: 20px; text-align: center; color: #666;'>📸 Upload an image to see PPE details</div>")
-                    
-                    ppe_summary_img = gr.Markdown("## Upload an image to start PPE detection")
-                
-                # Column 2: Video Upload
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 🎥 Video")
-                    ppe_video_input = gr.Video(label="Upload Video", height=200)
-                    
-                    ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                    ppe_btn_vid = gr.Button("Analyze Video", variant="primary")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
-                        ppe_labels_vid = gr.Checkbox(value=True, label="Labels")
-                        ppe_conf_show_vid = gr.Checkbox(value=True, label="Confidence")
-                        ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="Every N Frames")
-                    
-                    ppe_video_output = gr.Video(label="Result", visible=True, height=400, width="100%")
-                    ppe_summary_vid = gr.Markdown("## Upload a video to start PPE detection")
-                
-                # Column 3: Live Webcam
-                with gr.Column(scale=1):
-                    gr.Markdown("#### 📸 Webcam")
-                    
-                    ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                    
-                    with gr.Accordion("Settings", open=False):
-                        ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
-                        ppe_labels_cam = gr.Checkbox(value=True, label="Labels")
-                        ppe_conf_show_cam = gr.Checkbox(value=True, label="Confidence")
-                        ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="Every N Frames")
-                    
-                    ppe_webcam_input = gr.Image(
-                        sources=["webcam"],
-                        type="numpy",
-                        label="Live Camera",
-                        streaming=True,
-                        height=200
-                    )
-                    
-                    ppe_webcam_output = gr.Image(type="numpy", label="Detection", height=250)
-                    ppe_webcam_info = gr.Textbox(label="Info", interactive=False, lines=5, value="📹 Ready! Point camera at workers for PPE detection!")
+                # Left: Main Upload/Preview Area (full width now)
+                with gr.Column(scale=3):
+                    # Main content tabs for Image/Video/Webcam
+                    with gr.Tabs():
+                        with gr.TabItem("📂 Image"):
+                            ppe_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
+                            ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
+                            ppe_btn_img = gr.Button("🔍 Detect PPE", variant="primary", elem_classes=["obsidian-btn"])
+                            
+                            with gr.Accordion("⚙️ PPE Settings", open=False):
+                                ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence Threshold")
+                                ppe_labels_img = gr.Checkbox(value=True, label="Show Labels")
+                                ppe_conf_show_img = gr.Checkbox(value=True, label="Show Confidence")
+                            
+                            ppe_output_img = gr.Image(type="pil", label="PPE Detection Result", show_label=True, height=350)
+                            ppe_summary_img = gr.Markdown("📸 **Ready to detect PPE**")
+                        
+                        with gr.TabItem("🎬 Video"):
+                            ppe_video_input = gr.Video(label="", show_label=False, height=300)
+                            ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
+                            ppe_btn_vid = gr.Button("🎬 Analyze Video", variant="primary", elem_classes=["obsidian-btn"])
+                            
+                            with gr.Accordion("⚙️ Video Settings", open=False):
+                                ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
+                                ppe_labels_vid = gr.Checkbox(value=True, label="Labels")
+                                ppe_conf_show_vid = gr.Checkbox(value=True, label="Confidence")
+                                ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
+                            
+                            ppe_video_output = gr.Video(label="Processed Video", visible=True, height=350)
+                            ppe_summary_vid = gr.Markdown("🎥 **Upload a video to start analysis**")
+                        
+                        with gr.TabItem("📷 Webcam"):
+                            ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
+                            
+                            with gr.Accordion("⚙️ Camera Settings", open=False):
+                                ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
+                                ppe_labels_cam = gr.Checkbox(value=True, label="Labels")
+                                ppe_conf_show_cam = gr.Checkbox(value=True, label="Confidence")
+                                ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
+                            
+                            ppe_webcam_input = gr.Image(
+                                sources=["webcam"],
+                                type="numpy",
+                                label="Live Camera Feed",
+                                streaming=True,
+                                height=300
+                            )
+                            
+                            ppe_webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
+                            ppe_webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Point camera at workers for PPE detection!")
             
             # Connect all PPE components
             ppe_btn_img.click(
                 process_ppe_detection,
                 inputs=[ppe_input, ppe_conf_img, ppe_model_img, ppe_labels_img, ppe_conf_show_img],
-                outputs=[ppe_output_img, ppe_summary_img, ppe_side_panel],
+                outputs=[ppe_output_img, ppe_summary_img],
             )
             
             ppe_btn_vid.click(

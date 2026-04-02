@@ -13,6 +13,15 @@ from typing import Optional, Dict, List, Tuple, Union, Any
 import numpy as np
 import cv2
 
+# Global cache for text extraction results to avoid reprocessing
+_text_extraction_cache = {}
+
+# Global cache for text extraction results to avoid reprocessing
+_text_extraction_cache_tesseract = {}
+
+# Global cache for text extraction results to avoid reprocessing
+_text_extraction_cache_lighton = {}
+
 # Tesseract OCR - ENABLED for license plate detection
 try:
     import pytesseract
@@ -97,8 +106,124 @@ except ImportError:
 SIMPLE_OCR_AVAILABLE = True
 print("[INFO] Simple OCR fallback available")
 
-# Cache for text extraction
-_text_extraction_cache = {}
+# Common car brand names that should be detected as "number plates" when on vehicles
+CAR_BRANDS = {
+    'TOYOTA', 'HONDA', 'BMW', 'AUDI', 'MERCEDES', 'BENZ', 'FORD', 'CHEVROLET', 'CHEVY',
+    'NISSAN', 'HYUNDAI', 'KIA', 'VOLKSWAGEN', 'VW', 'PORSCHE', 'LEXUS', 'ACURA',
+    'INFINITI', 'CADILLAC', 'LINCOLN', 'BUICK', 'CHRYSLER', 'DODGE', 'JEEP',
+    'RAM', 'GMC', 'TESLA', 'VOLVO', 'JAGUAR', 'LANDROVER', 'RANGE', 'ROVER',
+    'MINI', 'FIAT', 'ALFA', 'ROMEO', 'MASERATI', 'FERRARI', 'LAMBORGHINI',
+    'BENTLEY', 'ROLLS', 'ROYCE', 'ASTON', 'MARTIN', 'LOTUS', 'McLAREN',
+    'BUGATTI', 'KOENIGSEGG', 'PAGANI', 'GENESIS', 'SUZUKI', 'MAZDA', 'MITSUBISHI',
+    'SUBARU', 'ISUZU', 'DAIHATSU', 'TATA', 'MAHINDRA', 'MARUTI', 'ASHOK',
+    'LEYLAND', 'EICHER', 'FORCE', 'Bajaj', 'TVS', 'HERO', 'ROYAL', 'ENFIELD',
+    'YAMAHA', 'KAWASAKI', 'DUCATI', 'TRIUMPH', 'BSA', 'RAJDOOT', 'LAMBRETTA',
+    'VESP', 'SCODA', 'SCODA', 'SEAT', 'CITROEN', 'PEUGEOT', 'RENAULT',
+    'OPEL', 'SAAB', 'SATURN', 'PONTIAC', 'OLDSMOBILE', 'PLYMOUTH', 'AMC',
+    'DATSUN', 'DATSON', 'HUMMER', 'HUMVEE', 'AMG', 'M', 'MPOWER', 'QUATTRO',
+    'RS', 'AMG', 'TYPE', 'SRT', 'GTI', 'GT', 'S', 'X', 'R', 'Z', 'I',
+    'BRAZIL', 'BRASIL',  # Word-play plates
+}
+
+# Word-play number plate corrections (OCR misreadings that form words)
+WORD_PLAY_CORRECTIONS = {
+    'BR45IL': 'BRAZIL',
+    'BR45IL1': 'BRAZIL',
+    'BR4S1L': 'BRAZIL',
+    '8R4Z1L': 'BRAZIL',
+    'BR4Z1L': 'BRAZIL',
+    'BRA51L': 'BRAZIL',
+    'T0Y0TA': 'TOYOTA',
+    'T0YOTA': 'TOYOTA',
+    'T0Y0T4': 'TOYOTA',
+    'H0ND4': 'HONDA',
+    'H0NDA': 'HONDA',
+    'HOND4': 'HONDA',
+    'BMWBMW': 'BMW',
+    'AU01': 'AUDI',
+    '4UDI': 'AUDI',
+    '4UD1': 'AUDI',
+    'M3RC': 'MERC',
+    'M3RC3D3S': 'MERCEDES',
+    'M3RCEDES': 'MERCEDES',
+    'V0LK5WAG3N': 'VOLKSWAGEN',
+    'VW4W': 'VW',
+    'P0R5CH3': 'PORSCHE',
+    'P0RSCHE': 'PORSCHE',
+    'F3RR4R1': 'FERRARI',
+    'F3RRARI': 'FERRARI',
+    'L4MB0': 'LAMBO',
+    'L4MB0RGH1N1': 'LAMBORGHINI',
+    'R0LL5': 'ROLLS',
+    'R0YCE': 'ROYCE',
+    'J4GU4R': 'JAGUAR',
+    'V0LV0': 'VOLVO',
+    'V0LVO': 'VOLVO',
+    'L3XU5': 'LEXUS',
+    '1NF1N1T1': 'INFINITI',
+    'C4D1LL4C': 'CADILLAC',
+    'CH3VROLET': 'CHEVROLET',
+    'CH3VY': 'CHEVY',
+    'N1SS4N': 'NISSAN',
+    'M4ZD4': 'MAZDA',
+    '5UB4RU': 'SUBARU',
+    'M1TSUB1SH1': 'MITSUBISHI',
+    'H1NO': 'HINO',
+    '1Suzu': 'ISUZU',
+    'D4T5UN': 'DATSUN',
+    'SU2UK1': 'SUZUKI',
+    'SUZUK1': 'SUZUKI',
+    'K14': 'KIA',
+    'HYUND41': 'HYUNDAI',
+    'G3N3S1S': 'GENESIS',
+    'T35L4': 'TESLA',
+    'T35LA': 'TESLA',
+    'J33P': 'JEEP',
+    'R4M': 'RAM',
+    'GMCGMC': 'GMC',
+    'D0DG3': 'DODGE',
+    'CHRY5L3R': 'CHRYSLER',
+    'L1NC0LN': 'LINCOLN',
+    'BU1CK': 'BUICK',
+    '0P3L': 'OPEL',
+    'S44B': 'SAAB',
+    'P3UG30T': 'PEUGEOT',
+    'C1TR03N': 'CITROEN',
+    'R3N4ULT': 'RENAULT',
+    'S34T': 'SEAT',
+    '5K0D4': 'SKODA',
+    'F14T': 'FIAT',
+    '4LF4': 'ALFA',
+    'R0M30': 'ROMEO',
+    'M4S3R4T1': 'MASERATI',
+    'B3NTL3Y': 'BENTLEY',
+    '4ST0N': 'ASTON',
+    'M4RT1N': 'MARTIN',
+    'L0TU5': 'LOTUS',
+    'MCL4R3N': 'MCLAREN',
+    'BUG4TT1': 'BUGATTI',
+    'P4G4N1': 'PAGANI',
+    'K03N1GG53GG': 'KOENIGSEGG',
+    'R0LL5R0YC3': 'ROLLSROYCE',
+    'R0Y4L3NF13LD': 'ROYALENFIELD',
+    'H3R0': 'HERO',
+    'B4J4J': 'BAJAJ',
+    'TV5': 'TVS',
+    'Y4M4H4': 'YAMAHA',
+    'K4W454K1': 'KAWASAKI',
+    'TR1UMPH': 'TRIUMPH',
+    'DUCR4T1': 'DUCATI',
+    'T4T4': 'TATA',
+    'M4H1NDR4': 'MAHINDRA',
+    'M4RUT1': 'MARUTI',
+    'ASH0K': 'ASHOK',
+    'L3YL4ND': 'LEYLAND',
+    '31CH3R': 'EICHER',
+    'F0RC3': 'FORCE',
+    'H1N0': 'HINO',
+    'W4L5': 'WALIS',
+    'W4LE': 'WALE',
+}
 
 
 def _detect_license_plates_in_vehicles(image_bgr: np.ndarray, vehicles_detected: list) -> list:

@@ -43,6 +43,10 @@ class LicensePlateDetector:
             r'^[A-Z]{1,2}\s?\d{2,4}\s?[A-Z]{1,3}$',
             # NEW: Mixed alphanumeric like IM4U 555 (Malaysian/Singapore format)
             r'^[A-Z]{1,3}\d{1,2}[A-Z]{1,3}\s?\d{1,4}$',
+            # NEW: European/Serbian format: 2 letters + 1-2 letters + 2-4 numbers (e.g., "PG AN 112", "BG 123 4567")
+            r'^[A-Z]{2}\s?[A-Z]{1,2}\s?\d{2,4}$',
+            # NEW: European format with multiple spaces: 2 letters + space + 2 letters + space + 3-4 numbers
+            r'^[A-Z]{2}\s+[A-Z]{2}\s+\d{3,4}$',
             # NEW: Flexible format - 4-8 alphanumeric chars with at least 2 letters and 2 numbers
             r'^(?=(?:.*[A-Z]){2,})(?=(?:.*\d){2,})[A-Z0-9]{4,8}$',
         ]
@@ -275,6 +279,12 @@ class LicensePlateDetector:
         european_pattern = r'^[A-Z]{1,2}\s+\d{3,4}\s+[A-Z]{2,3}$'
         if re.match(european_pattern, text):
             print(f"[DEBUG] ✅ European format license plate detected: {text}")
+            return True
+        
+        # Special case: Serbian format (2 letters + 2 letters + 3-4 numbers) like "PG AN 112"
+        serbian_pattern = r'^[A-Z]{2}\s?[A-Z]{2}\s?\d{3,4}$'
+        if re.match(serbian_pattern, text):
+            print(f"[DEBUG] ✅ Serbian format license plate detected: {text}")
             return True
         
         return False

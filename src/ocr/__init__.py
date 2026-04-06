@@ -6,6 +6,7 @@ Contains OCR functionality for text extraction and license plate detection.
 from .base_ocr import BaseOCR
 from .license_plate_detector import LicensePlateDetector
 from .text_extractor import TextExtractor
+from .ultra_plate_detector import UltraLicensePlateDetector, get_ultra_detector, detect_license_plate
 
 # Import PaddleOCR functions
 try:
@@ -44,5 +45,8 @@ __all__ = [
     'BaseOCR',
     'PaddleOCRProcessor', 
     'LicensePlateDetector',
-    'TextExtractor'
+    'TextExtractor',
+    'UltraLicensePlateDetector',
+    'get_ultra_detector',
+    'detect_license_plate'
 ]

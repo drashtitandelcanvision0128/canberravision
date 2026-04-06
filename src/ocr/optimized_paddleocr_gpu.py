@@ -361,7 +361,7 @@ def extract_license_plates_optimized(
     use_gpu: Optional[bool] = None
 ) -> List[Dict]:
     """
-    Extract license plates with optimized PaddleOCR.
+    Extract license plates with optimized PaddleOCR using Ultra detector.
     
     Args:
         image: Input image in BGR format
@@ -375,13 +375,48 @@ def extract_license_plates_optimized(
         if image is None or image.size == 0:
             return []
         
-        print(f"[DEBUG] Optimized license plate search...")
+        print(f"[DEBUG] Ultra-optimized license plate search...")
         
-        # Extract text using optimized PaddleOCR
+        # Try ultra detector first for region-based extraction
+        try:
+            from .ultra_plate_detector import UltraLicensePlateDetector
+            ultra = UltraLicensePlateDetector()
+            
+            # For full images, we need to detect regions first
+            # Extract text using optimized PaddleOCR
+            text_result = extract_text_optimized(
+                image, 
+                confidence_threshold=0.3,  # Lower threshold to catch more
+                lang='en',
+                use_gpu=use_gpu,
+                preprocess=True
+            )
+            
+            if text_result["text"]:
+                is_plate, plate_text, format_type = ultra.detect_plate(
+                    text_result["text"], 
+                    text_result.get("confidence", 0)
+                )
+                
+                if is_plate:
+                    print(f"[DEBUG] Ultra detector found plate: {plate_text}")
+                    return [{
+                        'text': plate_text,
+                        'original_text': text_result["text"],
+                        'confidence': text_result.get("confidence", 0.8),
+                        'method': 'ultra_paddleocr',
+                        'format': format_type,
+                        'processing_time': text_result["processing_time"],
+                        'device': text_result["device"]
+                    }]
+        except Exception as e:
+            print(f"[DEBUG] Ultra detector failed, falling back: {e}")
+        
+        # Fallback to pattern-based extraction
         text_result = extract_text_optimized(
             image, 
             confidence_threshold=confidence_threshold,
-            lang='en',  # English for license plates
+            lang='en',
             use_gpu=use_gpu,
             preprocess=True
         )
@@ -389,16 +424,26 @@ def extract_license_plates_optimized(
         if not text_result["text"]:
             return []
         
-        # Find license plates in extracted text
+        # Find license plates in extracted text using multiple patterns
         license_plates = []
         extracted_text = text_result["text"]
         
-        # Indian license plate patterns (optimized)
+        # Comprehensive license plate patterns
         patterns = [
-            r'\b[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}\b',  # MH12AB1234
-            r'\b[A-Z]{2}-[0-9]{1,2}-[A-Z]{1,3}-[0-9]{4}\b',  # MH-12-AB-1234
-            r'\b[A-Z]{2}[0-9]{1,2}\s[A-Z]{1,3}\s[0-9]{4}\b',  # MH12 AB 1234
-            r'\b[A-Z0-9]{6,12}\b'  # Generic alphanumeric
+            # Australian: ABC 123
+            r'\b[A-Z]{3}\s?\d{3}\b',
+            # Australian variant: AB 123
+            r'\b[A-Z]{2}\s?\d{3}\b',
+            # Indian: MH12AB1234
+            r'\b[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{4}\b',
+            # European: B 2228 HM
+            r'\b[A-Z]{1,2}\s?\d{3,4}\s?[A-Z]{2}\b',
+            # UK: AB12 ABC
+            r'\b[A-Z]{2}\d{2}\s?[A-Z]{3}\b',
+            # US: ABC 123
+            r'\b[A-Z]{3}\s?\d{3,4}\b',
+            # Generic alphanumeric
+            r'\b[A-Z0-9]{6,10}\b',
         ]
         
         for pattern in patterns:
@@ -406,36 +451,41 @@ def extract_license_plates_optimized(
             for match in matches:
                 cleaned_plate = match.upper().replace('-', '').replace(' ', '')
                 
-                if is_valid_indian_license_plate(cleaned_plate):
-                    # Find corresponding text region for confidence
-                    plate_confidence = confidence_threshold
-                    for region in text_result["text_regions"]:
-                        if cleaned_plate in region["text"]:
-                            plate_confidence = region["confidence"]
-                            break
+                # Validate length and composition
+                if len(cleaned_plate) >= 5 and len(cleaned_plate) <= 12:
+                    has_letter = any(c.isalpha() for c in cleaned_plate)
+                    has_number = any(c.isdigit() for c in cleaned_plate)
                     
-                    license_plates.append({
-                        'text': cleaned_plate,
-                        'original_text': match,
-                        'confidence': plate_confidence,
-                        'method': 'paddleocr_optimized',
-                        'pattern_matched': pattern,
-                        'processing_time': text_result["processing_time"],
-                        'device': text_result["device"]
-                    })
-                    print(f"[DEBUG] ✅ Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
+                    if has_letter and has_number:
+                        # Find corresponding text region for confidence
+                        plate_confidence = confidence_threshold
+                        for region in text_result["text_regions"]:
+                            if match.upper() in region["text"].upper():
+                                plate_confidence = region["confidence"]
+                                break
+                        
+                        license_plates.append({
+                            'text': cleaned_plate,
+                            'original_text': match,
+                            'confidence': plate_confidence,
+                            'method': 'paddleocr_optimized',
+                            'pattern_matched': pattern,
+                            'processing_time': text_result["processing_time"],
+                            'device': text_result["device"]
+                        })
+                        print(f"[DEBUG] Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
         
         # Remove duplicates and return best results
         unique_plates = []
         seen_texts = set()
         
-        for plate in license_plates:
+        for plate in sorted(license_plates, key=lambda x: x['confidence'], reverse=True):
             if plate['text'] not in seen_texts:
                 unique_plates.append(plate)
                 seen_texts.add(plate['text'])
         
         print(f"[DEBUG] Found {len(unique_plates)} unique license plates")
-        return unique_plates
+        return unique_plates[:3]  # Return top 3
         
     except Exception as e:
         print(f"[ERROR] Optimized license plate extraction failed: {e}")

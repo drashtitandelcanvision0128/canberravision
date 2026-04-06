@@ -175,8 +175,25 @@ class EnhancedANPRSystem:
             x1, y1, x2, y2 = vehicle_bbox
             vehicle_crop = image[y1:y2, x1:x2]
             
-            # Use text extractor to find license plates
-            result = self.text_extractor.extract_text_comprehensive(vehicle_crop)
+            # Display debug images if available
+            def display_debug_images(debug_images):
+                if debug_images:
+                    print("\n[DEBUG] OCR Pipeline Images:")
+                    for name, img in debug_images.items():
+                        if img is not None:
+                            print(f"  - {name}: {img.shape}")
+            
+            # Use reliable OCR function instead of strict OCR
+            from modules.text_extraction import _extract_text_from_license_plate_crop
+            plate_text = _extract_text_from_license_plate_crop(vehicle_crop)
+            result = {
+                'plate_text': plate_text,
+                'confidence': 0.8 if plate_text else 0.0,
+                'country': 'IN' if plate_text else '',
+                'license_plates': [{'text': plate_text, 'confidence': 0.8}] if plate_text else [],
+                'debug_images': {}
+            }
+            display_debug_images(result.get('debug_images'))
             
             # Look for license plates in results
             for plate_info in result.get('license_plates', []):
@@ -4350,13 +4367,18 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         indian_pattern1 = r'^[A-Z]{2}[0-9]{1,4}[A-Z]{1,3}[0-9]{1,4}$'
         indian_pattern2 = r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$'
         
+        # Check for Serbian/European format: 2 letters + 2 letters + 3-4 numbers (e.g., PG AN 112)
+        serbian_pattern = r'^[A-Z]{2}[A-Z]{2}[0-9]{3,4}$'
+        # Check for extended European format: 2-4 letters + 1-2 letters + 2-4 numbers
+        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$' 
         # Check for international patterns
         international_pattern = r'^[A-Z0-9]{6,12}$'
         
-        if (re.match(indian_pattern1, plate_upper) or 
+        if (re.match(indian_pattern1, plate_upper) or
             re.match(indian_pattern2, plate_upper) or
+            re.match(serbian_pattern, plate_upper) or
+            re.match(european_extended_pattern, plate_upper) or
             re.match(international_pattern, plate_upper)):
-            print(f"[DEBUG] ✅ Valid license plate pattern: {plate_text}")
             return True
         
         # If it doesn't match standard patterns but passes other checks, allow it

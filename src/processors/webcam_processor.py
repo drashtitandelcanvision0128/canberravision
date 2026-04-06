@@ -1796,6 +1796,14 @@ class WebcamProcessor:
         if re.match(r'^[A-Z]{1,2}\d{4}[A-Z]{2}$', text):
             return True
         
+        # Pattern 13: Letters (2) + Letters (2) + Numbers (3-4) - Serbian/European format like PG AN 112
+        if re.match(r'^[A-Z]{2}[A-Z]{2}\d{3,4}$', text):
+            return True
+        
+        # Pattern 14: Letters (2-4) + Letters (1-2) + Numbers (2-4) - Extended European format
+        if re.match(r'^[A-Z]{2,4}[A-Z]{1,2}\d{2,4}$', text):
+            return True
+        
         # NEW Pattern 13: Malaysian/Singapore format like IM4U555 (letters with embedded numbers)
         if re.match(r'^[A-Z]{1,3}\d{1,2}[A-Z]{1,3}\d{1,4}$', text):
             return True

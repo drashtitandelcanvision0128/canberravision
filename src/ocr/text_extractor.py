@@ -195,21 +195,41 @@ class TextExtractor:
     def _process_results(self, result: Dict):
         """Process and categorize text extraction results."""
         from .license_plate_detector import LicensePlateDetector
+        from .ultra_plate_detector import UltraLicensePlateDetector
         
-        license_detector = LicensePlateDetector()
+        # Use ultra detector for primary detection
+        ultra_detector = UltraLicensePlateDetector()
+        # Fallback to standard detector
+        standard_detector = LicensePlateDetector()
         
         for text_result in result['text_results']:
             text = text_result['text']
             confidence = text_result['confidence']
             method = text_result['method']
             
-            # Check if it's a license plate
-            if license_detector.is_license_plate(text):
+            # Try ultra detector first (more accurate)
+            is_plate, plate_text, format_type = ultra_detector.detect_plate(text, confidence)
+            
+            if is_plate:
+                result['license_plates'].append({
+                    'text': plate_text,
+                    'original_text': text,
+                    'confidence': confidence,
+                    'method': method,
+                    'device': text_result['device'],
+                    'format': format_type,
+                    'detector': 'ultra'
+                })
+                result['summary']['license_plates_found'] += 1
+                print(f"[INFO] Ultra detector found plate: {plate_text} (format: {format_type})")
+            elif standard_detector.is_license_plate(text, confidence):
+                # Fallback to standard detector
                 result['license_plates'].append({
                     'text': text,
                     'confidence': confidence,
                     'method': method,
-                    'device': text_result['device']
+                    'device': text_result['device'],
+                    'detector': 'standard'
                 })
                 result['summary']['license_plates_found'] += 1
             else:

@@ -1616,7 +1616,7 @@ except ImportError as e:
 
 # Import unified detection module
 try:
-    from unified_detection_module import process_unified_detection_simple
+    from apps.unified_detection_module import process_unified_detection_simple
     UNIFIED_DETECTION_AVAILABLE = True
     print("[INFO] Unified detection module loaded")
 except ImportError as e:
@@ -1713,7 +1713,7 @@ if UNIFIED_DETECTION_AVAILABLE:
     def process_unified_video_detection_all(video_path, conf_threshold=0.5):
         """Wrapper that calls the unified video detection module and saves final results to database"""
         try:
-            from unified_detection_module import process_unified_video_detection
+            from apps.unified_detection_module import process_unified_video_detection
         except ImportError:
             return None, "{}", "⚠️ Unified video detection module not available"
         

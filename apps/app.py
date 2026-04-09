@@ -1228,6 +1228,16 @@ CUSTOM_CSS = """
     color: var(--obsidian-text-muted) !important;
 }
 
+/* ===== OUTPUT IMAGES - Match input sizing ===== */
+.obsidian-output img,
+.obsidian-output .image-container img,
+.obsidian-output canvas {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: contain !important;
+    max-height: 300px !important;
+}
+
 /* ===== BUTTONS ===== */
 .obsidian-btn {
     background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
@@ -8926,7 +8936,7 @@ with demo:
                                 img_max_boxes = gr.Number(value=10, visible=False)
                                 img_ocr = gr.Checkbox(value=True, visible=False)
                             
-                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=300)
+                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=300, elem_classes=["obsidian-output"])
                             img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
                             img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
                             img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")

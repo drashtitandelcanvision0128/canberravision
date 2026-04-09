@@ -60,6 +60,47 @@ import torchvision
 from torchvision.models import resnet18, ResNet18_Weights
 from ultralytics import YOLO
 
+# Import fast_alpr for license plate detection
+try:
+    from fast_alpr import ALPR
+    ALPR_AVAILABLE = True
+    print("[INFO] fast_alpr loaded successfully")
+except ImportError as e:
+    ALPR_AVAILABLE = False
+    print(f"[WARNING] fast_alpr import failed: {e}")
+    import traceback
+    traceback.print_exc()
+except Exception as e:
+    ALPR_AVAILABLE = False
+    print(f"[ERROR] Unexpected error importing fast_alpr: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Initialize ALPR globally if available
+alpr = None
+if ALPR_AVAILABLE:
+    try:
+        # Try with specific models first
+        print("[INFO] Initializing ALPR with specific models...")
+        alpr = ALPR(
+            detector_model="yolo-v9-t-384-license-plate-end2end",
+            ocr_model="cct-xs-v2-global-model",
+        )
+        print("[INFO] ALPR initialized successfully with custom models")
+    except Exception as e:
+        print(f"[WARNING] Failed to initialize ALPR with custom models: {e}")
+        import traceback
+        traceback.print_exc()
+        # Try with default models as fallback
+        try:
+            print("[INFO] Trying ALPR with default models...")
+            alpr = ALPR()
+            print("[INFO] ALPR initialized successfully with default models")
+        except Exception as e2:
+            print(f"[ERROR] Failed to initialize ALPR with default models: {e2}")
+            import traceback
+            traceback.print_exc()
+
 # Force GPU usage if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"[INFO] Using device: {device}")
@@ -5838,508 +5879,173 @@ def predict_image(
     max_boxes,
     enable_ocr,
 ):
-    """Predicts objects in an image using enhanced YOLO detector with vehicle classification."""
+    """Predicts license plates in an image using fast_alpr."""
     if img is None:
-        return None, "Please upload an image first", "{}"
+        return None, "Please upload an image first", "{}", ""
 
     try:
-        # Use the enhanced YOLO detector with vehicle classification
-        try:
-            from src.core.detector import YOLODetector
-            detector = YOLODetector(model_name=model_name)
-            print("[INFO] Using enhanced YOLO detector with vehicle classification")
-        except Exception as e:
-            print(f"[WARNING] Enhanced detector not available, using fallback: {e}")
-            # Fallback to original method
-            model = get_model(model_name)
-            device = _get_device()
-            models = model if isinstance(model, list) else [model]
-            
-            # Processing Flow Optimization
-            if device != "cpu" and torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-
-            all_results = []
-            for m in models:
-                r = m.predict(
-                    source=img,
-                    conf=conf_threshold,
-                    iou=iou_threshold,
-                    imgsz=imgsz,
-                    device=device,
-                    verbose=False,
-                    half=True if device != "cpu" else False,
-                )
-                if r:
-                    all_results.append(r[0])
-
-            if not all_results:
-                # Convert to RGB PIL Image properly
-                try:
-                    if hasattr(img, 'convert'):
-                        result_image = img.convert('RGB')
-                    elif isinstance(img, np.ndarray):
-                        if len(img.shape) == 3 and img.shape[2] == 3:
-                            # Check if it's BGR (OpenCV default) and convert to RGB
-                            if img.dtype == np.uint8:
-                                result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(img)
-                    else:
-                        result_image = Image.fromarray(np.array(img))
-                    
-                    # Ensure the image is valid
-                    if result_image is None:
-                        result_image = Image.new('RGB', (640, 480), color='black')
-                    
-                    return result_image, "No objects detected", "{}"
-                except Exception as e:
-                    print(f"[ERROR] Failed to convert image in early return: {e}")
-                    # Last resort: create a blank image
-                    return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-                    img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-                if len(img.shape) == 3 and img.shape[2] == 3:
-                    frame_bgr = img
+        # Check if ALPR is available
+        if not ALPR_AVAILABLE or alpr is None:
+            print("[WARNING] ALPR not available, returning original image")
+            if hasattr(img, 'convert'):
+                return img.convert('RGB'), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
+            elif isinstance(img, np.ndarray):
+                if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
+                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
                 else:
-                    return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Invalid image format", "{}"
-            else:
-                return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Unsupported image format", "{}"
+                    return Image.fromarray(img), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
+            return None, "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
 
-            # Use enhanced detection with vehicle classification
-            try:
-                detections = detector.detect_objects(frame_bgr, conf_threshold, iou_threshold, imgsz)
-                print(f"[INFO] Enhanced detection found {len(detections)} objects")
-                
-                # Convert detections back to YOLO format for compatibility with existing code
-                if detections:
-                    # Create a mock YOLO result for compatibility
-                    class MockResult:
-                        def __init__(self, detections, names):
-                            self.boxes = self._create_mock_boxes(detections)
-                            self.names = names
-                        
-                        def _create_mock_boxes(self, detections):
-                            class MockBoxes:
-                                def __init__(self, detections):
-                                    self.xyxy = torch.tensor([[d['bbox'][0], d['bbox'][1], d['bbox'][2], d['bbox'][3]] for d in detections])
-                                    self.conf = torch.tensor([d['confidence'] for d in detections])
-                                    self.cls = torch.tensor([d['class_id'] for d in detections])
-                                    self._detections = detections
-                                
-                                def __len__(self):
-                                    return len(self._detections)
-                                
-                                def __getitem__(self, idx):
-                                    return {
-                                        'xyxy': self.xyxy[idx],
-                                        'conf': self.conf[idx],
-                                        'cls': self.cls[idx]
-                                    }
-                            
-                            return MockBoxes(detections)
-                    
-                    # Get model names
-                    model_obj = detector.model
-                    names = model_obj.names if hasattr(model_obj, 'names') else {i: f"class_{i}" for i in range(80)}
-                    
-                    all_results = [MockResult(detections, names)]
-                    print(f"[INFO] Created mock result with {len(detections)} detections")
-                else:
-                    # No detections - return original image as PIL RGB
-                    try:
-                        if hasattr(img, 'convert'):
-                            result_image = img.convert('RGB')
-                        elif isinstance(img, np.ndarray):
-                            if len(img.shape) == 3 and img.shape[2] == 3:
-                                # Convert BGR to RGB if needed
-                                if img.dtype == np.uint8:
-                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                                else:
-                                    result_image = Image.fromarray(img)
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(np.array(img))
-                        
-                        # Ensure the image is valid
-                        if result_image is None:
-                            result_image = Image.new('RGB', (640, 480), color='black')
-                        
-                        return result_image, "No objects detected", "{}"
-                    except Exception as e:
-                        print(f"[ERROR] Failed to convert image in enhanced detector: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-                    
-            except Exception as e:
-                print(f"[ERROR] Enhanced detection failed: {e}")
-                # Fallback to original method
-                model = get_model(model_name)
-                device = _get_device()
-                models = model if isinstance(model, list) else [model]
-                
-                if device != "cpu" and torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
-
-                all_results = []
-                for m in models:
-                    r = m.predict(
-                        source=img,
-                        conf=conf_threshold,
-                        iou=iou_threshold,
-                        imgsz=imgsz,
-                        device=device,
-                        verbose=False,
-                        half=True if device != "cpu" else False,
-                    )
-                    if r:
-                        all_results.append(r[0])
-
-                if not all_results:
-                    try:
-                        if hasattr(img, 'convert'):
-                            result_image = img.convert('RGB')
-                        elif isinstance(img, np.ndarray):
-                            if len(img.shape) == 3 and img.shape[2] == 3:
-                                # Convert BGR to RGB if needed
-                                if img.dtype == np.uint8:
-                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                                else:
-                                    result_image = Image.fromarray(img)
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(np.array(img))
-                        
-                        # Ensure the image is valid
-                        if result_image is None:
-                            result_image = Image.new('RGB', (640, 480), color='black')
-                        
-                        return result_image, "No objects detected", "{}"
-                    except Exception as e:
-                        print(f"[ERROR] Failed to convert image in fallback: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-
-        # Convert to BGR for OpenCV operations with defensive checks
-        if hasattr(img, 'convert'):  # PIL Image
+        # Convert image to numpy array (OpenCV format)
+        if hasattr(img, 'convert'):
             frame_rgb = np.array(img.convert('RGB'))
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
         elif isinstance(img, np.ndarray):
             if img.dtype != np.uint8:
                 img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-            if len(img.shape) == 2:  # grayscale
-                frame_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-            elif img.shape[2] == 4:  # RGBA
-                frame_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
-            elif img.shape[2] == 3:  # BGR or RGB
-                # Assume RGB if not BGR (most web frameworks send RGB)
-                frame_rgb = img
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                frame_bgr = img
+            elif len(img.shape) == 3 and img.shape[2] == 4:
+                frame_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
             else:
-                raise ValueError(f"Unsupported image shape: {img.shape}")
+                return Image.fromarray(img), "❌ Invalid image format", "{}", ""
         else:
-            raise ValueError(f"Unsupported image type: {type(img)}")
-        
-        # Ensure RGB format before converting to BGR
-        if frame_rgb.shape[2] == 3:
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-        else:
-            raise ValueError(f"Expected 3 channels, got {frame_rgb.shape[2]}")
-        
-        # Generate unique image ID for JSON text extraction
-        image_id = f"img_{int(time.time() * 1000)}"
-        
-        # Perform comprehensive text extraction if OCR is enabled
-        json_text_results = None
-        if enable_ocr:
-            print(f"[DEBUG] Starting JSON-based text extraction for image {image_id}")
-            json_text_results = extract_text_from_image_json(frame_bgr, image_id)
-            print(f"[DEBUG] Text extraction completed for {image_id}")
-        
-        # Initialize all_results to prevent UnboundLocalError
-        all_results = []
-        
-        # Initialize detections to prevent UnboundLocalError
-        detections = []
-        
-        # Use professional annotation system to prevent overlapping labels
-        try:
-            # Add project root to path if not already there
-            import sys
-            import os
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
-            
-            from src.processors.professional_annotator import professional_annotator
-            
-            # Convert YOLO results to detection format for professional annotator
-            detections = []
-            for res in all_results:
-                if hasattr(res, 'boxes') and res.boxes is not None:
-                    boxes = res.boxes
-                    if hasattr(boxes, 'xyxy') and len(boxes) > 0:
-                        xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
-                        conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
-                        cls = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls)
-                        names = res.names
-                        
-                        for i in range(len(boxes)):
-                            if conf[i] > 0.3:  # Confidence threshold
-                                x1, y1, x2, y2 = map(int, xyxy[i])
-                                confidence = float(conf[i])
-                                class_id = int(cls[i])
-                                class_name = names.get(class_id, f"class_{class_id}")
-                                
-                                detection = {
-                                    'bbox': [x1, y1, x2, y2],
-                                    'confidence': confidence,
-                                    'class_name': class_name,
-                                    'class_id': class_id
-                                }
-                                
-                                # Add simple color detection
-                                try:
-                                    crop = frame_bgr[y1:y2, x1:x2]
-                                    if crop.size > 0:
-                                        avg_color_per_row = np.average(crop, axis=0)
-                                        avg_color = np.average(avg_color_per_row, axis=0)
-                                        b, g, r = map(int, avg_color)
-                                        
-                                        # Simple color classification
-                                        if r > 200 and g > 200 and b > 200:
-                                            color = "white"
-                                        elif r < 50 and g < 50 and b < 50:
-                                            color = "black"
-                                        elif r > g and r > b:
-                                            color = "red" if r > 150 else "brown"
-                                        elif g > r and g > b:
-                                            color = "green" if g > 150 else "olive"
-                                        elif b > r and b > g:
-                                            color = "blue" if b > 150 else "navy"
-                                        elif r > 150 and g > 150:
-                                            color = "yellow"
-                                        elif r > 150 and b > 150:
-                                            color = "magenta"
-                                        elif g > 150 and b > 150:
-                                            color = "cyan"
-                                        else:
-                                            color = "gray"
-                                        
-                                        detection['color'] = color
-                                except Exception:
-                                    detection['color'] = 'unknown'
-                                
-                                detections.append(detection)
-            
-            # Extract license plates from JSON results if available
-            if json_text_results and enable_ocr:
-                try:
-                    extraction = json_text_results.get("text_extraction", {})
-                    license_plates = extraction.get("license_plates", [])
-                    
-                    # Create mapping of vehicles to license plates
-                    for plate_info in license_plates:
-                        if plate_info.get("object_id") and plate_info.get("plate_text"):
-                            plate_text = plate_info["plate_text"]
-                            object_id = plate_info["object_id"]
-                            
-                            # Find corresponding detection
-                            for detection in detections:
-                                if str(detection.get('class_id')) == object_id.split('_')[-1]:
-                                    detection['license_plate'] = plate_text
-                                    break
-                except Exception as e:
-                    print(f"[DEBUG] License plate mapping failed: {e}")
-            
-            # Use professional annotator
-            if detections:
-                annotated_bgr = professional_annotator.annotate_detections(
-                    frame_bgr,
-                    detections,
-                    show_confidence=show_conf,
-                    show_info_panel=True
-                )
-                
-                # Add JSON text annotations if available
-                if json_text_results and enable_ocr:
-                    annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
-            else:
-                annotated_bgr = frame_bgr
-                
-        except Exception as e:
-            print(f"[WARNING] Professional annotator not available, using fallback: {e}")
-            # Fallback to original annotation method
-            annotated_bgr = frame_bgr.copy()
-            print(f"[DEBUG] Starting fallback annotation with {len(all_results)} results")
-            for idx, res in enumerate(all_results):
-                print(f"[DEBUG] Annotating result {idx+1}/{len(all_results)}: {type(res)}")
-                annotated_bgr = _annotate_with_color(
-                    annotated_bgr,
-                    res,
-                    show_labels,
-                    show_conf,
-                    enable_resnet=bool(enable_resnet),
-                    max_boxes=int(max_boxes),
-                    resnet_every_n=1,
-                    stream_key_prefix=None,
-                    enable_ocr=False,
-                    ocr_every_n=1,
-                )
-                print(f"[DEBUG] Annotation complete for result {idx+1}, image shape: {annotated_bgr.shape if hasattr(annotated_bgr, 'shape') else 'N/A'}")
-            
-            # If we have JSON text results, add text annotations from JSON
-            if json_text_results and enable_ocr:
-                print(f"[DEBUG] Adding JSON text annotations")
-                annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
-        
-        # Generate detection summary
-        print(f"[DEBUG] Generating detection summary from {len(all_results)} results")
-        summaries = [
-            _generate_detection_summary(r, enable_resnet=bool(enable_resnet), enable_ocr=False)
-            for r in all_results
-        ]
-        summary = "\n\n".join([s for s in summaries if s])
-        print(f"[DEBUG] Summary generated: {summary[:100]}...")
-        
-        # Add JSON text extraction results to summary
-        if json_text_results and enable_ocr:
-            text_summary = format_text_extraction_results(json_text_results)
-            summary = f"{summary}\n\n{text_summary}"
-            
-            # Also add raw JSON for debugging
-            json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-            summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
-        
-        # Ensure annotated_bgr is valid
-        if annotated_bgr is None or not isinstance(annotated_bgr, np.ndarray):
-            print(f"[WARNING] annotated_bgr is invalid (type: {type(annotated_bgr)}), using original frame")
-            annotated_bgr = frame_bgr
-        
-        print(f"[DEBUG] Final annotated_bgr shape: {annotated_bgr.shape}, dtype: {annotated_bgr.dtype}")
-        
-        # Add time and date timestamp like Enhanced ANPR
-        try:
-            current_time = datetime.now().strftime('%H:%M:%S')
-            current_date = datetime.now().strftime('%d/%m/%Y')
-            
-            # Create semi-transparent background for timestamp
-            overlay = annotated_bgr.copy()
-            cv2.rectangle(overlay, (5, 5), (250, 80), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.7, annotated_bgr, 0.3, 0, annotated_bgr)
-            
-            # Add time with smaller font
-            cv2.putText(annotated_bgr, f"Time: {current_time}", (10, 25), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            
-            # Add date with smaller font  
-            cv2.putText(annotated_bgr, f"Date: {current_date}", (10, 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            
-            # Add vehicle count
-            vehicle_count = len([d for d in all_results if hasattr(d, 'boxes') and d.boxes is not None])
-            if vehicle_count > 0:
-                cv2.putText(annotated_bgr, f"Objects: {vehicle_count}", (10, 75), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-            
-            print(f"[DEBUG] Added timestamp: {current_time} {current_date}")
-        except Exception as time_error:
-            print(f"[WARNING] Failed to add timestamp: {time_error}")
-            
-        # Convert BGR to RGB for PIL
-        if len(annotated_bgr.shape) == 3 and annotated_bgr.shape[2] == 3:
-            annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
-        else:
-            annotated_rgb = annotated_bgr
-        
-        # Create PIL Image directly
-        result_image = Image.fromarray(annotated_rgb)
-        
-        # Ensure RGB mode
-        if result_image.mode != 'RGB':
-            result_image = result_image.convert('RGB')
-        
-        print(f"[DEBUG] Final image - Size: {result_image.size}, Mode: {result_image.mode}")
-        
-        # Create ANPR-style info text for image detection (similar to video detection)
-        info_lines = []
+            return None, f"❌ Unsupported image type: {type(img)}", "{}", ""
+
+        # Run ALPR detection
+        print("[INFO] Running fast_alpr detection...")
+        drawn = alpr.draw_predictions(frame_bgr)
+        annotated_frame = drawn.image
+        results = drawn.results
+
+        # Build detection results
+        plates = []
+        for i, result in enumerate(results, 1):
+            plate_info = {
+                'plate_number': i,
+                'text': result.ocr.text if result.ocr else 'N/A',
+                'detection_confidence': float(result.detection.confidence),
+                'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+                'bbox': {
+                    'x1': int(result.detection.bounding_box.x1),
+                    'y1': int(result.detection.bounding_box.y1),
+                    'x2': int(result.detection.bounding_box.x2),
+                    'y2': int(result.detection.bounding_box.y2)
+                }
+            }
+            plates.append(plate_info)
+            print(f"[INFO] Plate {i}: {plate_info['text']} (Detection: {plate_info['detection_confidence']:.2%}, OCR: {plate_info['ocr_confidence']:.2%})")
+
+        # Add timestamp overlay
         current_time = datetime.now().strftime('%H:%M:%S')
         current_date = datetime.now().strftime('%d/%m/%Y')
+        
+        # Create semi-transparent background for timestamp
+        overlay = annotated_frame.copy()
+        cv2.rectangle(overlay, (5, 5), (250, 80), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+        
+        # Add time and date
+        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        if plates:
+            cv2.putText(annotated_frame, f"Plates: {len(plates)}", (10, 75), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+
+        # Convert BGR to RGB for PIL
+        annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+        result_image = Image.fromarray(annotated_rgb)
+
+        # Build info text
+        info_lines = []
         info_lines.append(f"📅 Date: {current_date}")
         info_lines.append(f"⏰ Time: {current_time}")
         
-        # Count vehicles and extract plate info
-        vehicle_count = 0
-        plate_list = []
-        color_list = []
+        if plates:
+            info_lines.append(f"🚗 Plates Detected: {len(plates)}")
+            for plate in plates:
+                info_lines.append(f"📝 Plate: {plate['text']}")
+                info_lines.append(f"   Detection: {plate['detection_confidence']:.2%}")
+                if plate['ocr_confidence'] > 0:
+                    info_lines.append(f"   OCR: {plate['ocr_confidence']:.2%}")
+        else:
+            info_lines.append("❌ No license plates detected")
         
-        for result in all_results:
-            if hasattr(result, 'boxes') and result.boxes is not None:
-                boxes = result.boxes
-                for i, box in enumerate(boxes):
-                    cls_id = int(box.cls.item()) if hasattr(box.cls, 'item') else int(box.cls[0])
-                    class_name = result.names.get(cls_id, f"class_{cls_id}")
-                    
-                    # Check if it's a vehicle
-                    if class_name in ['car', 'truck', 'bus', 'motorcycle', 'scooter', 'bike', 'rickshaw', 'auto', 'autorickshaw']:
-                        vehicle_count += 1
-                        
-                    # Get color if available from detections
-                    for det in detections:
-                        if det.get('class_name') == class_name:
-                            if det.get('color'):
-                                color_list.append(det.get('color'))
-                            if det.get('license_plate'):
-                                plate_list.append(det.get('license_plate'))
+        info_text = "\n".join(info_lines)
+
+        # Build JSON output
+        json_output = json.dumps({
+            "timestamp": current_time,
+            "date": current_date,
+            "plates_detected": len(plates),
+            "plates": plates
+        }, indent=2, ensure_ascii=False)
+
+        # Build summary
+        summary_lines = ["🚗 **License Plate Detection Results**\n"]
+        if plates:
+            for plate in plates:
+                summary_lines.append(f"**Plate {plate['plate_number']}:** {plate['text']}")
+                summary_lines.append(f"- Detection Confidence: {plate['detection_confidence']:.2%}")
+                if plate['ocr_confidence'] > 0:
+                    summary_lines.append(f"- OCR Confidence: {plate['ocr_confidence']:.2%}")
+                summary_lines.append(f"- Bounding Box: ({plate['bbox']['x1']}, {plate['bbox']['y1']}) to ({plate['bbox']['x2']}, {plate['bbox']['y2']})")
+                summary_lines.append("")
+        else:
+            summary_lines.append("No license plates detected in the image.")
         
-        if vehicle_count > 0:
-            info_lines.append(f"🚗 Vehicles Detected: {vehicle_count}")
+        summary = "\n".join(summary_lines)
         
-        # Add unique plates
-        unique_plates = list(set(plate_list)) if plate_list else []
-        if unique_plates:
-            info_lines.append(f"📝 Plates: {', '.join(unique_plates[:5])}")
-            if len(unique_plates) > 5:
-                info_lines.append(f"   ... and {len(unique_plates) - 5} more")
+        # Add raw JSON to summary
+        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
+
+        # Create simple HTML side panel
+        side_panel_html = f"""
+        <div style="padding: 15px; background: #1a1a2e; color: white; border-radius: 8px;">
+            <h3 style="margin-top: 0; color: #4CAF50;">📊 Detection Summary</h3>
+            <p><strong>Date:</strong> {current_date}</p>
+            <p><strong>Time:</strong> {current_time}</p>
+            <p><strong>Plates Found:</strong> {len(plates)}</p>
+            <hr style="border-color: #333;">
+            <h4 style="color: #FFD700;">Detected Plates:</h4>
+        """
         
-        # Add colors detected
-        unique_colors = list(set(color_list)) if color_list else []
-        if unique_colors:
-            info_lines.append(f"🎨 Colors: {', '.join(unique_colors[:3])}")
+        if plates:
+            for plate in plates:
+                side_panel_html += f"""
+                <div style="background: #16213e; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #4CAF50;">{plate['text']}</p>
+                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #aaa;">Detection: {plate['detection_confidence']:.2%}</p>
+                </div>
+                """
+        else:
+            side_panel_html += "<p style='color: #888;'>No plates detected</p>"
         
-        info_text = "\n".join(info_lines) if info_lines else "✅ Processing Complete!"
-        
-        # Generate ANPR-style side panel HTML
-        side_panel_html = create_anpr_side_panel(detections, all_results, json_text_results)
-        
+        side_panel_html += "</div>"
+
         return result_image, info_text, summary, side_panel_html
-        
+
     except Exception as e:
         error_msg = f"Error in predict_image: {str(e)}"
         print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
-        # Ensure we return a proper PIL Image
+        
+        # Return original image on error
         try:
-            if isinstance(img, np.ndarray):
+            if hasattr(img, 'convert'):
+                return img.convert('RGB'), f"⚠️ **Error processing image**\n\n{error_msg}", "{}", ""
+            elif isinstance(img, np.ndarray):
                 if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
-                    # Convert BGR to RGB
-                    img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), f"⚠️ **Error processing image**\n\n{error_msg}", "{}", ""
                 else:
-                    img_pil = Image.fromarray(img if img.dtype == np.uint8 else (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
-            elif hasattr(img, 'convert'):
-                img_pil = img.convert('RGB')
-            else:
-                img_pil = Image.fromarray(np.array(img))
-            
-            # Ensure the image is valid
-            if img_pil is None:
-                img_pil = Image.new('RGB', (640, 480), color='black')
-                
-            return img_pil, f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details.", "{}", ""
+                    return Image.fromarray(img), f"⚠️ **Error processing image**\n\n{error_msg}", "{}", ""
+            return None, f"⚠️ **Error processing image**\n\n{error_msg}", "{}", ""
         except Exception as e2:
-            return None, f"❌ **Critical Error**\n\n{str(e2)}\n\nPlease restart the application.", "{}", ""
+            return None, f"❌ **Critical Error**\n\n{str(e2)}", "{}", ""
 
 
 def predict_video(

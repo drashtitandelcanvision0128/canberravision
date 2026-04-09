@@ -32,4 +32,5 @@ setuptools==68.0.0
 # Additional GPU dependencies can be added when CUDA is properly configured
 # Fast ALPR for license plate recognition
 fast-alpr
+onnxruntime
 # Optional enhanced modules - these are warnings only, core functionality works without them

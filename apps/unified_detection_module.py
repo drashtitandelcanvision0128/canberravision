@@ -540,6 +540,88 @@ def extract_plate_from_rear(image, vehicle_bbox, tesseract_available):
     return None
 
 
+def find_plate_location_by_text(image, plate_text, tesseract_available):
+    """
+    Find the actual location of a license plate in the image when we know the text.
+    This ensures the bounding box accurately matches where the plate actually is.
+    
+    Args:
+        image: Original image (numpy array)
+        plate_text: The detected plate text to search for
+        tesseract_available: Whether tesseract is available
+        
+    Returns:
+        bbox [x1, y1, x2, y2] or None if not found
+    """
+    if not tesseract_available or not plate_text:
+        return None
+    
+    try:
+        import pytesseract
+        
+        h, w = image.shape[:2]
+        
+        # Try to find the plate by searching different regions
+        # Strategy: Use OCR with bounding box output to find text location
+        
+        # Method 1: Use pytesseract image_to_data to get bounding boxes
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if len(image.shape) == 3 else image
+        
+        # Run OCR with data output to get text locations
+        data = pytesseract.image_to_data(gray, output_type=pytesseract.Output.DICT)
+        
+        # Search for matching text
+        n_boxes = len(data['text'])
+        for i in range(n_boxes):
+            text = data['text'][i].strip().upper()
+            conf = int(data['conf'][i])
+            
+            if conf > 0 and text:
+                # Clean text for comparison
+                cleaned = re.sub(r'[^A-Z0-9]', '', text)
+                plate_clean = re.sub(r'[^A-Z0-9]', '', plate_text.upper())
+                
+                # Check if this text matches or is contained in our plate text
+                if cleaned and (cleaned in plate_clean or plate_clean in cleaned or 
+                               len(set(cleaned) & set(plate_clean)) >= min(len(cleaned), len(plate_clean)) * 0.7):
+                    x, y, w_box, h_box = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
+                    
+                    # Expand the box slightly to ensure full plate is captured
+                    padding_x = int(w_box * 0.1)
+                    padding_y = int(h_box * 0.2)
+                    
+                    x1 = max(0, x - padding_x)
+                    y1 = max(0, y - padding_y)
+                    x2 = min(w, x + w_box + padding_x)
+                    y2 = min(h, y + h_box + padding_y)
+                    
+                    return [x1, y1, x2, y2]
+        
+        # Method 2: If text search didn't work, look for plate-like regions
+        # that might contain our text
+        plates = find_rectangles(gray, image) + find_edge_plates(gray, image)
+        
+        for plate in plates:
+            x1, y1, x2, y2 = plate['x1'], plate['y1'], plate['x2'], plate['y2']
+            
+            # Extract region and OCR
+            region = image[y1:y2, x1:x2]
+            if region.size > 0:
+                region_text = extract_text_simple(region, tesseract_available)
+                region_clean = re.sub(r'[^A-Z0-9]', '', region_text.upper())
+                
+                if region_clean and (region_clean in plate_clean or 
+                                    plate_clean in region_clean or
+                                    len(set(region_clean) & set(plate_clean)) >= min(len(region_clean), len(plate_clean)) * 0.5):
+                    return [x1, y1, x2, y2]
+        
+        return None
+        
+    except Exception as e:
+        print(f"[DEBUG] find_plate_location_by_text failed: {e}")
+        return None
+
+
 def detect_license_plates_simple(image, tesseract_available):
     """Simple license plate detection that actually works - from simple_working_plate_detector.py"""
     plates = []
@@ -551,6 +633,9 @@ def detect_license_plates_simple(image, tesseract_available):
             image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
         else:
             image_np = image.copy()
+        
+        # Store original image dimensions for coordinate verification
+        orig_h, orig_w = image_np.shape[:2]
         
         gray = cv2.cvtColor(image_np, cv2.COLOR_BGR2GRAY)
         
@@ -567,41 +652,102 @@ def detect_license_plates_simple(image, tesseract_available):
         unique_plates = remove_duplicates(plates)
         
         # Extract text from all candidates
+        plates_with_text = []
         for plate in unique_plates:
             plate_region = image_np[plate['y1']:plate['y2'], plate['x1']:plate['x2']]
             text = extract_text_simple(plate_region, tesseract_available)
             plate['text'] = text
             plate['is_plate'] = is_license_plate(text)
+            if text and len(text.strip()) >= 3:
+                plates_with_text.append(plate)
         
         # Filter for license plates
-        license_plates = [p for p in unique_plates if p['is_plate']]
+        license_plates = [p for p in plates_with_text if p['is_plate']]
         
-        # If no plates found, be more aggressive
-        if not license_plates and unique_plates:
-            # Take the best candidate
-            best_candidate = max(unique_plates, key=lambda x: x['confidence'])
-            if len(best_candidate['text']) >= 4:
-                best_candidate['is_plate'] = True
+        # If no plates found via region detection, try full image OCR
+        if not license_plates and tesseract_available:
+            try:
+                import pytesseract
+                # Try full image OCR
+                full_text = pytesseract.image_to_string(
+                    gray, 
+                    config=r'--oem 3 --psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+                ).strip().upper()
+                
+                # Extract potential plates from full text
+                words = re.findall(r'\b[A-Z0-9]{4,12}\b', full_text)
+                for word in words:
+                    if is_license_plate(word):
+                        # Try to find the actual location of this plate
+                        bbox = find_plate_location_by_text(image_np, word, tesseract_available)
+                        if bbox:
+                            license_plates.append({
+                                'x1': bbox[0], 'y1': bbox[1], 'x2': bbox[2], 'y2': bbox[3],
+                                'text': word,
+                                'confidence': 0.7,
+                                'method': 'full_image_ocr_located'
+                            })
+                        else:
+                            # If we can't find location, still add with zero bbox
+                            # (will be filtered out during drawing)
+                            license_plates.append({
+                                'x1': 0, 'y1': 0, 'x2': 0, 'y2': 0,
+                                'text': word,
+                                'confidence': 0.6,
+                                'method': 'full_image_ocr'
+                            })
+            except Exception as e:
+                print(f"[DEBUG] Full image OCR failed: {e}")
+        
+        # If no plates found, be more aggressive with candidates
+        if not license_plates and plates_with_text:
+            # Take the best candidate by text length and confidence
+            best_candidate = max(plates_with_text, 
+                                  key=lambda x: (len(x.get('text', '')), x['confidence']))
+            if len(best_candidate.get('text', '')) >= 4:
                 license_plates = [best_candidate]
         
-        # Convert to unified format
+        # Validate and correct bounding boxes
         result_plates = []
         for plate in license_plates:
+            x1, y1, x2, y2 = plate['x1'], plate['y1'], plate['x2'], plate['y2']
+            
+            # Ensure coordinates are within image bounds
+            x1 = max(0, min(x1, orig_w))
+            y1 = max(0, min(y1, orig_h))
+            x2 = max(0, min(x2, orig_w))
+            y2 = max(0, min(y2, orig_h))
+            
+            # Ensure x2 > x1 and y2 > y1
+            if x2 <= x1:
+                x2 = min(x1 + 100, orig_w)
+            if y2 <= y1:
+                y2 = min(y1 + 50, orig_h)
+            
+            # If bbox is [0,0,0,0] but we have text, try to find location
+            if [x1, y1, x2, y2] == [0, 0, 0, 0] and plate.get('text'):
+                found_bbox = find_plate_location_by_text(image_np, plate['text'], tesseract_available)
+                if found_bbox:
+                    x1, y1, x2, y2 = found_bbox
+            
+            # Only add if we have valid coordinates or text-only detection
             result_plates.append({
-                "text": plate['text'],
-                "confidence": plate['confidence'],
-                "bbox": [plate['x1'], plate['y1'], plate['x2'], plate['y2']],
-                "method": plate['method']
+                "text": plate.get('text', ''),
+                "confidence": plate.get('confidence', 0.5),
+                "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                "method": plate.get('method', 'unknown')
             })
         
         print(f"[DEBUG] Simple detection found {len(result_plates)} plates")
         for p in result_plates:
-            print(f"[DEBUG]   - {p['text']} (method: {p['method']}, conf: {p['confidence']})")
+            print(f"[DEBUG]   - {p['text']} (method: {p['method']}, conf: {p['confidence']}, bbox: {p['bbox']})")
         
         return result_plates
         
     except Exception as e:
         print(f"[DEBUG] Simple plate detection failed: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 
@@ -698,46 +844,321 @@ def find_edge_plates(gray, original):
     return plates
 
 
-def extract_text_simple(plate_region, tesseract_available):
-    """Simple text extraction"""
+def preprocess_for_ocr(plate_region):
+    """
+    Advanced preprocessing pipeline for license plate OCR.
+    Returns multiple preprocessed versions for best results.
+    """
+    preprocessed = []
+    
     try:
-        if plate_region.size == 0:
-            return ""
-        
         # Convert to grayscale
         if len(plate_region.shape) == 3:
             gray = cv2.cvtColor(plate_region, cv2.COLOR_BGR2GRAY)
         else:
-            gray = plate_region
+            gray = plate_region.copy()
         
-        # Resize if too small
-        if gray.shape[0] < 30:
-            scale = 30 / gray.shape[0]
-            gray = cv2.resize(gray, None, fx=scale, fy=scale)
+        # Resize to standard size for better OCR
+        h, w = gray.shape
+        target_height = 100
+        if h < target_height:
+            scale = target_height / h
+            gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
         
-        # Apply threshold
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        # Method 1: Original grayscale
+        preprocessed.append(('original', gray))
         
-        if tesseract_available:
-            try:
-                import pytesseract
-                # Simple config for license plates
-                config = '--psm 7 --oem 3'
-                text = pytesseract.image_to_string(thresh, config=config)
-                text = text.upper().strip()
-                
-                # Clean text
-                text = re.sub(r'[^A-Z0-9 ]', '', text)
-                
-                return text
-            except:
-                pass
+        # Method 2: CLAHE (Contrast Limited Adaptive Histogram Equalization)
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        clahe_img = clahe.apply(gray)
+        preprocessed.append(('clahe', clahe_img))
         
-        # Fallback: return region info
-        return f"REGION_{plate_region.shape[0]}x{plate_region.shape[1]}"
+        # Method 3: Denoising with Gaussian blur
+        denoised = cv2.GaussianBlur(gray, (3, 3), 0)
+        preprocessed.append(('denoised', denoised))
         
-    except:
-        return ""
+        # Method 4: Sharpening
+        kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+        sharpened = cv2.filter2D(gray, -1, kernel)
+        preprocessed.append(('sharpened', sharpened))
+        
+        # Method 5: CLAHE + Sharpening
+        clahe_sharp = cv2.filter2D(clahe_img, -1, kernel)
+        preprocessed.append(('clahe_sharp', clahe_sharp))
+        
+        # Method 6: Adaptive threshold
+        adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                         cv2.THRESH_BINARY, 11, 2)
+        preprocessed.append(('adaptive', adaptive))
+        
+        # Method 7: OTSU threshold
+        _, otsu = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        preprocessed.append(('otsu', otsu))
+        
+        # Method 8: CLAHE + OTSU
+        _, clahe_otsu = cv2.threshold(clahe_img, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        preprocessed.append(('clahe_otsu', clahe_otsu))
+        
+    except Exception as e:
+        print(f"[DEBUG] Preprocessing failed: {e}")
+        if 'gray' in locals():
+            preprocessed.append(('fallback', gray))
+    
+    return preprocessed
+
+
+def correct_ocr_errors_indian_plate(text):
+    """
+    Apply correction rules for Indian license plate OCR errors.
+    Based on common character confusion patterns.
+    """
+    if not text:
+        return text
+    
+    text = text.upper().strip()
+    original = text
+    
+    # Common OCR character confusion corrections
+    corrections = {
+        'N': 'M',  # N -> M (first letter of state code)
+        'T': 'H',  # T -> H (second letter of state code like MH)
+        'I': '1',  # I -> 1 (in digit positions)
+        'L': '1',  # L -> 1
+        'O': '0',  # O -> 0 (in digit positions)
+        'Q': '0',  # Q -> 0
+        'D': '0',  # D -> 0
+        'S': '5',  # S -> 5
+        'B': '8',  # B -> 8
+        'Z': '2',  # Z -> 2
+        'G': '6',  # G -> 6
+        'Y': 'A',  # Y -> A (common in letter section)
+        'V': 'U',  # V -> U
+        'W': 'V',  # W -> V
+        '8': 'B',  # 8 -> B (when in letter position)
+        '0': 'O',  # 0 -> O (when in letter position)
+        '1': 'I',  # 1 -> I (when in letter position)
+        '5': 'S',  # 5 -> S (when in letter position)
+    }
+    
+    # Apply corrections position-aware
+    corrected = list(text)
+    
+    # Remove spaces for analysis
+    text_nospace = text.replace(' ', '')
+    
+    # Indian plate format: XX00XX0000
+    # Position 0-1: State code (letters)
+    # Position 2-3: RTO code (digits)
+    # Position 4-5: Series code (letters, 1-2 chars)
+    # Position 6-9: Number (4 digits)
+    
+    for i, char in enumerate(text_nospace):
+        if char in corrections:
+            # Position-aware corrections
+            if i == 0 or i == 1:  # State code - should be letters
+                if char in ['0', '1', '5', '8']:
+                    # Digits in letter position - convert to similar letter
+                    if char == '0': corrected[i] = 'O'
+                    elif char == '1': corrected[i] = 'I'
+                    elif char == '5': corrected[i] = 'S'
+                    elif char == '8': corrected[i] = 'B'
+                elif char == 'N' and i == 0:
+                    corrected[i] = 'M'  # N -> M for first letter
+                elif char == 'T' and i == 1:
+                    corrected[i] = 'H'  # T -> H for second letter
+                    
+            elif i == 2 or i == 3:  # RTO code - should be digits
+                if char in corrections and corrections[char] in '0123456789':
+                    corrected[i] = corrections[char]
+                    
+            elif i >= 4 and i <= 5:  # Series code - should be letters
+                if char in ['0', '1', '5', '8']:
+                    if char == '0': corrected[i] = 'O'
+                    elif char == '1': corrected[i] = 'I'
+                    elif char == '5': corrected[i] = 'S'
+                    elif char == '8': corrected[i] = 'B'
+                elif char == 'Y':
+                    corrected[i] = 'A'  # Y -> A common error
+                elif char == '8':
+                    corrected[i] = 'B'
+                    
+            elif i >= 6:  # Number section - should be digits
+                if char in corrections and corrections[char] in '0123456789':
+                    corrected[i] = corrections[char]
+    
+    result = ''.join(corrected)
+    
+    # Specific known error patterns
+    error_patterns = {
+        'NH': 'MH',
+        'NHO': 'MH0',
+        'NH0': 'MH0',
+        'NH1': 'MH1',
+        'MIHI': 'MH14',
+        'MI': 'MH',
+        'TAY': 'TAV',
+        'TAV': 'TAV',
+        'AYB': 'AVB',
+        'AY8': 'AV8',
+        'AYB8': 'AVB8',
+    }
+    
+    for error, fix in error_patterns.items():
+        if error in result:
+            result = result.replace(error, fix)
+            break
+    
+    # Final pass: ensure format compliance
+    # State codes should be valid
+    valid_state_codes = ['MH', 'DL', 'KA', 'TN', 'AP', 'GJ', 'RJ', 'UP', 'WB', 
+                        'HR', 'PB', 'BR', 'MP', 'CG', 'JH', 'OD', 'KL', 'AS',
+                        'TR', 'ML', 'NL', 'MN', 'MZ', 'SK', 'AR', 'HP', 'UK',
+                        'GA', 'PY', 'CH', 'AN', 'LD', 'DD', 'DN']
+    
+    if len(result) >= 2:
+        state_code = result[:2]
+        if state_code not in valid_state_codes:
+            # Try to fix common state code errors
+            if state_code == 'NH':
+                result = 'MH' + result[2:]
+            elif state_code == 'MI':
+                result = 'MH' + result[2:]
+            elif state_code == 'PH':
+                result = 'PB' + result[2:]
+            elif state_code == 'HR' and len(result) > 2 and result[2] in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+                # HR followed by letter - likely MH
+                result = 'MH' + result[2:]
+    
+    if original != result:
+        print(f"[DEBUG] OCR corrected: '{original}' -> '{result}'")
+    
+    return result
+
+
+def validate_indian_plate(text):
+    """
+    Validate if text matches Indian license plate format.
+    Returns (is_valid, confidence_score)
+    """
+    if not text:
+        return False, 0
+    
+    text = text.upper().replace(' ', '')
+    
+    # Check length
+    if len(text) < 6 or len(text) > 12:
+        return False, 0
+    
+    # Pattern 1: Standard Indian format XX00XX0000
+    pattern1 = r'^[A-Z]{2}\d{2}[A-Z]{1,2}\d{4}$'
+    if re.match(pattern1, text):
+        return True, 100
+    
+    # Pattern 2: Shorter format XX00X0000
+    pattern2 = r'^[A-Z]{2}\d{2}[A-Z]\d{4}$'
+    if re.match(pattern2, text):
+        return True, 90
+    
+    # Pattern 3: XX00XX000 (7 chars at end)
+    pattern3 = r'^[A-Z]{2}\d{2}[A-Z]{2}\d{3}$'
+    if re.match(pattern3, text):
+        return True, 80
+    
+    # Pattern 4: Just check for 2 letters + digits + letters + digits structure
+    pattern4 = r'^[A-Z]{2}\d+[A-Z]+\d+$'
+    if re.match(pattern4, text):
+        return True, 60
+    
+    # Pattern 5: Alphanumeric mix (fallback)
+    letters = sum(c.isalpha() for c in text)
+    digits = sum(c.isdigit() for c in text)
+    
+    if letters >= 2 and digits >= 4:
+        return True, 40
+    
+    return False, 0
+
+
+def extract_text_enhanced(plate_region, tesseract_available):
+    """
+    Enhanced text extraction with multiple preprocessing methods
+    and post-processing correction for Indian plates.
+    """
+    if plate_region.size == 0:
+        return "", 0
+    
+    if not tesseract_available:
+        return "", 0
+    
+    try:
+        import pytesseract
+        
+        # Get preprocessed versions
+        preprocessed = preprocess_for_ocr(plate_region)
+        
+        # Tesseract config optimized for Indian license plates
+        configs = [
+            r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            r'--oem 3 --psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        ]
+        
+        results = []
+        
+        # Try each preprocessing method with each config
+        for prep_name, prep_img in preprocessed:
+            for config in configs:
+                try:
+                    text = pytesseract.image_to_string(prep_img, config=config).strip().upper()
+                    text = re.sub(r'[^A-Z0-9]', '', text)  # Keep only alphanumeric
+                    
+                    if text and len(text) >= 4:
+                        # Calculate confidence based on text length and pattern match
+                        is_valid, pattern_score = validate_indian_plate(text)
+                        confidence = pattern_score + (len(text) * 2)
+                        
+                        results.append({
+                            'text': text,
+                            'confidence': confidence,
+                            'is_valid': is_valid,
+                            'preprocessing': prep_name,
+                            'config': config[:10]
+                        })
+                except Exception as e:
+                    continue
+        
+        if not results:
+            return "", 0
+        
+        # Sort by confidence and validity
+        results.sort(key=lambda x: (x['is_valid'], x['confidence']), reverse=True)
+        
+        # Get best result
+        best = results[0]
+        best_text = best['text']
+        
+        # Apply post-processing corrections
+        corrected_text = correct_ocr_errors_indian_plate(best_text)
+        
+        # Validate corrected text
+        is_valid, final_score = validate_indian_plate(corrected_text)
+        
+        print(f"[DEBUG] OCR: raw='{best_text}' -> corrected='{corrected_text}' "
+              f"(valid={is_valid}, score={final_score}, prep={best['preprocessing']})")
+        
+        return corrected_text, final_score
+        
+    except Exception as e:
+        print(f"[DEBUG] Enhanced OCR failed: {e}")
+        return "", 0
+
+
+def extract_text_simple(plate_region, tesseract_available):
+    """
+    Simple text extraction - now uses enhanced OCR pipeline
+    """
+    text, confidence = extract_text_enhanced(plate_region, tesseract_available)
+    return text
 
 
 def is_license_plate(text):

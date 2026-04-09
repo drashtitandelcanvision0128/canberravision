@@ -86,7 +86,8 @@ RUN pip install --no-cache-dir \
     "numpy<2.0.0" \
     ultralytics \
     "transformers==4.37.2" \
-    timm
+    timm \
+    fast-alpr
 
 # -------------------------------------------------------
 # Step 6: PaddleOCR - CPU version (server has no GPU)

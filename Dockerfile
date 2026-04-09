@@ -87,7 +87,8 @@ RUN pip install --no-cache-dir \
     ultralytics \
     "transformers==4.37.2" \
     timm \
-    fast-alpr
+    fast-alpr \
+    onnxruntime
 
 # -------------------------------------------------------
 # Step 6: PaddleOCR - CPU version (server has no GPU)

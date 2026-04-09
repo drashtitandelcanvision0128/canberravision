@@ -1236,6 +1236,18 @@ CUSTOM_CSS = """
     height: auto !important;
     object-fit: contain !important;
     max-height: 300px !important;
+    max-width: 500px !important;
+    margin: 0 auto !important;
+    display: block !important;
+}
+
+/* Desktop responsive - limit max width */
+@media (min-width: 768px) {
+    .obsidian-output img,
+    .obsidian-output .image-container img,
+    .obsidian-output canvas {
+        max-width: 450px !important;
+    }
 }
 
 /* ===== BUTTONS ===== */

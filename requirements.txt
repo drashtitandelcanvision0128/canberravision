@@ -14,7 +14,7 @@ protobuf==3.20.2
 opencv-python
 timm
 # Enhanced detection dependencies
-numpy<2.0.0
+numpy>=2.0.0
 pillow
 scipy
 # K-means color detection dependencies

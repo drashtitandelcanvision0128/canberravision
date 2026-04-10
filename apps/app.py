@@ -8928,8 +8928,15 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         output_path = f"ppe_outputs/ppe_video_{timestamp}.mp4"
         os.makedirs("ppe_outputs", exist_ok=True)
         
+        # Use H264 codec for browser compatibility (MP4 format)
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
+        
+        if not out.isOpened():
+            # Fallback to avc1 if mp4v fails
+            print("[WARNING] mp4v codec failed, trying avc1")
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')
+            out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
         
         frame_count = 0
         processed_count = 0
@@ -8961,6 +8968,53 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         
         cap.release()
         out.release()
+        
+        # Verify output video was created and is valid
+        if not os.path.exists(output_path):
+            return None, "❌ **Error:** Failed to create output video", ""
+        
+        # Check video is readable
+        test_cap = cv2.VideoCapture(output_path)
+        if not test_cap.isOpened():
+            test_cap.release()
+            return None, "❌ **Error:** Output video is corrupted", ""
+        
+        actual_frames = int(test_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        test_cap.release()
+        
+        if actual_frames == 0:
+            return None, "❌ **Error:** Output video has no frames", ""
+        
+        print(f"[INFO] Output video verified: {actual_frames} frames, path: {os.path.abspath(output_path)}")
+        
+        # Re-encode to browser-compatible H.264 format using imageio-ffmpeg
+        try:
+            from imageio_ffmpeg import get_ffmpeg_exe
+            import subprocess
+            
+            ffmpeg_path = get_ffmpeg_exe()
+            final_output = output_path.replace('.mp4', '_final.mp4')
+            
+            ffmpeg_cmd = [
+                ffmpeg_path, '-y', '-i', output_path,
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                '-c:a', 'aac', '-movflags', '+faststart',
+                '-pix_fmt', 'yuv420p',
+                final_output
+            ]
+            ffmpeg_result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=60)
+            
+            if ffmpeg_result.returncode == 0 and os.path.exists(final_output):
+                os.remove(output_path)
+                output_path = final_output
+                print(f"[INFO] Video re-encoded to browser format: {output_path}")
+            else:
+                print(f"[WARNING] FFmpeg re-encoding failed: {ffmpeg_result.stderr[:200]}")
+        except Exception as e:
+            print(f"[WARNING] Could not re-encode video: {e}")
+        
+        # Use absolute path for Gradio
+        output_path = os.path.abspath(output_path)
         
         # Calculate compliance rate
         total_ppe = total_helmets + total_seatbelts

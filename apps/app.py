@@ -5918,12 +5918,35 @@ def predict_image(
         annotated_frame = drawn.image
         results = drawn.results
 
-        # Build detection results
+        # Build detection results with country detection
         plates = []
+        
+        # Initialize international recognizer if available
+        country_recognizer = None
+        if INTERNATIONAL_PLATES_AVAILABLE:
+            try:
+                from tools.international_license_plates import InternationalLicensePlateRecognizer
+                country_recognizer = InternationalLicensePlateRecognizer()
+            except Exception as e:
+                print(f"[WARNING] Could not initialize country recognizer: {e}")
+        
         for i, result in enumerate(results, 1):
+            plate_text = result.ocr.text if result.ocr else 'N/A'
+            
+            # Detect country for this plate
+            country = 'Unknown'
+            if country_recognizer and plate_text != 'N/A':
+                try:
+                    country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                    if country_matches and len(country_matches) > 0:
+                        country = country_matches[0]['country']
+                except Exception as e:
+                    print(f"[DEBUG] Country detection failed for {plate_text}: {e}")
+            
             plate_info = {
                 'plate_number': i,
-                'text': result.ocr.text if result.ocr else 'N/A',
+                'text': plate_text,
+                'country': country,
                 'detection_confidence': float(result.detection.confidence),
                 'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
                 'bbox': {
@@ -5934,7 +5957,26 @@ def predict_image(
                 }
             }
             plates.append(plate_info)
-            print(f"[INFO] Plate {i}: {plate_info['text']} (Detection: {plate_info['detection_confidence']:.2%}, OCR: {plate_info['ocr_confidence']:.2%})")
+            print(f"[INFO] Plate {i}: {plate_info['text']} [{plate_info['country']}] (Detection: {plate_info['detection_confidence']:.2%}, OCR: {plate_info['ocr_confidence']:.2%})")
+        
+        # Add country labels on the image (overlay on top of ALPR's default "Unknown")
+        if plates:
+            for plate in plates:
+                if plate['country'] != 'Unknown':
+                    x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                    # Draw country label above the plate
+                    country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                    label_y = y1 - 35 if y1 > 35 else y1 + 20
+                    
+                    # Get text size for background
+                    (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                    
+                    # Draw background rectangle (blue color)
+                    cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                    
+                    # Draw country text
+                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
         # Add timestamp overlay
         current_time = datetime.now().strftime('%H:%M:%S')
@@ -5967,7 +6009,8 @@ def predict_image(
         if plates:
             info_lines.append(f"🚗 Plates Detected: {len(plates)}")
             for plate in plates:
-                info_lines.append(f"📝 Plate: {plate['text']}")
+                country_str = f" [{plate['country']}]" if plate['country'] != 'Unknown' else ''
+                info_lines.append(f"📝 Plate: {plate['text']}{country_str}")
                 info_lines.append(f"   Detection: {plate['detection_confidence']:.2%}")
                 if plate['ocr_confidence'] > 0:
                     info_lines.append(f"   OCR: {plate['ocr_confidence']:.2%}")
@@ -6015,9 +6058,10 @@ def predict_image(
         
         if plates:
             for plate in plates:
+                country_badge = f"""<span style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">{plate['country']}</span>""" if plate['country'] != 'Unknown' else ''
                 side_panel_html += f"""
                 <div style="background: #16213e; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #4CAF50;">{plate['text']}</p>
+                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #4CAF50;">{plate['text']}{country_badge}</p>
                     <p style="margin: 5px 0 0 0; font-size: 12px; color: #aaa;">Detection: {plate['detection_confidence']:.2%}</p>
                 </div>
                 """
@@ -6269,12 +6313,33 @@ def _predict_video_original(
                         annotated_frame = drawn.image
                         results = drawn.results
                         
+                        # Initialize country recognizer for video (reuse if possible)
+                        country_recognizer = None
+                        if INTERNATIONAL_PLATES_AVAILABLE:
+                            try:
+                                from tools.international_license_plates import InternationalLicensePlateRecognizer
+                                country_recognizer = InternationalLicensePlateRecognizer()
+                            except Exception as e:
+                                pass
+                        
                         # Process detected plates
                         frame_plates = []
                         for i, result in enumerate(results, 1):
                             plate_text = result.ocr.text if result.ocr else 'N/A'
+                            
+                            # Detect country for this plate
+                            country = 'Unknown'
+                            if country_recognizer and plate_text != 'N/A':
+                                try:
+                                    country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                                    if country_matches and len(country_matches) > 0:
+                                        country = country_matches[0]['country']
+                                except Exception:
+                                    pass
+                            
                             plate_info = {
                                 'text': plate_text,
+                                'country': country,
                                 'detection_confidence': float(result.detection.confidence),
                                 'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
                                 'frame': processed_frames,
@@ -6286,11 +6351,28 @@ def _predict_video_original(
                                 }
                             }
                             frame_plates.append(plate_info)
-                            unique_plates.add(plate_text)
+                            unique_plates.add(f"{plate_text} [{country}]")
                             plate_detection_count += 1
                             
                             if processed_frames % 30 == 0 or processed_frames <= 5:
-                                print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} (Detection: {plate_info['detection_confidence']:.2%})")
+                                print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
+                        
+                        # Add country labels on video frames (blue background)
+                        for plate in frame_plates:
+                            if plate['country'] != 'Unknown':
+                                x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                                country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                                label_y = y1 - 35 if y1 > 35 else y1 + 20
+                                
+                                # Get text size
+                                (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                                
+                                # Draw blue background
+                                cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                                
+                                # Draw white text
+                                cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
                         
                         # Add timestamp and plate count overlay
                         current_time = datetime.now().strftime('%H:%M:%S')
@@ -7458,12 +7540,33 @@ def predict_webcam(
             annotated_frame = drawn.image
             results = drawn.results
             
+            # Initialize country recognizer
+            country_recognizer = None
+            if INTERNATIONAL_PLATES_AVAILABLE:
+                try:
+                    from tools.international_license_plates import InternationalLicensePlateRecognizer
+                    country_recognizer = InternationalLicensePlateRecognizer()
+                except Exception:
+                    pass
+            
             # Process detected plates
             frame_plates = []
             for i, result in enumerate(results, 1):
                 plate_text = result.ocr.text if result.ocr else 'N/A'
+                
+                # Detect country for this plate
+                country = 'Unknown'
+                if country_recognizer and plate_text != 'N/A':
+                    try:
+                        country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                        if country_matches and len(country_matches) > 0:
+                            country = country_matches[0]['country']
+                    except Exception:
+                        pass
+                
                 plate_info = {
                     'text': plate_text,
+                    'country': country,
                     'detection_confidence': float(result.detection.confidence),
                     'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
                     'bbox': {
@@ -7474,11 +7577,28 @@ def predict_webcam(
                     }
                 }
                 frame_plates.append(plate_info)
-                _webcam_stream_state["last_plates"].add(plate_text)
+                _webcam_stream_state["last_plates"].add(f"{plate_text} [{country}]")
                 
                 # Log every 30 frames
                 if _webcam_stream_state["frame_idx"] % 30 == 0:
-                    print(f"[INFO] Webcam Frame {_webcam_stream_state['frame_idx']}: Detected plate: {plate_text} (Detection: {plate_info['detection_confidence']:.2%})")
+                    print(f"[INFO] Webcam Frame {_webcam_stream_state['frame_idx']}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
+            
+            # Add country labels on webcam frames (blue background)
+            for plate in frame_plates:
+                if plate['country'] != 'Unknown':
+                    x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                    country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                    label_y = y1 - 35 if y1 > 35 else y1 + 20
+                    
+                    # Get text size
+                    (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    
+                    # Draw blue background
+                    cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                    
+                    # Draw white text
+                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
             # Add timestamp and plate count overlay
             current_time = datetime.now().strftime('%H:%M:%S')

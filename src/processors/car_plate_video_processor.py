@@ -744,21 +744,33 @@ class CarPlateVideoProcessor:
         return has_letters and has_numbers
     
     def _identify_plate_country(self, text: str) -> Optional[str]:
-        """Identify the country of a license plate"""
+        """Identify the country of a license plate using InternationalLicensePlateRecognizer"""
         if not self.plate_recognizer:
             return None
         
         try:
-            # This would use the international plate recognizer
-            # For now, return a simple guess based on patterns
+            # Use the international plate recognizer to detect country
+            country_matches = self.plate_recognizer.detect_country_from_plate(text)
+            
+            if country_matches and len(country_matches) > 0:
+                # Return the country with highest confidence
+                top_match = country_matches[0]
+                return top_match['country']
+            
+            # Fallback: simple pattern matching for common formats
             clean_text = re.sub(r'[^A-Za-z0-9]', '', text.upper())
             
-            # Simple pattern matching (can be enhanced)
-            if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z]{3}$', clean_text):
+            # Indian format: MH20EE7602 (2 letters + 2 digits + 1-2 letters + 4 digits)
+            if re.match(r'^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$', clean_text):
+                return 'India'
+            # UK format: AB12CDE (2 letters + 2 digits + 3 letters)
+            elif re.match(r'^[A-Z]{2}[0-9]{2}[A-Z]{3}$', clean_text):
                 return 'UK'
+            # Canada format: ABC123 (3 letters + 3 digits)
             elif re.match(r'^[A-Z]{3}[0-9]{3}$', clean_text):
                 return 'Canada'
-            elif re.match(r'^[A-Z]{3}[ -]?[0-9]{1,4}$', clean_text):
+            # USA format: ABC1234 (3 letters + 1-4 digits)
+            elif re.match(r'^[A-Z]{3}[0-9]{1,4}$', clean_text):
                 return 'USA'
             
         except Exception as e:

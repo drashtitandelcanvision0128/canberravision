@@ -209,6 +209,18 @@ class InternationalLicensePlateRecognizer:
                 examples=['京A12345', '沪B123CD', '粤S12345'],
                 description='Chinese Provincial Plates'
             ),
+            'india': CountryPlateFormat(
+                country='India',
+                patterns=[
+                    r'^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{4}$',  # Standard format: MH20EE7602
+                    r'^[A-Z]{2}[0-9]{2}[A-Z]{1,2}[0-9]{3,4}$',  # Flexible: MH20E7602, MH20EE760
+                    r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{2,4}$',  # Short number: MH20EE76
+                    r'^[A-Z]{2}[0-9]{1,2}[A-Z]{1,2}[0-9]{2,4}$',  # Flexible RTO: MH2E7602
+                    r'^[A-Z]{2}\s*[0-9]{2}\s*[A-Z]{1,2}\s*[0-9]{4}$',  # With spaces: MH 20 EE 7602
+                ],
+                examples=['MH20EE7602', 'MH 20 EE 7602', 'DL4CAF9523', 'KA03MG1234', 'MH14BN7077'],
+                description='Indian State Registration Plates'
+            ),
             'singapore': CountryPlateFormat(
                 country='Singapore',
                 patterns=[
@@ -603,6 +615,9 @@ if __name__ == "__main__":
         "1234ABC",    # Australia
         "京A12345",   # China
         "12가1234",   # South Korea
+        "MH20EE7602", # India
+        "MH 20 EE 7602", # India with spaces
+        "DL4CAF9523", # India
     ]
     
     print("\nTest Results:")

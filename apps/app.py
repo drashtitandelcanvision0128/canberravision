@@ -8765,7 +8765,7 @@ with demo:
             '.gradio-container > div:last-child',
             '#gradio-app > div > div:last-child'
         ];
-        
+
         footerSelectors.forEach(selector => {
             const elements = document.querySelectorAll(selector);
             elements.forEach(el => {
@@ -8777,7 +8777,7 @@ with demo:
                 el.style.margin = '0';
             });
         });
-        
+
         // Also hide specific links by text content
         const allLinks = document.querySelectorAll('a');
         allLinks.forEach(link => {
@@ -8787,31 +8787,52 @@ with demo:
             }
         });
     }
-    
+
     // Run immediately and on load
     hideGradioFooter();
     window.addEventListener('load', hideGradioFooter);
     document.addEventListener('DOMContentLoaded', hideGradioFooter);
-    
+
     // Run periodically to catch dynamically loaded elements
     setInterval(hideGradioFooter, 500);
+    
+    // Fix for Gradio nested tabs initialization error
+    function fixNestedTabs() {
+        // Wait for tabs to be fully initialized
+        setTimeout(() => {
+            const tabs = document.querySelectorAll('[role="tablist"]');
+            tabs.forEach(tabList => {
+                const visibleTabs = Array.from(tabList.querySelectorAll('[role="tab"]')).filter(tab => {
+                    return tab.offsetParent !== null && tab.style.display !== 'none';
+                });
+                if (visibleTabs.length > 0 && !visibleTabs.some(t => t.getAttribute('aria-selected') === 'true')) {
+                    // Click first visible tab if none selected
+                    visibleTabs[0].click();
+                }
+            });
+        }, 1000);
+    }
+    
+    // Run tab fix after page load
+    window.addEventListener('load', fixNestedTabs);
+    document.addEventListener('DOMContentLoaded', fixNestedTabs);
     </script>
     """)
-    
-    with gr.Tabs(selected=0):
+
+    with gr.Tabs(elem_id="main-tabs"):
         # Image Detection Tab - Exact Match from Image
         # Image Detection, Video Processing, and Live Webcam tabs merged into Vehicle Detection tab below
         # Commented out as requested - now part of Vehicle Detection tab
         
         # Vehicle Detection Tab - Clean Layout (without header, insights, and bottom nav)
-        with gr.TabItem("Vehicle Detection"):
+        with gr.TabItem("Vehicle Detection", elem_id="tab-vehicle"):
             # Live Feed Section with Upload Areas
             with gr.Row():
                 # Left: Main Upload/Preview Area (full width now)
                 with gr.Column(scale=3):
                     # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs(selected=0):
-                        with gr.TabItem("Image"):
+                    with gr.Tabs(elem_id="vehicle-subtabs"):
+                        with gr.TabItem("Image", elem_id="tab-vehicle-image"):
                             img_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
                             img_btn = gr.Button("Detect Vehicles", variant="primary", elem_classes=["obsidian-btn"])
@@ -8831,7 +8852,7 @@ with demo:
                             img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
                             # img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")
                         
-                        with gr.TabItem("Video"):
+                        with gr.TabItem("Video", elem_id="tab-vehicle-video"):
                             vid_input = gr.Video(label="", show_label=False, height=300)
                             vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
                             vid_btn = gr.Button("Process Video", variant="primary", elem_classes=["obsidian-btn"])
@@ -8856,7 +8877,7 @@ with demo:
                             vid_output = gr.Video(label="Processed Video", visible=True, height=350)
                             vid_info = gr.Textbox(label="Video Status", interactive=False, lines=2)
                         
-                        with gr.TabItem("Webcam"):
+                        with gr.TabItem("Webcam", elem_id="tab-vehicle-webcam"):
                             webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
                             
                             with gr.Accordion("Camera Settings", open=False):
@@ -8993,14 +9014,14 @@ with demo:
         #     
         #     parking_btn_vid.click(
         #         process_parking_video,
-        with gr.TabItem("PPE Detection"):
+        with gr.TabItem("PPE Detection", elem_id="tab-ppe"):
             # Live Feed Section with Upload Areas
             with gr.Row():
                 # Left: Main Upload/Preview Area
                 with gr.Column(scale=2):
                     # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs(selected=0):
-                        with gr.TabItem("Image"):
+                    with gr.Tabs(elem_id="ppe-subtabs"):
+                        with gr.TabItem("Image", elem_id="tab-ppe-image"):
                             ppe_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
                             ppe_btn_img = gr.Button("Detect PPE", variant="primary", elem_classes=["obsidian-btn"])
@@ -9013,7 +9034,7 @@ with demo:
                             ppe_output_img = gr.Image(type="pil", label="PPE Detection Result", show_label=True, elem_classes=["responsive-image"])
                             ppe_summary_img = gr.Markdown("**Ready to detect PPE**")
                         
-                        with gr.TabItem("Video"):
+                        with gr.TabItem("Video", elem_id="tab-ppe-video"):
                             ppe_video_input = gr.Video(label="", show_label=False, height=300)
                             ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
                             ppe_btn_vid = gr.Button("Analyze Video", variant="primary", elem_classes=["obsidian-btn"])
@@ -9027,7 +9048,7 @@ with demo:
                             ppe_video_output = gr.Video(label="Processed Video", visible=True, height=350)
                             ppe_summary_vid = gr.Markdown("**Upload a video to start analysis**")
                         
-                        with gr.TabItem("Webcam"):
+                        with gr.TabItem("Webcam", elem_id="tab-ppe-webcam"):
                             ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
                             
                             with gr.Accordion("Camera Settings", open=False):

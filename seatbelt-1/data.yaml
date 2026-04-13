@@ -1,0 +1,13 @@
+# Seatbelt Detection Dataset
+path: C:\canberravision\YOLO26\seatbelt-1
+train: train/images
+val: valid/images
+test: test/images
+
+# Number of classes
+nc: 2  # seatbelt, no_seatbelt
+
+# Class names
+names:
+  0: seatbelt
+  1: no_seatbelt

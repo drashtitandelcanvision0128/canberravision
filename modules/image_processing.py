@@ -209,8 +209,8 @@ def predict_image(
         summary = f"{summary}\n\n{text_summary}"
         
         # Also add raw JSON for debugging
-        json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
+        # json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
+        # summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
     
     # Convert back to PIL and save to outputs folder
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)

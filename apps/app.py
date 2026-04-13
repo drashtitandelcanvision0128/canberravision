@@ -1242,6 +1242,58 @@ CUSTOM_CSS = """
     width: 100% !important;
 }
 
+/* ===== RESPONSIVE IMAGES ===== */
+.responsive-image {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
+.responsive-image img {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
+/* ===== RESPONSIVE LAYOUT ===== */
+@media (max-width: 768px) {
+    .gradio-container {
+        padding: 10px !important;
+    }
+    
+    .obsidian-btn {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+    }
+    
+    .obsidian-upload {
+        padding: 30px 15px !important;
+    }
+    
+    /* Stack columns on mobile */
+    .gradio-row {
+        flex-direction: column !important;
+    }
+    
+    .gradio-column {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .gradio-container {
+        padding: 5px !important;
+    }
+    
+    .obsidian-btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+}
+
 .obsidian-btn:hover {
     transform: translateY(-2px) !important;
     box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4) !important;
@@ -1328,6 +1380,14 @@ CUSTOM_CSS = """
 .gradio-container .footer,
 .gradio-container .gr-footer,
 footer {
+    display: none !important;
+}
+
+/* Hide Gradio 6.x header navigation - top bar with API, Gradio branding, Settings */
+header,
+.gradio-container > div:first-of-type > div:first-of-type,
+.gradio-container > div:nth-child(2),
+#gradio-app > div > div:first-child {
     display: none !important;
 }
 
@@ -1529,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create and add theme toggle button
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'theme-toggle';
-    toggleBtn.innerHTML = savedTheme === 'light' ? '🌙' : '☀️';
+    toggleBtn.innerHTML = savedTheme === 'light' ? 'Dark' : 'Light';
     toggleBtn.onclick = toggleTheme;
     toggleBtn.title = 'Toggle Theme';
     
@@ -5881,20 +5941,20 @@ def predict_image(
 ):
     """Predicts license plates in an image using fast_alpr."""
     if img is None:
-        return None, "Please upload an image first", "{}", ""
+        return None, ""
 
     try:
         # Check if ALPR is available
         if not ALPR_AVAILABLE or alpr is None:
             print("[WARNING] ALPR not available, returning original image")
             if hasattr(img, 'convert'):
-                return img.convert('RGB'), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
+                return img.convert('RGB'), ""
             elif isinstance(img, np.ndarray):
                 if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
-                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
+                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), ""
                 else:
-                    return Image.fromarray(img), "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
-            return None, "⚠️ ALPR not available\n\nPlease install fast_alpr to use license plate detection.", "{}", ""
+                    return Image.fromarray(img), ""
+            return None, ""
 
         # Convert image to numpy array (OpenCV format)
         if hasattr(img, 'convert'):
@@ -5908,9 +5968,9 @@ def predict_image(
             elif len(img.shape) == 3 and img.shape[2] == 4:
                 frame_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
             else:
-                return Image.fromarray(img), "❌ Invalid image format", "{}", ""
+                return Image.fromarray(img), ""
         else:
-            return None, f"❌ Unsupported image type: {type(img)}", "{}", ""
+            return None, ""
 
         # Run ALPR detection
         print("[INFO] Running fast_alpr detection...")
@@ -6028,49 +6088,50 @@ def predict_image(
         }, indent=2, ensure_ascii=False)
 
         # Build summary
-        summary_lines = ["🚗 **License Plate Detection Results**\n"]
-        if plates:
-            for plate in plates:
-                summary_lines.append(f"**Plate {plate['plate_number']}:** {plate['text']}")
-                summary_lines.append(f"- Detection Confidence: {plate['detection_confidence']:.2%}")
-                if plate['ocr_confidence'] > 0:
-                    summary_lines.append(f"- OCR Confidence: {plate['ocr_confidence']:.2%}")
-                summary_lines.append(f"- Bounding Box: ({plate['bbox']['x1']}, {plate['bbox']['y1']}) to ({plate['bbox']['x2']}, {plate['bbox']['y2']})")
-                summary_lines.append("")
-        else:
-            summary_lines.append("No license plates detected in the image.")
+        # summary_lines = ["🚗 **License Plate Detection Results**\n"]
+        # if plates:
+        #     for plate in plates:
+        #         summary_lines.append(f"**Plate {plate['plate_number']}:** {plate['text']}")
+        #         summary_lines.append(f"- Detection Confidence: {plate['detection_confidence']:.2%}")
+        #         if plate['ocr_confidence'] > 0:
+        #             summary_lines.append(f"- OCR Confidence: {plate['ocr_confidence']:.2%}")
+        #         summary_lines.append(f"- Bounding Box: ({plate['bbox']['x1']}, {plate['bbox']['y1']}) to ({plate['bbox']['x2']}, {plate['bbox']['y2']})")
+        #         summary_lines.append("")
+        # else:
+        #     summary_lines.append("No license plates detected in the image.")
         
-        summary = "\n".join(summary_lines)
+        # summary = "\n".join(summary_lines)
+        summary = ""
         
         # Add raw JSON to summary
-        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
+        # summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
 
         # Create simple HTML side panel
         side_panel_html = f"""
-        <div style="padding: 15px; background: #1a1a2e; color: white; border-radius: 8px;">
-            <h3 style="margin-top: 0; color: #4CAF50;">📊 Detection Summary</h3>
-            <p><strong>Date:</strong> {current_date}</p>
-            <p><strong>Time:</strong> {current_time}</p>
-            <p><strong>Plates Found:</strong> {len(plates)}</p>
-            <hr style="border-color: #333;">
-            <h4 style="color: #FFD700;">Detected Plates:</h4>
+        <div style="padding: 10px; background: #1a1a2e; color: white; border-radius: 6px; font-size: 13px;">
+            <h3 style="margin: 0 0 8px 0; color: #4CAF50; font-size: 14px; font-weight: 600;">Detection Summary</h3>
+            <div style="margin-bottom: 8px; line-height: 1.6;">
+                <span style="color: #aaa;">Date:</span> {current_date} &nbsp;
+                <span style="color: #aaa;">Time:</span> {current_time} &nbsp;
+                <span style="color: #aaa;">Plates:</span> {len(plates)}
+            </div>
         """
         
         if plates:
             for plate in plates:
-                country_badge = f"""<span style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin-left: 8px;">{plate['country']}</span>""" if plate['country'] != 'Unknown' else ''
+                country_badge = f"""<span style="background: #2196F3; color: white; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-left: 6px;">{plate['country']}</span>""" if plate['country'] != 'Unknown' else ''
                 side_panel_html += f"""
-                <div style="background: #16213e; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                    <p style="margin: 0; font-size: 18px; font-weight: bold; color: #4CAF50;">{plate['text']}{country_badge}</p>
-                    <p style="margin: 5px 0 0 0; font-size: 12px; color: #aaa;">Detection: {plate['detection_confidence']:.2%}</p>
+                <div style="background: #16213e; padding: 6px; margin: 4px 0; border-radius: 4px;">
+                    <div style="margin: 0; font-size: 14px; font-weight: 500; color: #4CAF50;">{plate['text']}{country_badge}</div>
+                    <div style="margin: 2px 0 0 0; font-size: 11px; color: #aaa;">Confidence: {plate['detection_confidence']:.2%}</div>
                 </div>
                 """
         else:
-            side_panel_html += "<p style='color: #888;'>No plates detected</p>"
+            side_panel_html += "<div style='color: #888; font-size: 12px;'>No plates detected</div>"
         
         side_panel_html += "</div>"
 
-        return result_image, info_text, summary, side_panel_html
+        return result_image, side_panel_html
 
     except Exception as e:
         error_msg = f"Error in predict_image: {str(e)}"
@@ -7974,14 +8035,20 @@ def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n
 
 # ==================== PPE DETECTION FUNCTIONS ====================
 
-def _get_ppe_detector_safe(model_name="yolov8n", debug=False):
+def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
     """
     Safely get PPE detector with automatic fallback
     NEVER returns None - always provides a working detector
+    
+    Args:
+        model_name: YOLO model to use
+        debug: Enable debug output
+        force_new: Always create fresh detector to prevent state leakage (default: True)
     """
     try:
         # Try to get the PPE detector with auto-recovery enabled
-        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True)
+        # force_new=True ensures fresh detector for each image to prevent state leakage
+        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True, force_new=force_new)
         return detector, True
     except Exception as e:
         print(f"[PPE-WARNING] Failed to get PPE detector: {e}")
@@ -8621,6 +8688,36 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 demo = gr.Blocks(
     title="Canberra Vision",
     theme=gr.themes.Soft(),
+    css="""
+    /* Hide Gradio 6.x footer with API, Gradio branding, and Settings */
+    footer,
+    .footer,
+    .gradio-footer,
+    .gr-footer,
+    .gradio-container footer,
+    #gradio-app footer {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    /* Hide the bottom section containing the footer links */
+    .gradio-container > div:last-child,
+    #gradio-app > div > div:last-child {
+        display: none !important;
+    }
+    
+    /* Hide specific footer link elements */
+    a[href*="api"],
+    a[href*="gradio"],
+    .footer-links,
+    .footer-link {
+        display: none !important;
+    }
+    """
 )
 
 with demo:
@@ -8641,6 +8738,54 @@ with demo:
     # Professional header
     gr.Markdown("# Canberra Vision")
     gr.Markdown("Advanced AI Vision Detection System")
+
+    # JavaScript to hide Gradio footer elements
+    gr.HTML("""
+    <script>
+    function hideGradioFooter() {
+        // Target footer elements containing API, Gradio branding, and Settings
+        const footerSelectors = [
+            'footer',
+            '.footer',
+            '.gradio-footer',
+            '.gr-footer',
+            '.gradio-container footer',
+            '#gradio-app footer',
+            '.gradio-container > div:last-child',
+            '#gradio-app > div > div:last-child'
+        ];
+        
+        footerSelectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+                el.style.display = 'none';
+                el.style.visibility = 'hidden';
+                el.style.height = '0';
+                el.style.overflow = 'hidden';
+                el.style.padding = '0';
+                el.style.margin = '0';
+            });
+        });
+        
+        // Also hide specific links by text content
+        const allLinks = document.querySelectorAll('a');
+        allLinks.forEach(link => {
+            const text = link.textContent.toLowerCase();
+            if (text.includes('api') || text.includes('gradio') || text.includes('settings')) {
+                link.style.display = 'none';
+            }
+        });
+    }
+    
+    // Run immediately and on load
+    hideGradioFooter();
+    window.addEventListener('load', hideGradioFooter);
+    document.addEventListener('DOMContentLoaded', hideGradioFooter);
+    
+    // Run periodically to catch dynamically loaded elements
+    setInterval(hideGradioFooter, 500);
+    </script>
+    """)
     
     with gr.Tabs(selected=0):
         # Image Detection Tab - Exact Match from Image
@@ -8655,12 +8800,12 @@ with demo:
                 with gr.Column(scale=3):
                     # Main content tabs for Image/Video/Webcam
                     with gr.Tabs():
-                        with gr.TabItem("📂 Image"):
-                            img_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
+                        with gr.TabItem("Image"):
+                            img_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                            img_btn = gr.Button("🔍 Detect Vehicles", variant="primary", elem_classes=["obsidian-btn"])
+                            img_btn = gr.Button("Detect Vehicles", variant="primary", elem_classes=["obsidian-btn"])
                             
-                            with gr.Accordion("⚙️ Advanced Settings", open=False):
+                            with gr.Accordion("Advanced Settings", open=False):
                                 img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence Threshold")
                                 img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU Threshold")
                                 img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
@@ -8670,19 +8815,19 @@ with demo:
                                 img_max_boxes = gr.Number(value=10, visible=False)
                                 img_ocr = gr.Checkbox(value=True, visible=False)
                             
-                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=300)
-                            img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
+                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, elem_classes=["responsive-image"])
+                            # img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
                             img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
-                            img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")
+                            # img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")
                         
-                        with gr.TabItem("🎬 Video"):
+                        with gr.TabItem("Video"):
                             vid_input = gr.Video(label="", show_label=False, height=300)
                             vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                            vid_btn = gr.Button("🎬 Process Video", variant="primary", elem_classes=["obsidian-btn"])
+                            vid_btn = gr.Button("Process Video", variant="primary", elem_classes=["obsidian-btn"])
                             
-                            with gr.Accordion("⚙️ Video Settings", open=False):
+                            with gr.Accordion("Video Settings", open=False):
                                 vid_speed_mode = gr.Radio(
-                                    choices=[("Ultra-Fast ⚡", "ultra_fast"), ("Fast 🚀", "fast"), ("Balanced ⚖️", "balanced")],
+                                    choices=[("Ultra-Fast", "ultra_fast"), ("Fast", "fast"), ("Balanced", "balanced")],
                                     label="Processing Speed",
                                     value="ultra_fast"
                                 )
@@ -8700,10 +8845,10 @@ with demo:
                             vid_output = gr.Video(label="Processed Video", visible=True, height=350)
                             vid_info = gr.Textbox(label="Video Status", interactive=False, lines=2)
                         
-                        with gr.TabItem("📷 Webcam"):
+                        with gr.TabItem("Webcam"):
                             webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
                             
-                            with gr.Accordion("⚙️ Camera Settings", open=False):
+                            with gr.Accordion("Camera Settings", open=False):
                                 webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")
                                 webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
                                 webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=320)
@@ -8724,14 +8869,14 @@ with demo:
                                 height=300
                             )
                             
-                            webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
+                            webcam_output = gr.Image(type="numpy", label="Live Detection", elem_classes=["responsive-image"])
                             webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Allow camera access.")
             
             # Button click handlers
             img_btn.click(
                 predict_image,
                 inputs=[img_input, img_conf, img_iou, img_model, img_labels, img_conf_show, img_size, img_resnet, img_max_boxes, img_ocr],
-                outputs=[img_output, img_info, img_summary, img_side_panel],
+                outputs=[img_output, img_side_panel],
             )
             
             vid_btn.click(
@@ -8844,37 +8989,37 @@ with demo:
                 with gr.Column(scale=2):
                     # Main content tabs for Image/Video/Webcam
                     with gr.Tabs():
-                        with gr.TabItem("📂 Image"):
-                            ppe_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
+                        with gr.TabItem("Image"):
+                            ppe_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                            ppe_btn_img = gr.Button("🔍 Detect PPE", variant="primary", elem_classes=["obsidian-btn"])
+                            ppe_btn_img = gr.Button("Detect PPE", variant="primary", elem_classes=["obsidian-btn"])
                             
-                            with gr.Accordion("⚙️ PPE Settings", open=False):
+                            with gr.Accordion("PPE Settings", open=False):
                                 ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence Threshold")
                                 ppe_labels_img = gr.Checkbox(value=True, label="Show Labels")
                                 ppe_conf_show_img = gr.Checkbox(value=True, label="Show Confidence")
                             
-                            ppe_output_img = gr.Image(type="pil", label="PPE Detection Result", show_label=True, height=350)
-                            ppe_summary_img = gr.Markdown("📸 **Ready to detect PPE**")
+                            ppe_output_img = gr.Image(type="pil", label="PPE Detection Result", show_label=True, elem_classes=["responsive-image"])
+                            ppe_summary_img = gr.Markdown("**Ready to detect PPE**")
                         
-                        with gr.TabItem("🎬 Video"):
+                        with gr.TabItem("Video"):
                             ppe_video_input = gr.Video(label="", show_label=False, height=300)
                             ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                            ppe_btn_vid = gr.Button("🎬 Analyze Video", variant="primary", elem_classes=["obsidian-btn"])
+                            ppe_btn_vid = gr.Button("Analyze Video", variant="primary", elem_classes=["obsidian-btn"])
                             
-                            with gr.Accordion("⚙️ Video Settings", open=False):
+                            with gr.Accordion("Video Settings", open=False):
                                 ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
                                 ppe_labels_vid = gr.Checkbox(value=True, label="Labels")
                                 ppe_conf_show_vid = gr.Checkbox(value=True, label="Confidence")
                                 ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
                             
                             ppe_video_output = gr.Video(label="Processed Video", visible=True, height=350)
-                            ppe_summary_vid = gr.Markdown("🎥 **Upload a video to start analysis**")
+                            ppe_summary_vid = gr.Markdown("**Upload a video to start analysis**")
                         
-                        with gr.TabItem("📷 Webcam"):
+                        with gr.TabItem("Webcam"):
                             ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
                             
-                            with gr.Accordion("⚙️ Camera Settings", open=False):
+                            with gr.Accordion("Camera Settings", open=False):
                                 ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
                                 ppe_labels_cam = gr.Checkbox(value=True, label="Labels")
                                 ppe_conf_show_cam = gr.Checkbox(value=True, label="Confidence")
@@ -8888,7 +9033,7 @@ with demo:
                                 height=300
                             )
                             
-                            ppe_webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
+                            ppe_webcam_output = gr.Image(type="numpy", label="Live Detection", elem_classes=["responsive-image"])
                             ppe_webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Point camera at workers for PPE detection!")
                 
                 # Right: ANPR-Style PPE Detection Dashboard
@@ -9114,7 +9259,9 @@ if __name__ == "__main__":
                 server_name=_gradio_server_name,
                 server_port=7863 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-                prevent_thread_lock=False
+                prevent_thread_lock=False,
+                show_api=False,
+                show_header=False
             )
             print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
         except Exception as e2:

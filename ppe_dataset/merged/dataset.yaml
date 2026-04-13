@@ -1,0 +1,10 @@
+names:
+  0: helmet
+  1: no_helmet
+  2: seatbelt
+  3: no_seatbelt
+nc: 4
+path: C:\canberravision\YOLO26\ppe_dataset\merged
+test: images/test
+train: images/train
+val: images/val

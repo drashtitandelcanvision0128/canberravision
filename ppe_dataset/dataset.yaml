@@ -1,0 +1,13 @@
+# Seatbelt Detection Dataset Configuration
+# YOLOv8 format
+train: ppe_dataset/merged/images/train
+val: ppe_dataset/merged/images/val
+test: ppe_dataset/merged/images/test
+
+# Classes
+nc: 4  # number of classes
+names: ['helmet', 'no_helmet', 'seatbelt', 'no_seatbelt']
+
+# Dataset information
+description: 'PPE Detection Dataset - Helmet and Seatbelt'
+version: '1.0'

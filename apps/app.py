@@ -8810,7 +8810,7 @@ with demo:
                 # Left: Main Upload/Preview Area (full width now)
                 with gr.Column(scale=3):
                     # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs():
+                    with gr.Tabs(selected=0):
                         with gr.TabItem("Image"):
                             img_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
@@ -8999,7 +8999,7 @@ with demo:
                 # Left: Main Upload/Preview Area
                 with gr.Column(scale=2):
                     # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs():
+                    with gr.Tabs(selected=0):
                         with gr.TabItem("Image"):
                             ppe_input = gr.Image(type="pil", label="", show_label=False, elem_classes=["obsidian-upload", "responsive-image"])
                             ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")

@@ -1,0 +1,5 @@
+# Seatbelt Detection Sample
+# Class 0: seatbelt_present
+# Class 1: seatbelt_missing
+
+0 0.5 0.5 0.3 0.4

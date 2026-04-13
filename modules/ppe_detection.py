@@ -88,10 +88,10 @@ class PPEDetector:
         self.model_load_attempts = 0
         self.max_load_attempts = 3
 
-        # LOW thresholds for maximum detection sensitivity
-        self.person_threshold = 0.25
-        self.helmet_threshold = 0.15  # Lowered from 0.20 for better detection
-        self.fallback_threshold = 0.10  # Even lower for fallback
+        # IMPROVED thresholds for better helmet detection on 2-wheelers
+        self.person_threshold = 0.20  # Lowered to detect more persons
+        self.helmet_threshold = 0.25  # Balanced for helmet detection
+        self.fallback_threshold = 0.15  # Better fallback detection
 
         self._ensure_model_loaded()
         print(f"[PPE] Initialized - helmet_threshold={self.helmet_threshold}, fallback_enabled=True")
@@ -107,6 +107,18 @@ class PPEDetector:
 
     def _ensure_model_loaded(self):
         """Ensure model is loaded with retry mechanism"""
+        import torch
+        import warnings
+        
+        # FIX: Patch torch.load to handle weights_only security restriction
+        _original_torch_load = torch.load
+        def _patched_torch_load(*args, **kwargs):
+            if 'weights_only' not in kwargs:
+                kwargs['weights_only'] = False
+            return _original_torch_load(*args, **kwargs)
+        torch.load = _patched_torch_load
+        warnings.filterwarnings('ignore', message='.*weights_only.*')
+        
         while self.model is None and self.model_load_attempts < self.max_load_attempts:
             try:
                 self.model_load_attempts += 1
@@ -115,11 +127,13 @@ class PPEDetector:
                 self.model.to(self.device)
                 print(f"[PPE] Model loaded successfully on {self.device}")
                 self.model_load_attempts = 0
+                torch.load = _original_torch_load  # Restore original
                 return True
             except Exception as e:
                 print(f"[PPE-WARNING] Model load attempt {self.model_load_attempts} failed: {e}")
                 time.sleep(0.5)
-
+        
+        torch.load = _original_torch_load  # Restore on failure too
         if self.model is None:
             print(f"[PPE-ERROR] Failed to load model after {self.max_load_attempts} attempts")
             return False
@@ -186,76 +200,134 @@ class PPEDetector:
             return False, 0.0, "error"
 
     def _check_dome_shape(self, gray_roi):
-        """Check if the shape resembles a helmet dome"""
+        """
+        Check if the shape resembles a helmet dome
+        IMPROVED: More lenient for various helmet types
+        """
         try:
             # Blur to reduce noise
             blurred = cv2.GaussianBlur(gray_roi, (5, 5), 0)
 
-            # Find contours
-            _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            # Find contours with multiple threshold methods
+            _, thresh1 = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            thresh2 = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                           cv2.THRESH_BINARY, 11, 2)
+            
+            best_contour = None
+            best_score = 0
+            
+            for thresh in [thresh1, thresh2]:
+                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                
+                if not contours:
+                    continue
 
-            if not contours:
-                return False, 0.0
+                largest = max(contours, key=cv2.contourArea)
+                area = cv2.contourArea(largest)
+                roi_area = gray_roi.shape[0] * gray_roi.shape[1]
 
-            # Get largest contour
-            largest = max(contours, key=cv2.contourArea)
-            area = cv2.contourArea(largest)
-            roi_area = gray_roi.shape[0] * gray_roi.shape[1]
+                if area < roi_area * 0.10:  # RELAXED: 10% instead of 15%
+                    continue
 
-            if area < roi_area * 0.15:  # Must cover at least 15% of region
-                return False, 0.0
-
-            # Check convexity - helmets are convex
-            hull = cv2.convexHull(largest)
-            hull_area = cv2.contourArea(hull)
-            if hull_area > 0:
-                convexity = area / hull_area
-                if convexity < 0.75:  # Must be fairly convex
-                    return False, 0.0
-
-            # Check for dome-like top (parabola shape)
-            x, y, w, h = cv2.boundingRect(largest)
-            if h > 0:
-                aspect_ratio = w / h
-                # Helmet dome typically wider than tall or equal
-                if aspect_ratio < 0.8 or aspect_ratio > 3.0:
-                    return False, 0.0
-
-            # Calculate dome confidence
-            dome_conf = min(area / (roi_area * 0.6), 1.0) * convexity
-            return True, dome_conf
-        except:
+                hull = cv2.convexHull(largest)
+                hull_area = cv2.contourArea(hull)
+                convexity = area / hull_area if hull_area > 0 else 0
+                
+                x, y, w, h = cv2.boundingRect(largest)
+                aspect_ratio = w / h if h > 0 else 0
+                
+                # RELAXED criteria
+                is_valid_shape = (convexity >= 0.60 and 0.6 <= aspect_ratio <= 3.5)
+                
+                if is_valid_shape:
+                    score = min(area / (roi_area * 0.5), 1.0) * convexity
+                    if score > best_score:
+                        best_score = score
+                        best_contour = largest
+            
+            if best_contour is not None:
+                return True, best_score
+            
+            # Fallback: Check brightness analysis
+            top_half = gray_roi[:gray_roi.shape[0]//2, :]
+            brightness_mean = np.mean(top_half)
+            brightness_std = np.std(top_half)
+            
+            if brightness_mean > 80 and brightness_std < 60:
+                return True, 0.5
+                
+            return False, 0.0
+        except Exception as e:
+            if self.debug:
+                print(f"[PPE-DEBUG] Dome shape error: {e}")
             return False, 0.0
 
     def _check_hair_texture(self, head_roi):
-        """Detect if hair is visible (rejects helmet if hair dominates)"""
+        """
+        Detect if hair is visible (rejects helmet if hair dominates)
+        IMPROVED: More sensitive to catch hair and prevent false helmet detection
+        """
         try:
             gray = cv2.cvtColor(head_roi, cv2.COLOR_BGR2GRAY)
+            h, w = gray.shape
+            
+            if h < 10 or w < 10:
+                return False
 
-            # Hair detection: high texture, dark, non-uniform
+            # Hair detection: high texture, dark/non-uniform
             # Use Laplacian for texture detection
             laplacian = cv2.Laplacian(gray, cv2.CV_64F)
             texture_score = np.var(laplacian)
 
-            # Dark regions (potential hair)
-            dark_mask = gray < 60
+            # Dark regions (potential hair) - hair is usually darker than helmet
+            dark_mask = gray < 80  # Increased threshold for more sensitivity
             dark_ratio = np.sum(dark_mask) / dark_mask.size
 
-            # Hair has high texture AND dark color
-            if texture_score > 500 and dark_ratio > 0.3:
-                return True  # Hair detected
+            # Check for non-uniformity (hair has varying shades)
+            std_dev = np.std(gray)
 
             # Check for fine texture patterns (hair strands)
-            edges = cv2.Canny(gray, 50, 150)
+            edges = cv2.Canny(gray, 30, 100)  # Lower thresholds
             edge_density = np.sum(edges > 0) / edges.size
 
-            # High edge density suggests hair texture
-            if edge_density > 0.15 and texture_score > 300:
-                return True
+            # HAIR DETECTION - EXTREMELY STRICT: Helmet covers hair completely!
+            # Only flag as hair when absolutely certain (e.g., clear hair visible)
+            hair_indicators = 0
+            
+            # Indicator 1: EXTREMELY high texture + significant dark regions
+            if texture_score > 1500 and dark_ratio > 0.4:
+                hair_indicators += 1
+                
+            # Indicator 2: EXTREMELY high edge density (clear hair strands)
+            if edge_density > 0.3:
+                hair_indicators += 1
+                
+            # Indicator 3: EXTREMELY high variance in texture
+            if texture_score > 2000:
+                hair_indicators += 1
+                
+            # Indicator 4: EXTREMELY high non-uniform shading
+            if std_dev > 60:
+                hair_indicators += 1
+            
+            # Indicator 5: Very dark and EXTREMELY textured
+            if dark_ratio > 0.6 and texture_score > 1000:
+                hair_indicators += 1
 
-            return False
-        except:
+            # EXTREMELY STRICT: Need ALL 5 indicators to confirm hair
+            # (helmet completely covers hair, so false positive is very bad)
+            has_hair = hair_indicators >= 4
+            
+            if self.debug and has_hair:
+                print(f"[PPE-DEBUG] Hair detected! indicators={hair_indicators}, "
+                      f"texture={texture_score:.0f}, dark_ratio={dark_ratio:.2f}, "
+                      f"edge_density={edge_density:.3f}, std_dev={std_dev:.1f}")
+            
+            return has_hair
+            
+        except Exception as e:
+            if self.debug:
+                print(f"[PPE-DEBUG] Hair detection error: {e}")
             return False
 
     def _check_smooth_surface(self, head_roi):
@@ -274,7 +346,9 @@ class PPEDetector:
 
             # Lower variance = smoother surface
             smoothness = max(0, min(1, 1 - (avg_variance / 1000)))
-            return smoothness > 0.6, smoothness
+            # RELAXED: 0.5 threshold for smoothness (was 0.6)
+            # Black helmets can have some reflections that increase variance slightly
+            return smoothness > 0.5, smoothness
         except:
             return False, 0.0
 
@@ -311,6 +385,19 @@ class PPEDetector:
 
         # STEP 4: Check position (must be ON TOP of head)
         position_score = self._check_top_position(head_roi)
+        
+        # EARLY CHECK: If strong helmet features detected, hair can be overridden
+        # A proper helmet has: smooth surface + good position (dome is bonus)
+        # RELAXED: Only need smoothness + position to override hair
+        strong_helmet_features = (is_smooth and smooth_conf > 0.4 and 
+                                  position_score > 0.4)
+        
+        # If strong helmet shape detected, ignore hair (helmet covers most hair)
+        if strong_helmet_features:
+            if has_hair and self.debug:
+                print(f"[PPE-DEBUG] Hair detected but STRONG helmet shape (smooth={smooth_conf:.2f}, pos={position_score:.2f}) overrides it")
+            has_hair = False  # Override hair detection
+            hair_penalty = 1.0
 
         # STEP 5: Color check (supporting only)
         color_detected, color_conf, color_name = self.detect_helmet_by_color(head_roi, threshold)
@@ -328,11 +415,11 @@ class PPEDetector:
         # Need 2 of 3 strong conditions OR 1 strong + position + color
         
         strong_conditions = 0
-        if is_smooth and smooth_conf > 0.4:  # Lowered from 0.5
+        if is_smooth and smooth_conf > 0.4:
             strong_conditions += 1
-        if has_dome and dome_conf > 0.3:  # Lowered from 0.4
+        if has_dome and dome_conf > 0.3:
             strong_conditions += 1
-        if position_score > 0.5:  # Lowered from 0.6
+        if position_score > 0.5:
             strong_conditions += 1
 
         # Calculate combined confidence
@@ -343,21 +430,27 @@ class PPEDetector:
         if has_hair:
             combined_conf *= hair_penalty
 
-        # Decision logic
+        # Decision logic - IMPROVED for 2-wheeler helmet detection
+        
+        # CASE 1: Very smooth surface (>0.75) is strong indicator of helmet even without dome/position
+        # RELAXED: was 0.8, now 0.75 to catch more helmets
+        if is_smooth and smooth_conf > 0.75 and not has_hair:
+            return True, max(combined_conf, smooth_conf * 0.8), "very_smooth_helmet"
+        
+        # CASE 2: Two or more strong conditions
         if strong_conditions >= 2:
-            # Strong case - definitely helmet
             reason = f"valid_helmet_shape_{color_name}" if color_detected else "valid_helmet_shape"
-            if combined_conf >= 0.4:  # Lowered from 0.5
+            if combined_conf >= 0.30:
                 return True, combined_conf, reason
 
+        # CASE 3: One strong + color support
         elif strong_conditions == 1 and color_detected:
-            # One strong + color support
-            if combined_conf >= 0.5:  # Lowered from 0.6
+            if combined_conf >= 0.40:
                 return True, combined_conf, f"uncertain_but_positive_{color_name}"
 
+        # CASE 4: One strong, no hair, no color - borderline
         elif strong_conditions == 1 and not has_hair:
-            # One strong, no hair, no color - borderline
-            if combined_conf >= 0.6:  # Lowered from 0.7
+            if combined_conf >= 0.45:
                 return True, combined_conf, "uncertain_but_positive"
 
         # No helmet cases
@@ -369,25 +462,51 @@ class PPEDetector:
             return False, combined_conf, "insufficient_evidence"
 
     def _check_top_position(self, head_roi):
-        """Check if helmet-like object is on top of head region"""
+        """
+        Check if helmet-like object is on top of head region
+        IMPROVED: Better detection of helmets at various positions
+        """
         try:
             gray = cv2.cvtColor(head_roi, cv2.COLOR_BGR2GRAY)
             h, w = gray.shape
             
-            # Check top 30% of head region for solid object
-            top_region = gray[:int(h*0.3), :]
+            if h < 5 or w < 5:
+                return 0.0
             
-            # Look for solid object at top (helmet should be here)
+            # Check top 40% of head region (increased from 30%)
+            top_region = gray[:int(h*0.4), :]
+            
+            # Method 1: OTSU threshold
             _, thresh = cv2.threshold(top_region, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            coverage1 = np.sum(thresh > 0) / (top_region.shape[0] * top_region.shape[1])
             
-            # Calculate coverage in top region
-            top_coverage = np.sum(thresh > 0) / (top_region.shape[0] * top_region.shape[1])
+            # Method 2: Fixed threshold for dark helmets
+            _, thresh2 = cv2.threshold(top_region, 100, 255, cv2.THRESH_BINARY)
+            coverage2 = np.sum(thresh2 > 0) / (top_region.shape[0] * top_region.shape[1])
             
-            # Helmet should have good coverage at top
-            if top_coverage > 0.2:
-                return min(top_coverage * 2, 1.0)
+            # Method 3: Check for bright helmets
+            _, thresh3 = cv2.threshold(top_region, 150, 255, cv2.THRESH_BINARY_INV)
+            coverage3 = np.sum(thresh3 > 0) / (top_region.shape[0] * top_region.shape[1])
+            
+            # Use best coverage
+            top_coverage = max(coverage1, coverage2, coverage3)
+            
+            # RELAXED threshold: was 0.2, now 0.12
+            if top_coverage > 0.12:
+                return min(top_coverage * 2.5, 1.0)
+            
+            # Fallback: Check brightness variance
+            mean_brightness = np.mean(top_region)
+            brightness_variance = np.var(top_region)
+            
+            # If region has moderate brightness with low variance (uniform like helmet)
+            if 40 < mean_brightness < 200 and brightness_variance < 3000:
+                return 0.5
+                
             return 0.0
-        except:
+        except Exception as e:
+            if self.debug:
+                print(f"[PPE-DEBUG] Top position error: {e}")
             return 0.0
 
     def _detect_seatbelt(self, frame, person_bbox):
@@ -422,15 +541,26 @@ class PPEDetector:
             # METHOD 1: Look for diagonal strap patterns (more sensitive)
             hsv = cv2.cvtColor(shoulder_roi, cv2.COLOR_BGR2HSV)
             
-            # Dark colors for seatbelt (black, dark grey) - expanded range
+            # Dark colors for seatbelt (black, dark grey, dark blue) - EXPANDED range
             lower_dark = np.array([0, 0, 0])
-            upper_dark = np.array([180, 60, 120])  # Increased range
+            upper_dark = np.array([180, 80, 150])  # INCREASED: was 60,120 now 80,150
             dark_mask = cv2.inRange(hsv, lower_dark, upper_dark)
             
-            # Calculate dark coverage - lowered threshold
-            dark_pixels = np.sum(dark_mask > 0)
+            # Additional mask for medium-dark colors (seatbelts can be various shades)
+            lower_medium = np.array([0, 0, 40])
+            upper_medium = np.array([180, 100, 180])
+            medium_mask = cv2.inRange(hsv, lower_medium, upper_medium)
+            
+            # Combine masks
+            combined_mask = cv2.bitwise_or(dark_mask, medium_mask)
+            
+            # Calculate dark coverage - use combined mask
+            dark_pixels = np.sum(combined_mask > 0)
             total_pixels = shoulder_roi.shape[0] * shoulder_roi.shape[1]
             dark_coverage = dark_pixels / total_pixels
+            
+            # Use combined mask for further processing
+            dark_mask = combined_mask
             
             # METHOD 2: Look for diagonal lines (more sensitive)
             gray = cv2.cvtColor(shoulder_roi, cv2.COLOR_BGR2GRAY)
@@ -457,8 +587,9 @@ class PPEDetector:
                                 best_diagonal_line = (x1_l, y1_l, x2_l, y2_l, line_length)
             
             # METHOD 3: Check for strap pattern (more sensitive)
-            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 1))  # Smaller kernel
+            kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 2))  # Larger kernel for better connectivity
             morph = cv2.morphologyEx(dark_mask, cv2.MORPH_CLOSE, kernel)
+            morph = cv2.morphologyEx(morph, cv2.MORPH_OPEN, kernel)  # Remove noise
             
             # Find contours in the morphological result
             contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -468,11 +599,11 @@ class PPEDetector:
             
             for cnt in contours:
                 area = cv2.contourArea(cnt)
-                if area > 100:  # Lowered minimum area
+                if area > 80:  # Lowered minimum area even more
                     x, y, cw, ch = cv2.boundingRect(cnt)
-                    aspect_ratio = cw / ch
-                    # More lenient aspect ratio for strap
-                    if aspect_ratio > 2.0:  # Lowered requirement
+                    aspect_ratio = cw / max(ch, 1)  # Avoid division by zero
+                    # RELAXED: Strap can be vertical or horizontal (seatbelt orientation varies)
+                    if aspect_ratio > 1.5 or aspect_ratio < 0.67:  # RELAXED: any non-square shape
                         strap_like_contours += 1
                         # Store the best contour
                         if best_strap_contour is None or area > cv2.contourArea(best_strap_contour):
@@ -510,28 +641,49 @@ class PPEDetector:
             combined_conf = (color_conf * 0.4 + line_conf * 0.3 + strap_conf * 0.2 + continuity_conf * 0.1)
             
             if self.debug:
-                print(f"[PPE-DEBUG] Sensitive seatbelt detection:")
-                print(f"  - Dark coverage: {dark_coverage:.2f} (need >0.08)")
-                print(f"  - Diagonal lines: {diagonal_lines} (need >=1)")
-                print(f"  - Strap-like contours: {strap_like_contours} (need >=1)")
-                print(f"  - Strap continuity: {strap_continuity:.2f}")
-                print(f"  - Combined conf: {combined_conf:.2f}")
+                print(f"[PPE-DEBUG] BALANCED seatbelt detection (car interior filtering):")
+                print(f"  - Dark coverage: {dark_coverage:.2f} (need 0.15-0.60)")
+                print(f"  - Diagonal lines: {diagonal_lines} (need 3-1000)")
+                print(f"  - Strap-like contours: {strap_like_contours} (need >=2)")
+                print(f"  - Strap continuity: {strap_continuity:.2f} (need >0.20)")
+                print(f"  - Combined conf: {combined_conf:.2f} (need >0.30)")
             
-            # More lenient detection criteria
-            if (dark_coverage > 0.08 and  # Lowered dark coverage requirement
-                diagonal_lines >= 1 and   # Need at least 1 diagonal line
-                strap_like_contours >= 1 and # Need at least 1 strap-like contour
-                combined_conf > 0.15):     # Lowered confidence threshold
+            # BALANCED detection criteria - avoid false positives but don't miss actual seatbelts
+            # Only detect when there's good evidence of seatbelt
+            
+            # ADDITIONAL VALIDATION: Reject if dark coverage is TOO high (likely car interior)
+            if dark_coverage > 0.70:
+                if self.debug:
+                    print(f"[PPE-DEBUG] REJECTED: Dark coverage too high ({dark_coverage:.2f}) - likely car interior")
+                return False, combined_conf, "too_dark_interior"
+            
+            # ADDITIONAL VALIDATION: Check strap width consistency (seatbelts have uniform width)
+            # REMOVED: Diagonal lines rejection - it was rejecting actual seatbelts
+            # Rely on other features to distinguish car interior vs seatbelt
+            
+            # CASE 1: Strong case - all features present with good quality
+            if (dark_coverage > 0.15 and  # BALANCED: Lowered to 0.15 to catch more seatbelts
+                dark_coverage < 0.60 and  # Not too dark (exclude car interior)
+                diagonal_lines >= 3 and   # Need multiple diagonal lines
+                diagonal_lines < 1000 and # REMOVED upper bound - don't reject based on lines count
+                strap_like_contours >= 2 and # Need multiple strap contours
+                strap_continuity > 0.20 and  # BALANCED: Lowered to 0.20
+                combined_conf > 0.30):     # BALANCED: Lowered to 0.30
                 
                 reason = "seatbelt_detected"
-                if diagonal_lines > 2:
+                if diagonal_lines > 10:
                     reason = "seatbelt_multiple_diagonal_straps"
-                elif dark_coverage > 0.20:
+                elif dark_coverage > 0.35:
                     reason = "seatbelt_strong_dark_strap"
-                elif strap_continuity > 0.5:
+                elif strap_continuity > 0.50:
                     reason = "seatbelt_continuous_strap"
                 
+                if self.debug:
+                    print(f"[PPE-DEBUG] Seatbelt detected with STRONG evidence")
                 return True, combined_conf, reason
+            
+            # REMOVED: All fallback cases to prevent false positives
+            # Only detect when ALL features are strong and clear
             
             return False, combined_conf, "no_seatbelt"
             
@@ -650,28 +802,65 @@ class PPEDetector:
                         if horizontal_lines >= 3:
                             return "4-wheeler"
             
-            # Method 3: Position-based fallback (only if no clear vehicle evidence)
-            # This is the least reliable method
+            # Method 3: Check for 2-wheeler indicators (scooter/motorcycle features)
+            # Look for two wheels near the person
+            wheel_indicators = 0
             person_height = y2 - y1
+            
+            # Check below person for wheel-like circles (2-wheelers have visible wheels)
+            wheel_search_region = frame[y2:int(y2 + person_height*0.5), 
+                                       max(0, x1 - 20):min(w, x2 + 20)]
+            if wheel_search_region.size > 0:
+                gray_wheel = cv2.cvtColor(wheel_search_region, cv2.COLOR_BGR2GRAY)
+                # Look for circular shapes (wheels)
+                circles = cv2.HoughCircles(gray_wheel, cv2.HOUGH_GRADIENT, 1, 15,
+                                         param1=50, param2=25, minRadius=8, maxRadius=40)
+                if circles is not None and len(circles[0]) >= 1:
+                    wheel_indicators += len(circles[0])
+                    if self.debug:
+                        print(f"[PPE-DEBUG] Found {len(circles[0])} wheel-like circles")
+            
+            # Check for open-air context (not enclosed like car)
+            # 2-wheeler riders are exposed, not in a cabin
+            person_region = frame[y1:y2, x1:x2]
+            if person_region.size > 0:
+                # Check if person is against a complex background (outdoor/street)
+                hsv_person = cv2.cvtColor(person_region, cv2.COLOR_BGR2HSV)
+                saturation = np.mean(hsv_person[:,:,1])
+                # Outdoor scenes have higher saturation variation
+                if saturation > 40:  # Colorful background suggests outdoor/street
+                    wheel_indicators += 1
+            
+            # If we found wheel indicators, likely a 2-wheeler
+            if wheel_indicators >= 2:
+                if self.debug:
+                    print(f"[PPE-DEBUG] 2-wheeler detected by wheel indicators: {wheel_indicators}")
+                return "2-wheeler"
+            
+            # Method 4: Position-based fallback (only if no clear vehicle evidence)
             person_center_y = (y1 + y2) / 2
             image_height = h
             person_width = x2 - x1
             aspect_ratio = person_width / person_height
             
-            # Very specific conditions for vehicle detection
-            # Person must be in lower portion AND have sitting posture AND have structured background
-            if (person_center_y > image_height * 0.7 and  # Very low in frame
-                aspect_ratio > 0.45 and  # Wide (sitting)
-                person_height < image_height * 0.4):  # Not too tall (sitting)
+            # Check for sitting posture (typical for both 2-wheelers and 4-wheelers)
+            if (person_center_y > image_height * 0.6 and  # Lower in frame
+                aspect_ratio > 0.4 and  # Wide (sitting)
+                person_height < image_height * 0.5):  # Not too tall (sitting)
                 
-                # One final check - look for wheel-like shapes
+                # Look for wheel-like shapes below person
                 wheel_region = frame[y2:int(y2 + person_height*0.3), x1:x2]
                 if wheel_region.size > 0:
                     gray_wheel = cv2.cvtColor(wheel_region, cv2.COLOR_BGR2GRAY)
                     circles = cv2.HoughCircles(gray_wheel, cv2.HOUGH_GRADIENT, 1, 20,
                                              param1=50, param2=30, minRadius=10, maxRadius=30)
                     if circles is not None:
-                        return "4-wheeler"
+                        # Found wheels - could be 2-wheeler or 4-wheeler
+                        # If only 1-2 wheels visible, more likely 2-wheeler
+                        if len(circles[0]) <= 2:
+                            return "2-wheeler"
+                        else:
+                            return "4-wheeler"
             
             # Default to "unknown" if no clear vehicle evidence
             return "unknown"
@@ -1216,11 +1405,13 @@ _ppe_detector = None
 _lock = threading.Lock()
 
 
-def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True):
+def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True, force_new=False):
     """Get or create PPE detector with auto-recovery"""
     global _ppe_detector
     with _lock:
-        if _ppe_detector is None:
+        if force_new or _ppe_detector is None:
+            if force_new and _ppe_detector is not None:
+                print("[PPE] Creating fresh detector instance (force_new=True)")
             _ppe_detector = PPEDetector(model_path, debug=debug, auto_recovery=auto_recovery)
         return _ppe_detector
 

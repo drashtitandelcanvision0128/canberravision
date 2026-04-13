@@ -1,0 +1,7 @@
+names:
+  0: seatbelt
+  1: no_seatbelt
+nc: 2
+path: C:\canberravision\YOLO26\ppe_dataset\seatbelt_manual
+train: train/images
+val: valid/images

@@ -1244,16 +1244,30 @@ CUSTOM_CSS = """
 
 /* ===== RESPONSIVE IMAGES ===== */
 .responsive-image {
-    width: auto !important;
-    height: auto !important;
+    width: 100% !important;
+    height: 400px !important;
     max-width: 100% !important;
     object-fit: contain !important;
 }
 
-.responsive-image img {
-    width: auto !important;
-    height: auto !important;
+.responsive-image img,
+.responsive-image .image-container,
+.responsive-image .image-frame,
+.responsive-image > div,
+.responsive-image > div > div {
+    width: 100% !important;
+    height: 100% !important;
     max-width: 100% !important;
+    max-height: 400px !important;
+    object-fit: contain !important;
+}
+
+/* Ensure input and output images have same size */
+.obsidian-upload.responsive-image,
+.obsidian-upload.responsive-image img {
+    width: 100% !important;
+    height: 400px !important;
+    max-height: 400px !important;
     object-fit: contain !important;
 }
 
@@ -2023,9 +2037,6 @@ if sys.platform.startswith("win"):
 
 MODEL_CHOICES = [
     "yolo26n",
-    "yolo26s",
-    "yolo26m",
-    "yolov8s",
 ]
 
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
@@ -8846,7 +8857,7 @@ with demo:
                             vid_info = gr.Textbox(label="Video Status", interactive=False, lines=2)
                         
                         with gr.TabItem("Webcam"):
-                            webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
+                            webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
                             
                             with gr.Accordion("Camera Settings", open=False):
                                 webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")

@@ -8728,6 +8728,24 @@ demo = gr.Blocks(
     .footer-link {
         display: none !important;
     }
+    
+    /* FIX: Force first tab panel to be visible */
+    .tabitem:first-of-type {
+        display: block !important;
+    }
+    
+    /* FIX: Ensure tab content is not hidden */
+    [role="tabpanel"] {
+        display: block !important;
+    }
+    
+    /* FIX: Override any hidden states on first tabs */
+    #tab-vehicle .tabitem:first-child,
+    #tab-ppe .tabitem:first-child {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
     """
 )
 
@@ -8796,26 +8814,83 @@ with demo:
     // Run periodically to catch dynamically loaded elements
     setInterval(hideGradioFooter, 500);
     
-    // Fix for Gradio nested tabs initialization error
+    // Fix for Gradio nested tabs initialization error - AGGRESSIVE FIX
     function fixNestedTabs() {
-        // Wait for tabs to be fully initialized
-        setTimeout(() => {
-            const tabs = document.querySelectorAll('[role="tablist"]');
-            tabs.forEach(tabList => {
-                const visibleTabs = Array.from(tabList.querySelectorAll('[role="tab"]')).filter(tab => {
-                    return tab.offsetParent !== null && tab.style.display !== 'none';
-                });
-                if (visibleTabs.length > 0 && !visibleTabs.some(t => t.getAttribute('aria-selected') === 'true')) {
-                    // Click first visible tab if none selected
-                    visibleTabs[0].click();
+        console.log('[Gradio Fix] Running nested tabs fix...');
+        
+        // Multiple attempts with increasing delays
+        [500, 1000, 2000, 3000].forEach(delay => {
+            setTimeout(() => {
+                try {
+                    // Find all tab lists
+                    const tabLists = document.querySelectorAll('[role="tablist"]');
+                    console.log(`[Gradio Fix] Found ${tabLists.length} tab lists`);
+                    
+                    tabLists.forEach((tabList, index) => {
+                        const tabs = Array.from(tabList.querySelectorAll('[role="tab"]'));
+                        const visibleTabs = tabs.filter(tab => {
+                            return tab.offsetParent !== null && 
+                                   tab.style.display !== 'none' &&
+                                   !tab.disabled &&
+                                   tab.getAttribute('aria-disabled') !== 'true';
+                        });
+                        
+                        console.log(`[Gradio Fix] Tab list ${index}: ${visibleTabs.length} visible tabs`);
+                        
+                        if (visibleTabs.length > 0) {
+                            const selectedTab = visibleTabs.find(t => t.getAttribute('aria-selected') === 'true');
+                            if (!selectedTab) {
+                                console.log(`[Gradio Fix] Selecting first visible tab in list ${index}`);
+                                visibleTabs[0].click();
+                            }
+                        }
+                    });
+                } catch (e) {
+                    console.log('[Gradio Fix] Error in tab fix:', e);
                 }
-            });
-        }, 1000);
+            }, delay);
+        });
     }
     
-    // Run tab fix after page load
+    // Suppress the specific Tabs.svelte error
+    window.addEventListener('error', function(e) {
+        if (e.message && e.message.includes('non-interactive or hidden tab')) {
+            console.log('[Gradio Fix] Suppressed tab selection error');
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    });
+    
+    // Patch Gradio Tabs component to prevent selecting hidden tabs
+    (function patchGradioTabs() {
+        const originalDefine = customElements.define;
+        customElements.define = function(name, constructor, options) {
+            if (name && name.includes && name.includes('tab')) {
+                console.log('[Gradio Fix] Patching tab component:', name);
+                // Wrap constructor to prevent hidden tab selection
+                const wrappedConstructor = class extends constructor {
+                    connectedCallback() {
+                        try {
+                            super.connectedCallback();
+                        } catch (e) {
+                            console.log('[Gradio Fix] Suppressed tab connection error');
+                        }
+                    }
+                };
+                return originalDefine.call(this, name, wrappedConstructor, options);
+            }
+            return originalDefine.call(this, name, constructor, options);
+        };
+    })();
+    
+    // Run tab fix multiple times
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fixNestedTabs);
+    } else {
+        fixNestedTabs();
+    }
     window.addEventListener('load', fixNestedTabs);
-    document.addEventListener('DOMContentLoaded', fixNestedTabs);
     </script>
     """)
 

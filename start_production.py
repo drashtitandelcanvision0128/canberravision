@@ -128,13 +128,30 @@ def main():
         # Enable queue for production stability
         demo.queue()
         
-        # Launch with production settings - HARD-CODED for Coolify compatibility
+        # Get allowed paths for file uploads/downloads
+        import tempfile
+        allowed_paths = [
+            os.getcwd(),
+            tempfile.gettempdir(),
+            "/tmp",
+            "uploads",
+            "processed",
+            "temp_gradio"
+        ]
+        
+        logger.info(f"Allowed paths: {allowed_paths}")
+        
+        # Launch with production settings - PROXY-FRIENDLY for Coolify
         demo.launch(
             server_name="0.0.0.0",
             server_port=7860,
             share=False,
             show_error=True,
-            inbrowser=False
+            inbrowser=False,
+            allowed_paths=allowed_paths,
+            prevent_thread_lock=False,
+            show_api=False,
+            quiet=False
         )
         
     except Exception as e:

@@ -1377,6 +1377,15 @@ CUSTOM_CSS = """
 }
 
 /* ===== HIDE GRADIO DEFAULTS ===== */
+/* Ensure body is always visible - prevents black screen issues */
+body,
+.gradio-container,
+#gradio-app {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 .gradio-container .footer,
 .gradio-container .gr-footer,
 footer {
@@ -1549,12 +1558,7 @@ function forceThemeUpdate(theme) {
         }
     });
     
-    // Force reflow
-    document.body.style.display = 'none';
-    document.body.offsetHeight; // Trigger reflow
-    document.body.style.display = '';
-    
-    // Apply theme again after reflow
+    // Apply theme after short delay (removed problematic force reflow)
     setTimeout(() => {
         document.documentElement.setAttribute('data-theme', theme);
         forceTextColors(theme);

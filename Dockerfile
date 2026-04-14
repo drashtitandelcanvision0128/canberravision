@@ -65,8 +65,8 @@ RUN pip install --no-cache-dir \
 # Step 4: PyTorch CPU (no CUDA needed on Coolify server)
 # -------------------------------------------------------
 RUN pip install --no-cache-dir \
-    "torch==2.1.2" \
-    "torchvision==0.16.2" \
+    "torch==2.2.0+cpu" \
+    "torchvision==0.17.0+cpu" \
     --index-url https://download.pytorch.org/whl/cpu
 
 # -------------------------------------------------------

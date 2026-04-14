@@ -8787,7 +8787,7 @@ with demo:
     </script>
     """)
     
-    with gr.Tabs(selected=0):
+    with gr.Tabs():
         # Image Detection Tab - Exact Match from Image
         # Image Detection, Video Processing, and Live Webcam tabs merged into Vehicle Detection tab below
         # Commented out as requested - now part of Vehicle Detection tab

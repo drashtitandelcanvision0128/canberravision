@@ -150,7 +150,6 @@ def main():
             inbrowser=False,
             allowed_paths=allowed_paths,
             prevent_thread_lock=False,
-            show_api=False,
             quiet=False
         )
         

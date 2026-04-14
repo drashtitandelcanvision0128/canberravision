@@ -9264,7 +9264,6 @@ if __name__ == "__main__":
                 server_port=7863 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
                 prevent_thread_lock=False,
-                show_api=False,
                 show_header=False
             )
             print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")

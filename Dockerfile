@@ -2,7 +2,7 @@
 # Canberra Vision Detection System - Production Dockerfile
 # Fixed: gradio/huggingface_hub compatibility + Debian Trixie
 # ============================================================
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -40,19 +40,9 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --upgrade pip setuptools wheel
 
 # -------------------------------------------------------
-# Step 1: Pin huggingface_hub first to avoid HfFolder error
-# (HfFolder was removed in huggingface_hub>=0.25)
+# Step 1: Install gradio 5.25.0 (compatible with Python 3.12)
 # -------------------------------------------------------
-RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
-
-# -------------------------------------------------------
-# Step 2: Install gradio (compatible with pinned hf_hub)
-# Must install AFTER huggingface_hub to avoid override
-# -------------------------------------------------------
-# Force reinstall of FastAPI and Pydantic v2 to ensure compatibility with gradio 4.25.0
-RUN pip install --no-cache-dir --force-reinstall "starlette==0.36.3" "jinja2==3.1.2" "fastapi==0.110.0" "pydantic==2.10.6"
-RUN pip install --no-cache-dir "gradio==4.32.2"
-RUN pip install --no-cache-dir "gradio-client==0.15.1"
+RUN pip install --no-cache-dir "gradio==5.25.0"
 
 # -------------------------------------------------------
 # Step 3: Core dependencies

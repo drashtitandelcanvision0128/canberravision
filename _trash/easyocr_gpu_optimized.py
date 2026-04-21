@@ -19,7 +19,7 @@ import hashlib
 try:
     import easyocr
     EASYOCR_AVAILABLE = True
-    print("[INFO] 🚀 EasyOCR loaded with GPU support")
+    print("[INFO]  EasyOCR loaded with GPU support")
 except ImportError:
     EASYOCR_AVAILABLE = False
     print("[WARNING] EasyOCR not available")
@@ -47,11 +47,11 @@ def initialize_gpu_environment():
                 'device_memory': torch.cuda.get_device_properties(0).total_memory / 1e9,
                 'current_device': torch.cuda.current_device()
             }
-            print(f"[INFO] 🚀 CUDA GPU Detected: {_device_info['device_name']}")
+            print(f"[INFO]  CUDA GPU Detected: {_device_info['device_name']}")
             print(f"[INFO] GPU Memory: {_device_info['device_memory']:.1f} GB")
         else:
             _device_info = {'pytorch_cuda': False}
-            print("[INFO] ⚠️ CUDA not available, using CPU mode")
+            print("[INFO]  CUDA not available, using CPU mode")
             
         return _gpu_available
         
@@ -87,7 +87,7 @@ def get_easyocr_reader(gpu: bool = None):
             recognizer=True
         )
         
-        device_type = "🚀 GPU" if gpu else "💻 CPU"
+        device_type = " GPU" if gpu else " CPU"
         print(f"[INFO] EasyOCR initialized successfully on {device_type}")
         return _easyocr_reader
         
@@ -297,7 +297,7 @@ def extract_license_plates_optimized(
                         'processing_time': text_result["processing_time"],
                         'device': text_result["device"]
                     })
-                    print(f"[DEBUG] ✅ Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
+                    print(f"[DEBUG]  Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
         
         # Remove duplicates and return best results
         unique_plates = []

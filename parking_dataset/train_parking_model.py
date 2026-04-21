@@ -417,7 +417,7 @@ class ParkingModelTrainer:
 ## Requirements Analysis
 - **Required mAP@0.5**: 0.95
 - **Achieved mAP@0.5**: {metrics.get('map50', 0):.4f}
-- **Status**: {'✅ MET' if metrics.get('map50', 0) >= 0.95 else '❌ NOT MET'}
+- **Status**: {' MET' if metrics.get('map50', 0) >= 0.95 else ' NOT MET'}
 
 ## Recommendations
 """

@@ -32,9 +32,9 @@ def remove_current_remote():
         
         # Remove origin remote
         if run_command("git remote remove origin"):
-            print("✓ Removed Hugging Face remote")
+            print(" Removed Hugging Face remote")
         else:
-            print("✗ Failed to remove remote")
+            print(" Failed to remove remote")
             return False
     
     return True
@@ -46,15 +46,15 @@ def add_github_remote(username, repo_name, branch="main"):
     print(f"Adding GitHub remote: {github_url}")
     
     if run_command(f"git remote add origin {github_url}"):
-        print(f"✓ Added GitHub remote for {username}/{repo_name}")
+        print(f" Added GitHub remote for {username}/{repo_name}")
         
         # Set upstream branch
         if run_command(f"git branch --set-upstream-to=origin/{branch} {branch}"):
-            print(f"✓ Set upstream branch to {branch}")
+            print(f" Set upstream branch to {branch}")
         
         return True
     else:
-        print("✗ Failed to add GitHub remote")
+        print(" Failed to add GitHub remote")
         return False
 
 def setup_git_config(username, email):
@@ -62,10 +62,10 @@ def setup_git_config(username, email):
     print(f"Setting up Git config for {username}")
     
     if run_command(f"git config user.name '{username}'"):
-        print(f"✓ Set Git username to {username}")
+        print(f" Set Git username to {username}")
     
     if email and run_command(f"git config user.email '{email}'"):
-        print(f"✓ Set Git email to {email}")
+        print(f" Set Git email to {email}")
     
     return True
 

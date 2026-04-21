@@ -154,13 +154,13 @@ if video_path and detection_results:
     saved_video_path = process_and_save_video(video_path, detection_results)
     
     if saved_video_path:
-        print(f"✅ Video saved to: {saved_video_path}")
+        print(f" Video saved to: {saved_video_path}")
         
         # Add to your results
         result['saved_video_path'] = saved_video_path
         result['output_info'] = get_outputs_info()
     else:
-        print("❌ Failed to save video")
+        print(" Failed to save video")
 """
 
 # ================================================================
@@ -195,12 +195,12 @@ def create_gradio_video_interface():
                 'processed_video': saved_path,  # For Gradio video display
                 'saved_path': saved_path,       # For download/info
                 'output_info': output_info,     # For display
-                'message': f"✅ Video processed and saved! Total outputs: {output_info['total_files']} files ({output_info['total_size_mb']:.1f} MB)"
+                'message': f" Video processed and saved! Total outputs: {output_info['total_files']} files ({output_info['total_size_mb']:.1f} MB)"
             }
             
         except Exception as e:
             return {
-                'error': f"❌ Processing failed: {str(e)}"
+                'error': f" Processing failed: {str(e)}"
             }
     
     return process_video_with_output
@@ -266,28 +266,28 @@ def get_download_links():
 # ================================================================
 
 if __name__ == "__main__":
-    print("📹 App Video Integration Guide")
+    print(" App Video Integration Guide")
     print("=" * 40)
     
-    print("📋 Integration Steps:")
+    print(" Integration Steps:")
     print("1. Add imports to app.py")
     print("2. Add process_and_save_video function")
     print("3. Add draw_detections_on_frame function")
     print("4. Update your video processing function")
     print("5. Add Gradio integration if needed")
     
-    print("\n🔧 Key Features:")
-    print("✅ Automatic video saving to outputs/ folder")
-    print("✅ Frame snapshots for detections")
-    print("✅ Thumbnail generation")
-    print("✅ Automatic cleanup (7 days)")
-    print("✅ Size management (max 2GB)")
-    print("✅ GitIgnore ready (heavy files excluded)")
+    print("\n Key Features:")
+    print(" Automatic video saving to outputs/ folder")
+    print(" Frame snapshots for detections")
+    print(" Thumbnail generation")
+    print(" Automatic cleanup (7 days)")
+    print(" Size management (max 2GB)")
+    print(" GitIgnore ready (heavy files excluded)")
     
-    print("\n📁 Output Structure:")
+    print("\n Output Structure:")
     print("outputs/")
-    print("├── videos/        # Processed videos")
-    print("├── frames/        # Detection frames")
-    print("└── thumbnails/    # Video thumbnails")
+    print(" videos/        # Processed videos")
+    print(" frames/        # Detection frames")
+    print(" thumbnails/    # Video thumbnails")
     
-    print("\n✅ Integration ready! Add to your app.py now!")
+    print("\n Integration ready! Add to your app.py now!")

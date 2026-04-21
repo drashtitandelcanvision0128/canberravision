@@ -71,7 +71,7 @@ try:
         initialize_gpu_environment
     )
     OPTIMIZED_PADDLEOCR_AVAILABLE = True
-    print("[INFO] 🚀 Optimized PaddleOCR GPU integration loaded (PRIMARY)")
+    print("[INFO]  Optimized PaddleOCR GPU integration loaded (PRIMARY)")
 except ImportError:
     # FALLBACK: Use our new optimized GPU text extraction
     try:
@@ -82,7 +82,7 @@ except ImportError:
             initialize_gpu_environment
         )
         OPTIMIZED_PADDLEOCR_AVAILABLE = True
-        print("[INFO] 🚀 Optimized GPU Text Extraction loaded (PRIMARY FALLBACK)")
+        print("[INFO]  Optimized GPU Text Extraction loaded (PRIMARY FALLBACK)")
     except ImportError:
         OPTIMIZED_PADDLEOCR_AVAILABLE = False
         print("[WARNING] Optimized PaddleOCR GPU integration not available")
@@ -288,11 +288,11 @@ def _detect_license_plates_in_vehicles(image_bgr: np.ndarray, vehicles_detected:
             
             if full_x2 > full_x1 and full_y2 > full_y1:
                 license_plate_regions.append((full_x1, full_y1, full_x2, full_y2))
-                print(f"[DEBUG] ✅ License plate found in {vehicle['class_name']}: ({full_x1},{full_y1},{full_x2},{full_y2})")
+                print(f"[DEBUG]  License plate found in {vehicle['class_name']}: ({full_x1},{full_y1},{full_x2},{full_y2})")
             else:
-                print(f"[DEBUG] ❌ Invalid license plate coordinates: ({full_x1},{full_y1},{full_x2},{full_y2})")
+                print(f"[DEBUG]  Invalid license plate coordinates: ({full_x1},{full_y1},{full_x2},{full_y2})")
         else:
-            print(f"[DEBUG] ❌ No license plate found in {vehicle['class_name']}")
+            print(f"[DEBUG]  No license plate found in {vehicle['class_name']}")
     
     print(f"[DEBUG] Found {len(license_plate_regions)} license plates total")
     return license_plate_regions
@@ -456,7 +456,7 @@ def _detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
                             }
                         }
                         detected_vehicles.append(vehicle_info)
-                        print(f"[DEBUG] 🚗 Vehicle detected: {class_name} (conf: {confidence:.3f})")
+                        print(f"[DEBUG]  Vehicle detected: {class_name} (conf: {confidence:.3f})")
         
         return detected_vehicles
         
@@ -559,7 +559,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
         print(f"[DEBUG] Step 0: Starting comprehensive text extraction...")
         vehicles_detected = _detect_vehicles_in_image(image_bgr)
         
-        print(f"[DEBUG] ✅ Text extraction will run for ALL images")
+        print(f"[DEBUG]  Text extraction will run for ALL images")
         print(f"[DEBUG] Vehicles detected: {[v['class_name'] for v in vehicles_detected] if vehicles_detected else 'None'}")
         print(f"[DEBUG] Proceeding with text extraction...")
         
@@ -588,7 +588,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                     if _is_vehicle_related_text(cleaned_plate, vehicles_detected):
                         # RE-ENABLE STRICT VALIDATION TO PREVENT FALSE POSITIVES
                         if _validate_license_plate_in_image(plate_crop, cleaned_plate):
-                            print(f"[DEBUG] ✅ Strict validation passed for: {cleaned_plate}")
+                            print(f"[DEBUG]  Strict validation passed for: {cleaned_plate}")
                             # Add to license plates list
                             result["text_extraction"]["license_plates"].append({
                                 "object_id": f"license_plate_{i}",
@@ -600,11 +600,11 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                                 }
                             })
                             result["text_extraction"]["summary"]["license_plates_found"] += 1
-                            print(f"[DEBUG] ✅ Found VALID vehicle license plate: {cleaned_plate}")
+                            print(f"[DEBUG]  Found VALID vehicle license plate: {cleaned_plate}")
                         else:
-                            print(f"[DEBUG] ❌ REJECTED license plate - validation failed: {cleaned_plate}")
+                            print(f"[DEBUG]  REJECTED license plate - validation failed: {cleaned_plate}")
                     else:
-                        print(f"[DEBUG] ❌ REJECTED non-vehicle license plate: {cleaned_plate} (no vehicles detected)")
+                        print(f"[DEBUG]  REJECTED non-vehicle license plate: {cleaned_plate} (no vehicles detected)")
         
         # STEP 3: Detect other objects in the image (excluding license plate regions)
         print(f"[DEBUG] Step 3: Detecting other objects...")
@@ -705,7 +705,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                             ])
                             result["text_extraction"]["summary"]["general_text_found"] += len(text_found["general_text"])
                             for text_item in text_found["general_text"]:
-                                print(f"[DEBUG] ✅ General text found: {text_item['text']}")
+                                print(f"[DEBUG]  General text found: {text_item['text']}")
                     
                     result["text_extraction"]["all_objects"].append(object_info)
                     result["text_extraction"]["summary"]["total_objects"] += 1
@@ -790,7 +790,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
         print("[DEBUG] Trying multi-angle extraction for angled plates...")
         multi_angle_result = _try_multi_angle_ocr(plate_crop)
         if multi_angle_result:
-            print(f"[DEBUG] ✅ Multi-angle extraction found: {multi_angle_result}")
+            print(f"[DEBUG]  Multi-angle extraction found: {multi_angle_result}")
             return multi_angle_result
         
         # Try Tesseract with standard preprocessing
@@ -817,7 +817,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                 cleaned = text.strip().upper()
                 
                 if cleaned and len(cleaned) >= 4:
-                    print(f"[DEBUG] ✅ Tesseract found: {cleaned}")
+                    print(f"[DEBUG]  Tesseract found: {cleaned}")
                     return cleaned
                 else:
                     print(f"[DEBUG] Tesseract result too short: '{cleaned}'")
@@ -829,7 +829,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
         # Method 2: Optimized PaddleOCR GPU (if available)
         if OPTIMIZED_PADDLEOCR_AVAILABLE:
             try:
-                print("[DEBUG] 🚀 Using Optimized PaddleOCR GPU for license plate extraction")
+                print("[DEBUG]  Using Optimized PaddleOCR GPU for license plate extraction")
                 
                 paddleocr_result = extract_text_optimized(
                     plate_crop, 
@@ -843,7 +843,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                 if paddleocr_result["text"] and paddleocr_result["text"].strip():
                     cleaned = _clean_license_plate_text(paddleocr_result["text"])
                     if cleaned and len(cleaned) >= 4:
-                        print(f"[DEBUG] ✅ Optimized PaddleOCR found: {cleaned}")
+                        print(f"[DEBUG]  Optimized PaddleOCR found: {cleaned}")
                         return cleaned
                 
             except Exception as e:
@@ -878,13 +878,13 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     cleaned = _clean_license_plate_text(text.strip())
                     
                     if cleaned and len(cleaned) >= 6 and _is_valid_indian_license_plate(cleaned):
-                        print(f"[DEBUG] ✅ {method_name} with config {config} found: {cleaned}")
+                        print(f"[DEBUG]  {method_name} with config {config} found: {cleaned}")
                         return cleaned
                         
             except Exception as e:
                 continue
         
-        print("[DEBUG] ❌ All OCR methods failed")
+        print("[DEBUG]  All OCR methods failed")
         return ""
         
     except Exception as e:
@@ -961,7 +961,7 @@ def _try_multi_angle_ocr(plate_crop: np.ndarray) -> Optional[str]:
                         has_numbers = sum(c.isdigit() for c in cleaned) >= 1
                         
                         if has_letters and has_numbers:
-                            print(f"[DEBUG] ✅ Multi-angle OCR found at {angle}°: {cleaned}")
+                            print(f"[DEBUG]  Multi-angle OCR found at {angle}°: {cleaned}")
                             return cleaned
                             
             except Exception as e:
@@ -985,7 +985,7 @@ def _try_multi_angle_ocr(plate_crop: np.ndarray) -> Optional[str]:
                     has_numbers = sum(c.isdigit() for c in cleaned) >= 1
                     
                     if has_letters and has_numbers:
-                        print(f"[DEBUG] ✅ Perspective correction found: {cleaned}")
+                        print(f"[DEBUG]  Perspective correction found: {cleaned}")
                         return cleaned
             except Exception as e:
                 pass
@@ -1155,7 +1155,7 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
         paddleocr_success = False
         if OPTIMIZED_PADDLEOCR_AVAILABLE:
             try:
-                print(f"[DEBUG] 🚀 Trying PaddleOCR GPU for {class_name} text extraction")
+                print(f"[DEBUG]  Trying PaddleOCR GPU for {class_name} text extraction")
                 paddleocr_result = extract_text_optimized(
                     crop_bgr, 
                     confidence_threshold=0.4,
@@ -1181,15 +1181,15 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                             "method": "paddleocr_gpu"
                         })
                         paddleocr_success = True
-                        print(f"[DEBUG] ✅ PaddleOCR GPU found text: {cleaned_general}")
+                        print(f"[DEBUG]  PaddleOCR GPU found text: {cleaned_general}")
                 
             except Exception as e:
-                print(f"[DEBUG] ❌ PaddleOCR GPU failed: {e}")
+                print(f"[DEBUG]  PaddleOCR GPU failed: {e}")
         
         # Method 3: Legacy PaddleOCR (SECONDARY if optimized fails)
         if PADDLEOCR_AVAILABLE and not paddleocr_success:
             try:
-                print(f"[DEBUG] 🔄 Trying Legacy PaddleOCR for {class_name}")
+                print(f"[DEBUG]  Trying Legacy PaddleOCR for {class_name}")
                 processed_crop = preprocess_image_for_paddleocr(crop_bgr)
                 paddleocr_result = extract_text_with_paddleocr(
                     processed_crop, 
@@ -1213,15 +1213,15 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                             "method": "paddleocr_legacy"
                         })
                         paddleocr_success = True
-                        print(f"[DEBUG] ✅ Legacy PaddleOCR found text: {cleaned_general}")
+                        print(f"[DEBUG]  Legacy PaddleOCR found text: {cleaned_general}")
                 
             except Exception as e:
-                print(f"[DEBUG] ❌ Legacy PaddleOCR failed: {e}")
+                print(f"[DEBUG]  Legacy PaddleOCR failed: {e}")
         
         # Method 4: LightOnOCR (FALLBACK when PaddleOCR fails)
         if LIGHTON_AVAILABLE and not paddleocr_success:
             try:
-                print(f"[DEBUG] 🔧 Using LightOnOCR fallback for {class_name}")
+                print(f"[DEBUG]  Using LightOnOCR fallback for {class_name}")
                 lighton_result = extract_text_with_lighton(crop_bgr, confidence_threshold=0.3)
                 if lighton_result and lighton_result.strip():
                     cleaned_general = _clean_general_text(lighton_result)
@@ -1238,9 +1238,9 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                             "confidence": 0.7,
                             "method": "lighton_ocr_fallback"
                         })
-                        print(f"[DEBUG] ✅ LightOnOCR fallback found text: {cleaned_general}")
+                        print(f"[DEBUG]  LightOnOCR fallback found text: {cleaned_general}")
             except Exception as e:
-                print(f"[DEBUG] ❌ LightOnOCR fallback failed: {e}")
+                print(f"[DEBUG]  LightOnOCR fallback failed: {e}")
         
         # Method 5: Tesseract OCR (LAST FALLBACK)
         if not paddleocr_success:
@@ -1268,7 +1268,7 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                             "confidence": 0.6,
                             "method": "tesseract_fallback"
                         })
-                        print(f"[DEBUG] ✅ Tesseract fallback found text: {cleaned_tess}")
+                        print(f"[DEBUG]  Tesseract fallback found text: {cleaned_tess}")
         
         # Method 6: Specialized OCR for different object types
         specialized_text = _extract_specialized_text(crop_bgr, class_name)
@@ -1294,7 +1294,7 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
     
     try:
         # Method 1: Optimized PaddleOCR GPU (PRIMARY - FORCE RUN)
-        print("[DEBUG] 🚀 FORCING Optimized PaddleOCR for full image text extraction...")
+        print("[DEBUG]  FORCING Optimized PaddleOCR for full image text extraction...")
         
         if OPTIMIZED_PADDLEOCR_AVAILABLE:
             try:
@@ -1318,7 +1318,7 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                             "confidence": paddleocr_result["confidence"],
                             "method": "full_image_optimized_paddleocr"
                         })
-                        print(f"[DEBUG] ✅ Optimized PaddleOCR SUCCESS: '{cleaned}' (conf: {paddleocr_result['confidence']:.3f})")
+                        print(f"[DEBUG]  Optimized PaddleOCR SUCCESS: '{cleaned}' (conf: {paddleocr_result['confidence']:.3f})")
                         
                         # Extract individual text regions for better JSON output
                         if paddleocr_result.get("text_regions"):
@@ -1331,19 +1331,19 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                                         "method": "full_image_optimized_paddleocr_region",
                                         "bounding_box": region.get("bbox")
                                     })
-                                    print(f"[DEBUG] ✅ PaddleOCR region: '{region_text}'")
+                                    print(f"[DEBUG]  PaddleOCR region: '{region_text}'")
                 else:
-                    print(f"[DEBUG] ❌ PaddleOCR returned empty text: '{paddleocr_result['text']}'")
+                    print(f"[DEBUG]  PaddleOCR returned empty text: '{paddleocr_result['text']}'")
                 
             except Exception as e:
-                print(f"[DEBUG] ❌ Optimized PaddleOCR failed: {e}")
+                print(f"[DEBUG]  Optimized PaddleOCR failed: {e}")
                 import traceback
                 traceback.print_exc()
         else:
-            print(f"[DEBUG] ❌ OPTIMIZED_PADDLEOCR_AVAILABLE is False")
+            print(f"[DEBUG]  OPTIMIZED_PADDLEOCR_AVAILABLE is False")
         
         # Method 1.5: Enhanced Multi-Angle Extraction (FORCE RUN)
-        print("[DEBUG] ✨ FORCING Enhanced Multi-Angle extraction...")
+        print("[DEBUG]  FORCING Enhanced Multi-Angle extraction...")
         
         try:
             from optimized_paddleocr_gpu import extract_text_with_multiple_angles
@@ -1365,7 +1365,7 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                         "method": "full_image_enhanced_multi_angle",
                         "angle_corrected": enhanced_result.get('angle_corrected', False)
                     })
-                    print(f"[DEBUG] ✅ Enhanced Multi-Angle SUCCESS: '{cleaned}' (angle_corrected: {enhanced_result.get('angle_corrected', False)})")
+                    print(f"[DEBUG]  Enhanced Multi-Angle SUCCESS: '{cleaned}' (angle_corrected: {enhanced_result.get('angle_corrected', False)})")
                     
                     # Add enhanced regions
                     if enhanced_result.get('text_regions'):
@@ -1379,12 +1379,12 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                                     "bounding_box": region.get('bbox'),
                                     "angle_corrected": enhanced_result.get('angle_corrected', False)
                                 })
-                                print(f"[DEBUG] ✅ Enhanced region: '{region_text}'")
+                                print(f"[DEBUG]  Enhanced region: '{region_text}'")
             else:
-                print(f"[DEBUG] ❌ Enhanced returned empty text: '{enhanced_result['text']}'")
+                print(f"[DEBUG]  Enhanced returned empty text: '{enhanced_result['text']}'")
                 
         except Exception as e:
-            print(f"[DEBUG] ❌ Enhanced multi-angle failed: {e}")
+            print(f"[DEBUG]  Enhanced multi-angle failed: {e}")
             import traceback
             traceback.print_exc()
         
@@ -1408,9 +1408,9 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                             "confidence": 0.7,
                             "method": "full_image_legacy_paddleocr"
                         })
-                        print(f"[DEBUG] ✅ Legacy PaddleOCR SUCCESS: '{cleaned}'")
+                        print(f"[DEBUG]  Legacy PaddleOCR SUCCESS: '{cleaned}'")
             except Exception as e:
-                print(f"[DEBUG] ❌ Legacy PaddleOCR failed: {e}")
+                print(f"[DEBUG]  Legacy PaddleOCR failed: {e}")
         
         # Method 3: LightOnOCR (ONLY IF OTHERS FAIL)
         if LIGHTON_AVAILABLE and not text_items:
@@ -1425,9 +1425,9 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                             "confidence": 0.6,
                             "method": "full_image_lighton"
                         })
-                        print(f"[DEBUG] ✅ LightOnOCR SUCCESS: '{cleaned}'")
+                        print(f"[DEBUG]  LightOnOCR SUCCESS: '{cleaned}'")
             except Exception as e:
-                print(f"[DEBUG] ❌ LightOnOCR failed: {e}")
+                print(f"[DEBUG]  LightOnOCR failed: {e}")
         
         # Method 4: Tesseract (LAST FALLBACK - if available)
         if TESSERACT_AVAILABLE and not text_items:
@@ -1443,9 +1443,9 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
                             "confidence": 0.5,
                             "method": "full_image_tesseract"
                         })
-                        print(f"[DEBUG] ✅ Tesseract SUCCESS: '{cleaned}'")
+                        print(f"[DEBUG]  Tesseract SUCCESS: '{cleaned}'")
             except Exception as e:
-                print(f"[DEBUG] ❌ Tesseract failed: {e}")
+                print(f"[DEBUG]  Tesseract failed: {e}")
         
         # Special handling: Look for license plates in any extracted text
         all_text = " ".join([item["text"] for item in text_items])
@@ -1485,7 +1485,7 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
     # Method 1: Optimized PaddleOCR GPU (PRIMARY - BEST ACCURACY + SPEED)
     if OPTIMIZED_PADDLEOCR_AVAILABLE:
         try:
-            print("[DEBUG] 🚀 Using Optimized PaddleOCR GPU for text extraction")
+            print("[DEBUG]  Using Optimized PaddleOCR GPU for text extraction")
             result = extract_text_optimized(
                 crop_bgr, 
                 confidence_threshold=0.4,
@@ -1604,7 +1604,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         estimated_max_width = expected_chars * max_char_width
         
         if not (estimated_min_width <= w <= estimated_max_width * 2):
-            print(f"[DEBUG] ❌ Plate size doesn't match text length: {w}px vs {expected_chars} chars")
+            print(f"[DEBUG]  Plate size doesn't match text length: {w}px vs {expected_chars} chars")
             return False
         
         # Method 2: Visual character verification
@@ -1632,7 +1632,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         
         # Allow some tolerance (some characters might be merged or split)
         if not (visual_char_count >= expected_chars * 0.4 and visual_char_count <= expected_chars * 2.0):
-            print(f"[DEBUG] ❌ Visual character count doesn't match text")
+            print(f"[DEBUG]  Visual character count doesn't match text")
             # Don't immediately reject, continue with other validations
         
         # Method 3: Cross-validate with different OCR methods
@@ -1693,7 +1693,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         # Method 4: Plate structure validation
         # Check if the detected text follows realistic license plate patterns
         if not _is_realistic_license_plate_pattern(plate_text):
-            print(f"[DEBUG] ❌ Unreliable license plate pattern: {plate_text}")
+            print(f"[DEBUG]  Unreliable license plate pattern: {plate_text}")
             return False
         
         # Final decision based on all validations
@@ -1721,9 +1721,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         is_valid = validation_score >= 2
         
         if is_valid:
-            print(f"[DEBUG] ✅ License plate validation PASSED: {plate_text}")
+            print(f"[DEBUG]  License plate validation PASSED: {plate_text}")
         else:
-            print(f"[DEBUG] ❌ License plate validation FAILED: {plate_text}")
+            print(f"[DEBUG]  License plate validation FAILED: {plate_text}")
         
         return is_valid
         
@@ -1751,14 +1751,14 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         has_letter = any(c.isalpha() for c in plate_upper)
         
         if not (has_digit and has_letter):
-            print(f"[DEBUG] ❌ Plate missing digits or letters: {plate_text}")
+            print(f"[DEBUG]  Plate missing digits or letters: {plate_text}")
             return False
         
         # Rule 2: Reject patterns that look like OCR errors
         # Too many repeated characters might indicate OCR errors
         repeated_chars = plate_upper.count(plate_upper[0]) if plate_upper else 0
         if repeated_chars > len(plate_upper) * 0.6:
-            print(f"[DEBUG] ❌ Too many repeated characters: {plate_text}")
+            print(f"[DEBUG]  Too many repeated characters: {plate_text}")
             return False
         
         # Rule 3: Reject obviously unrealistic patterns
@@ -1774,17 +1774,17 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         
         # SPECIFIC REJECTION: Known false positive patterns
         if plate_upper == "EEAH56AY":
-            print(f"[DEBUG] ❌ Known false positive pattern: {plate_text}")
+            print(f"[DEBUG]  Known false positive pattern: {plate_text}")
             return False
         
         for pattern in ocr_error_patterns:
             if re.match(pattern, plate_upper):
-                print(f"[DEBUG] ❌ Suspicious pattern detected: {plate_text}")
+                print(f"[DEBUG]  Suspicious pattern detected: {plate_text}")
                 return False
         
         # Rule 4: Length should be reasonable (6-12 characters for most plates)
         if not (6 <= len(plate_upper) <= 12):
-            print(f"[DEBUG] ❌ Unreasonable length: {len(plate_upper)} chars in {plate_text}")
+            print(f"[DEBUG]  Unreasonable length: {len(plate_upper)} chars in {plate_text}")
             return False
         
         # Rule 5: Should follow some basic license plate structure
@@ -1805,7 +1805,7 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         
         # STRONGER: For Indian plates, must start with valid state code
         if starts_with_state_code and (re.match(indian_pattern1, plate_upper) or re.match(indian_pattern2, plate_upper)):
-            print(f"[DEBUG] ✅ Valid INDIAN license plate pattern: {plate_text}")
+            print(f"[DEBUG]  Valid INDIAN license plate pattern: {plate_text}")
             return True
         
         # More restrictive international pattern (avoid false positives)
@@ -1817,11 +1817,11 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         if letter_count > 0 and number_count > 0:
             ratio = max(letter_count, number_count) / min(letter_count, number_count)
             if ratio <= 3:  # Reasonable balance
-                print(f"[DEBUG] ✅ Valid international license plate pattern: {plate_text}")
+                print(f"[DEBUG]  Valid international license plate pattern: {plate_text}")
                 return True
         
         # REJECT suspicious patterns that don't meet criteria
-        print(f"[DEBUG] ❌ INVALID license plate pattern: {plate_text} (L:{letter_count}, N:{number_count}, Ratio:{ratio if letter_count > 0 and number_count > 0 else 'N/A'})")
+        print(f"[DEBUG]  INVALID license plate pattern: {plate_text} (L:{letter_count}, N:{number_count}, Ratio:{ratio if letter_count > 0 and number_count > 0 else 'N/A'})")
         return False
         
     except Exception as e:
@@ -2056,7 +2056,7 @@ def _is_valid_indian_license_plate(text: str) -> bool:
     if len(alnum_text) >= 3:
         # Accept most alphanumeric sequences of reasonable length
         if 3 <= len(alnum_text) <= 15:
-            print(f"[DEBUG] ✅ VERY LENIENT validation passed for: {text}")
+            print(f"[DEBUG]  VERY LENIENT validation passed for: {text}")
             return True
     
     return False
@@ -2244,7 +2244,7 @@ def format_text_extraction_results(json_result: dict) -> str:
     summary = extraction["summary"]
     
     lines = []
-    lines.append("📝 **Text Extraction Results:**")
+    lines.append(" **Text Extraction Results:**")
     lines.append(f"   Total Objects: {summary['total_objects']}")
     lines.append(f"   Objects with Text: {summary['objects_with_text']}")
     lines.append(f"   License Plates Found: {summary['license_plates_found']}")
@@ -2253,21 +2253,21 @@ def format_text_extraction_results(json_result: dict) -> str:
     
     # Show license plates
     if extraction["license_plates"]:
-        lines.append("🚗 **License Plates:**")
+        lines.append(" **License Plates:**")
         for plate in extraction["license_plates"]:
             lines.append(f"   • {plate['plate_text']} (confidence: {plate['confidence']:.2f})")
         lines.append("")
     
     # Show general text
     if extraction["general_text"]:
-        lines.append("📄 **General Text:**")
+        lines.append(" **General Text:**")
         for text_item in extraction["general_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")
     
     # Show full image text
     if "full_image_text" in extraction and extraction["full_image_text"]:
-        lines.append("🖼️ **Full Image Text:**")
+        lines.append(" **Full Image Text:**")
         for text_item in extraction["full_image_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")

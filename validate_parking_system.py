@@ -30,13 +30,13 @@ def validate_system_components():
         "apps"
     ]
     
-    print("📁 Checking directories...")
+    print(" Checking directories...")
     all_dirs_exist = True
     for dir_path in required_dirs:
         if Path(dir_path).exists():
-            print(f"  ✅ {dir_path}")
+            print(f"   {dir_path}")
         else:
-            print(f"  ❌ {dir_path} - Missing")
+            print(f"   {dir_path} - Missing")
             all_dirs_exist = False
             
     # Check required files
@@ -50,54 +50,54 @@ def validate_system_components():
         "apps/parking_dashboard.py"
     ]
     
-    print("\n📄 Checking core files...")
+    print("\n Checking core files...")
     all_files_exist = True
     for file_path in required_files:
         if Path(file_path).exists():
-            print(f"  ✅ {file_path}")
+            print(f"   {file_path}")
         else:
-            print(f"  ❌ {file_path} - Missing")
+            print(f"   {file_path} - Missing")
             all_files_exist = False
             
     # Check Python imports
-    print("\n🐍 Checking Python imports...")
+    print("\n Checking Python imports...")
     try:
         import yaml
-        print("  ✅ yaml")
+        print("   yaml")
     except ImportError:
-        print("  ❌ yaml - Missing")
+        print("   yaml - Missing")
         all_files_exist = False
         
     try:
         import cv2
-        print("  ✅ opencv")
+        print("   opencv")
     except ImportError:
-        print("  ❌ opencv - Missing")
+        print("   opencv - Missing")
         all_files_exist = False
         
     try:
         import numpy as np
-        print("  ✅ numpy")
+        print("   numpy")
     except ImportError:
-        print("  ❌ numpy - Missing")
+        print("   numpy - Missing")
         all_files_exist = False
         
     try:
         from ultralytics import YOLO
-        print("  ✅ ultralytics")
+        print("   ultralytics")
     except ImportError:
-        print("  ❌ ultralytics - Missing")
+        print("   ultralytics - Missing")
         all_files_exist = False
         
     return all_dirs_exist and all_files_exist
 
 def validate_configuration():
     """Validate parking configuration file"""
-    print("\n⚙️  Validating configuration...")
+    print("\n  Validating configuration...")
     
     config_path = "parking_dataset/config/parking_zones.yaml"
     if not Path(config_path).exists():
-        print("  ❌ Configuration file not found")
+        print("   Configuration file not found")
         return False
         
     try:
@@ -106,11 +106,11 @@ def validate_configuration():
             
         # Check zones
         if 'zones' not in config:
-            print("  ❌ No zones defined in configuration")
+            print("   No zones defined in configuration")
             return False
             
         zones = config['zones']
-        print(f"  ✅ Found {len(zones)} zones")
+        print(f"   Found {len(zones)} zones")
         
         total_spots = 0
         total_cameras = 0
@@ -122,7 +122,7 @@ def validate_configuration():
             required_fields = ['name', 'total_spots', 'cameras', 'camera_ids', 'coordinates']
             for field in required_fields:
                 if field not in zone_config:
-                    print(f"      ❌ Missing field: {field}")
+                    print(f"       Missing field: {field}")
                     return False
                     
             total_spots += zone_config['total_spots']
@@ -131,28 +131,28 @@ def validate_configuration():
             # Check camera coordinates
             for camera_id in zone_config['camera_ids']:
                 if camera_id not in zone_config['coordinates']:
-                    print(f"      ❌ Missing coordinates for camera {camera_id}")
+                    print(f"       Missing coordinates for camera {camera_id}")
                     return False
                     
                 camera_spots = zone_config['coordinates'][camera_id]['spots']
                 print(f"      Camera {camera_id}: {len(camera_spots)} spots")
                 
-        print(f"  ✅ Total: {total_spots} spots, {total_cameras} cameras")
+        print(f"   Total: {total_spots} spots, {total_cameras} cameras")
         
         # Check detection config
         if 'detection_config' in config:
             det_config = config['detection_config']
-            print(f"  ✅ Detection config: confidence={det_config.get('confidence_threshold', 0.85)}")
+            print(f"   Detection config: confidence={det_config.get('confidence_threshold', 0.85)}")
             
         return True
         
     except Exception as e:
-        print(f"  ❌ Configuration error: {e}")
+        print(f"   Configuration error: {e}")
         return False
 
 def validate_model_availability():
     """Check if YOLO models are available"""
-    print("\n🤖 Validating model availability...")
+    print("\n Validating model availability...")
     
     model_files = [
         "yolov8n.pt",
@@ -165,37 +165,37 @@ def validate_model_availability():
     for model_file in model_files:
         if Path(model_file).exists():
             size_mb = Path(model_file).stat().st_size / (1024*1024)
-            print(f"  ✅ {model_file} ({size_mb:.1f} MB)")
+            print(f"   {model_file} ({size_mb:.1f} MB)")
             models_found += 1
         else:
-            print(f"  ⚠️  {model_file} - Not found (will be downloaded automatically)")
+            print(f"    {model_file} - Not found (will be downloaded automatically)")
             
     # Test model loading
     try:
         from ultralytics import YOLO
-        print("  🔄 Testing model loading...")
+        print("   Testing model loading...")
         model = YOLO('yolov8n.pt')  # This will download if not present
-        print(f"  ✅ Model loaded successfully: {len(model.names)} classes")
+        print(f"   Model loaded successfully: {len(model.names)} classes")
         print(f"    Classes: {', '.join(list(model.names.values())[:5])}...")
         return True
     except Exception as e:
-        print(f"  ❌ Model loading failed: {e}")
+        print(f"   Model loading failed: {e}")
         return False
 
 def validate_detection_pipeline():
     """Test the detection pipeline with sample data"""
-    print("\n🔍 Validating detection pipeline...")
+    print("\n Validating detection pipeline...")
     
     try:
         from modules.parking_detection import ParkingDetector
         
         # Initialize detector
         detector = ParkingDetector("parking_dataset/config/parking_zones.yaml")
-        print("  ✅ ParkingDetector initialized")
+        print("   ParkingDetector initialized")
         
         # Create test frame
         test_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-        print("  ✅ Test frame created")
+        print("   Test frame created")
         
         # Test zone processing (if zones exist)
         if detector.config.get('zones'):
@@ -205,35 +205,35 @@ def validate_detection_pipeline():
             frames = {first_camera: test_frame}
             zone_result = detector.process_zone(frames, first_zone)
             
-            print(f"  ✅ Zone processing successful: {zone_result.zone_id}")
+            print(f"   Zone processing successful: {zone_result.zone_id}")
             print(f"    Processed {len(zone_result.spot_details)} spots")
             
             # Test JSON output
             json_output = detector.get_json_output({first_zone: zone_result})
             parsed = json.loads(json_output)
-            print("  ✅ JSON output format valid")
+            print("   JSON output format valid")
             
         return True
         
     except Exception as e:
-        print(f"  ❌ Detection pipeline error: {e}")
+        print(f"   Detection pipeline error: {e}")
         return False
 
 def validate_web_dashboard():
     """Test web dashboard components"""
-    print("\n🌐 Validating web dashboard...")
+    print("\n Validating web dashboard...")
     
     try:
         # Check Flask availability
         import flask
-        print("  ✅ Flask available")
+        print("   Flask available")
         
         # Check dashboard file
         dashboard_path = "apps/parking_dashboard.py"
         if Path(dashboard_path).exists():
-            print("  ✅ Dashboard script exists")
+            print("   Dashboard script exists")
         else:
-            print("  ❌ Dashboard script missing")
+            print("   Dashboard script missing")
             return False
             
         # Test dashboard initialization (without starting server)
@@ -241,19 +241,19 @@ def validate_web_dashboard():
         try:
             from parking_dashboard import ParkingWebAPI
             api = ParkingWebAPI()
-            print("  ✅ Web API can be initialized")
+            print("   Web API can be initialized")
         except Exception as e:
-            print(f"  ⚠️  Web API initialization issue: {e}")
+            print(f"    Web API initialization issue: {e}")
             
         return True
         
     except ImportError:
-        print("  ❌ Flask not available - install with: pip install flask flask-cors")
+        print("   Flask not available - install with: pip install flask flask-cors")
         return False
 
 def run_performance_test():
     """Run basic performance test"""
-    print("\n⚡ Running performance test...")
+    print("\n Running performance test...")
     
     try:
         from modules.parking_detection import ParkingDetector
@@ -274,25 +274,25 @@ def run_performance_test():
             zone_result = detector.process_zone(frames, first_zone)
             processing_time = time.time() - start_time
             
-            print(f"  📊 Performance Results:")
+            print(f"   Performance Results:")
             print(f"    Frame size: {test_frame.shape}")
             print(f"    Spots processed: {len(zone_result.spot_details)}")
             print(f"    Processing time: {processing_time:.3f}s")
             
             if processing_time < 1.0:
-                print("  ✅ Meets < 1 second requirement")
+                print("   Meets < 1 second requirement")
             else:
-                print("  ⚠️  Exceeds 1 second requirement")
+                print("    Exceeds 1 second requirement")
                 
             return processing_time < 1.0
             
     except Exception as e:
-        print(f"  ❌ Performance test failed: {e}")
+        print(f"   Performance test failed: {e}")
         return False
 
 def generate_validation_report():
     """Generate final validation report"""
-    print("\n📋 Generating validation report...")
+    print("\n Generating validation report...")
     
     report = {
         "validation_timestamp": datetime.now().isoformat(),
@@ -343,41 +343,41 @@ def generate_validation_report():
     with open(report_path, 'w') as f:
         json.dump(report, f, indent=2)
         
-    print(f"  ✅ Report saved: {report_path}")
+    print(f"   Report saved: {report_path}")
     return report
 
 def main():
     """Main validation function"""
-    print("🚗 YOLO26 Parking Detection System Validation")
+    print(" YOLO26 Parking Detection System Validation")
     print("=" * 50)
     
     # Run complete validation
     report = generate_validation_report()
     
     # Print summary
-    print(f"\n📊 Validation Summary:")
+    print(f"\n Validation Summary:")
     print(f"  Status: {report['system_status']}")
     print(f"  Timestamp: {report['validation_timestamp']}")
     
-    print(f"\n🔧 Component Status:")
+    print(f"\n Component Status:")
     for component, status in report['components'].items():
-        status_icon = "✅" if status == "PASS" else "❌"
+        status_icon = "" if status == "PASS" else ""
         print(f"  {status_icon} {component}: {status}")
     
-    print(f"\n💡 Recommendations:")
+    print(f"\n Recommendations:")
     for i, rec in enumerate(report['recommendations'], 1):
         print(f"  {i}. {rec}")
     
     if report['system_status'] == 'READY':
-        print(f"\n🎉 System validation completed successfully!")
+        print(f"\n System validation completed successfully!")
         print(f"   Your parking detection system is ready to use.")
-        print(f"\n🚀 Next steps:")
+        print(f"\n Next steps:")
         print(f"   1. Run: python parking_dataset/create_dataset.py")
         print(f"   2. Run: python parking_dataset/train_parking_model.py") 
         print(f"   3. Run: python apps/parking_dashboard.py")
         print(f"   4. Open: http://localhost:5000")
     else:
-        print(f"\n⚠️  System needs attention before deployment.")
+        print(f"\n  System needs attention before deployment.")
         print(f"   Please address the failed components above.")
     
     return report['system_status'] == 'READY'

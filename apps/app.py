@@ -1,4 +1,4 @@
-# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# Ultralytics  AGPL-3.0 License - https://ultralytics.com/license
 
 import tempfile
 import signal
@@ -59,6 +59,47 @@ import torch
 import torchvision
 from torchvision.models import resnet18, ResNet18_Weights
 from ultralytics import YOLO
+
+# Import fast_alpr for license plate detection
+try:
+    from fast_alpr import ALPR
+    ALPR_AVAILABLE = True
+    print("[INFO] fast_alpr loaded successfully")
+except ImportError as e:
+    ALPR_AVAILABLE = False
+    print(f"[WARNING] fast_alpr import failed: {e}")
+    import traceback
+    traceback.print_exc()
+except Exception as e:
+    ALPR_AVAILABLE = False
+    print(f"[ERROR] Unexpected error importing fast_alpr: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Initialize ALPR globally if available
+alpr = None
+if ALPR_AVAILABLE:
+    try:
+        # Try with specific models first
+        print("[INFO] Initializing ALPR with specific models...")
+        alpr = ALPR(
+            detector_model="yolo-v9-t-384-license-plate-end2end",
+            ocr_model="cct-xs-v2-global-model",
+        )
+        print("[INFO] ALPR initialized successfully with custom models")
+    except Exception as e:
+        print(f"[WARNING] Failed to initialize ALPR with custom models: {e}")
+        import traceback
+        traceback.print_exc()
+        # Try with default models as fallback
+        try:
+            print("[INFO] Trying ALPR with default models...")
+            alpr = ALPR()
+            print("[INFO] ALPR initialized successfully with default models")
+        except Exception as e2:
+            print(f"[ERROR] Failed to initialize ALPR with default models: {e2}")
+            import traceback
+            traceback.print_exc()
 
 # Force GPU usage if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -175,8 +216,25 @@ class EnhancedANPRSystem:
             x1, y1, x2, y2 = vehicle_bbox
             vehicle_crop = image[y1:y2, x1:x2]
             
-            # Use text extractor to find license plates
-            result = self.text_extractor.extract_text_comprehensive(vehicle_crop)
+            # Display debug images if available
+            def display_debug_images(debug_images):
+                if debug_images:
+                    print("\n[DEBUG] OCR Pipeline Images:")
+                    for name, img in debug_images.items():
+                        if img is not None:
+                            print(f"  - {name}: {img.shape}")
+            
+            # Use reliable OCR function instead of strict OCR
+            from modules.text_extraction import _extract_text_from_license_plate_crop
+            plate_text = _extract_text_from_license_plate_crop(vehicle_crop)
+            result = {
+                'plate_text': plate_text,
+                'confidence': 0.8 if plate_text else 0.0,
+                'country': 'IN' if plate_text else '',
+                'license_plates': [{'text': plate_text, 'confidence': 0.8}] if plate_text else [],
+                'debug_images': {}
+            }
+            display_debug_images(result.get('debug_images'))
             
             # Look for license plates in results
             for plate_info in result.get('license_plates', []):
@@ -401,7 +459,7 @@ def process_enhanced_anpr(input_image):
         # Check if enhanced ANPR system is available
         if not enhanced_anpr or not enhanced_anpr.yolo_model:
             print("[ERROR] Enhanced ANPR system not properly initialized")
-            return None, "❌ Enhanced ANPR system not available. Please check system initialization.", "", ""
+            return None, " Enhanced ANPR system not available. Please check system initialization.", "", ""
         
         # Try enhanced processing first
         try:
@@ -518,7 +576,7 @@ def process_enhanced_anpr(input_image):
                         'type': 'stolen_vehicle',
                         'severity': 'high',
                         'license_plate': license_plate,
-                        'message': f'🚨 STOLEN VEHICLE: {license_plate}'
+                        'message': f' STOLEN VEHICLE: {license_plate}'
                     })
                 
                 results['vehicles'].append(vehicle_info)
@@ -529,35 +587,35 @@ def process_enhanced_anpr(input_image):
         display_image = enhanced_anpr.create_anpr_display(image, results)
         
         # Generate detailed information text
-        info_text = f"🔍 ANPR Detection Results\n"
-        info_text += f"⏱️ Processing Time: {results['processing_time']}s\n"
-        info_text += f"📅 Date: {results['date']}\n"
-        info_text += f"🕐 Time: {results['timestamp']}\n"
-        info_text += f"🚗 Vehicles Detected: {len(results['vehicles'])}\n"
-        info_text += f"🚨 Active Alerts: {len(results['alerts'])}\n\n"
+        info_text = f" ANPR Detection Results\n"
+        info_text += f" Processing Time: {results['processing_time']}s\n"
+        info_text += f" Date: {results['date']}\n"
+        info_text += f" Time: {results['timestamp']}\n"
+        info_text += f" Vehicles Detected: {len(results['vehicles'])}\n"
+        info_text += f" Active Alerts: {len(results['alerts'])}\n\n"
         
         for vehicle in results['vehicles']:
-            info_text += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            info_text += f"🚗 Vehicle {vehicle['id']}:\n"
-            info_text += f"📋 License Plate: {vehicle['license_plate']}\n"
-            info_text += f"🏭 Make/Model: {vehicle['make']} {vehicle['model']}\n"
-            info_text += f"🎨 Color: {vehicle['color']}\n"
-            info_text += f"⚡ Speed: {vehicle['speed']} km/h\n"
-            info_text += f"👤 Owner: {vehicle['owner']}\n"
-            info_text += f"📊 Confidence: {vehicle['confidence']:.2f}\n"
-            info_text += f"🚨 Status: {'ALERT' if vehicle['alert'] or vehicle['alerts'] else 'Clear'}\n"
+            info_text += f"\n"
+            info_text += f" Vehicle {vehicle['id']}:\n"
+            info_text += f" License Plate: {vehicle['license_plate']}\n"
+            info_text += f" Make/Model: {vehicle['make']} {vehicle['model']}\n"
+            info_text += f" Color: {vehicle['color']}\n"
+            info_text += f" Speed: {vehicle['speed']} km/h\n"
+            info_text += f" Owner: {vehicle['owner']}\n"
+            info_text += f" Confidence: {vehicle['confidence']:.2f}\n"
+            info_text += f" Status: {'ALERT' if vehicle['alert'] or vehicle['alerts'] else 'Clear'}\n"
             
             # Add vehicle-specific alerts
             if vehicle['alerts']:
-                info_text += "⚠️ Alerts:\n"
+                info_text += " Alerts:\n"
                 for alert in vehicle['alerts']:
                     info_text += f"   • {alert['message']}\n"
             
             info_text += "\n"
         
         # Generate database matches with similarity scores
-        db_matches = f"🗄️ Database Matches & Similar Vehicles\n"
-        db_matches += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        db_matches = f" Database Matches & Similar Vehicles\n"
+        db_matches += f"\n\n"
         
         # Add sample database matches
         sample_matches = [
@@ -567,28 +625,28 @@ def process_enhanced_anpr(input_image):
         ]
         
         for match in sample_matches:
-            alert_status = "🚨 ALERT" if match.get('alert') else "✅ Clear"
-            db_matches += f"📋 {match['plate']}\n"
-            db_matches += f"   🏭 Vehicle: {match['make']} {match['model']}\n"
-            db_matches += f"   🎨 Color: {match['color']}\n"
-            db_matches += f"   📊 Match: {match['similarity']:.1%}\n"
-            db_matches += f"   🚨 Status: {alert_status}\n"
+            alert_status = " ALERT" if match.get('alert') else " Clear"
+            db_matches += f" {match['plate']}\n"
+            db_matches += f"    Vehicle: {match['make']} {match['model']}\n"
+            db_matches += f"    Color: {match['color']}\n"
+            db_matches += f"    Match: {match['similarity']:.1%}\n"
+            db_matches += f"    Status: {alert_status}\n"
             if match.get('reason'):
-                db_matches += f"   ⚠️ Reason: {match['reason']}\n"
+                db_matches += f"    Reason: {match['reason']}\n"
             db_matches += "\n"
         
         # Generate active alerts summary
-        alerts_summary = f"🚨 Active Alerts Summary\n"
-        alerts_summary += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        alerts_summary = f" Active Alerts Summary\n"
+        alerts_summary += f"\n\n"
         
         if results['alerts']:
             for i, alert in enumerate(results['alerts'], 1):
-                severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(alert.get('severity', 'medium'), "⚪")
+                severity_icon = {"high": "[HIGH]", "medium": "[MED]", "low": "[LOW]"}.get(alert.get('severity', 'medium'), "[?]")
                 alerts_summary += f"{i}. {severity_icon} {alert['type'].upper()}\n"
-                alerts_summary += f"   📋 Plate: {alert['license_plate']}\n"
-                alerts_summary += f"   📝 Message: {alert['message']}\n\n"
+                alerts_summary += f"    Plate: {alert['license_plate']}\n"
+                alerts_summary += f"    Message: {alert['message']}\n\n"
         else:
-            alerts_summary += "✅ No active alerts\n\n"
+            alerts_summary += " No active alerts\n\n"
         
         # Convert back to RGB for display
         display_image = cv2.cvtColor(display_image, cv2.COLOR_BGR2RGB)
@@ -597,7 +655,7 @@ def process_enhanced_anpr(input_image):
         return display_image, info_text, db_matches, alerts_summary
         
     except Exception as e:
-        error_msg = f"❌ Error processing image: {str(e)}"
+        error_msg = f" Error processing image: {str(e)}"
         print(f"[ERROR] Enhanced ANPR processing failed: {e}")
         return None, error_msg, "", ""
 
@@ -1184,6 +1242,58 @@ CUSTOM_CSS = """
     width: 100% !important;
 }
 
+/* ===== RESPONSIVE IMAGES ===== */
+.responsive-image {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
+.responsive-image img {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+}
+
+/* ===== RESPONSIVE LAYOUT ===== */
+@media (max-width: 768px) {
+    .gradio-container {
+        padding: 10px !important;
+    }
+    
+    .obsidian-btn {
+        padding: 10px 16px !important;
+        font-size: 13px !important;
+    }
+    
+    .obsidian-upload {
+        padding: 30px 15px !important;
+    }
+    
+    /* Stack columns on mobile */
+    .gradio-row {
+        flex-direction: column !important;
+    }
+    
+    .gradio-column {
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .gradio-container {
+        padding: 5px !important;
+    }
+    
+    .obsidian-btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+}
+
 .obsidian-btn:hover {
     transform: translateY(-2px) !important;
     box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4) !important;
@@ -1267,9 +1377,26 @@ CUSTOM_CSS = """
 }
 
 /* ===== HIDE GRADIO DEFAULTS ===== */
+/* Ensure body is always visible - prevents black screen issues */
+body,
+.gradio-container,
+#gradio-app {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
 .gradio-container .footer,
 .gradio-container .gr-footer,
 footer {
+    display: none !important;
+}
+
+/* Hide Gradio 6.x header navigation - top bar with API, Gradio branding, Settings */
+header,
+.gradio-container > div:first-of-type > div:first-of-type,
+.gradio-container > div:nth-child(2),
+#gradio-app > div > div:first-child {
     display: none !important;
 }
 
@@ -1406,7 +1533,7 @@ function toggleTheme() {
     // Update toggle button text
     const toggleBtn = document.querySelector('.theme-toggle');
     if (toggleBtn) {
-        toggleBtn.innerHTML = newTheme === 'light' ? '🌙' : '☀️';
+        toggleBtn.innerHTML = newTheme === 'light' ? '' : '';
     }
     
     // Force refresh of CSS variables and text colors
@@ -1431,12 +1558,7 @@ function forceThemeUpdate(theme) {
         }
     });
     
-    // Force reflow
-    document.body.style.display = 'none';
-    document.body.offsetHeight; // Trigger reflow
-    document.body.style.display = '';
-    
-    // Apply theme again after reflow
+    // Apply theme after short delay (removed problematic force reflow)
     setTimeout(() => {
         document.documentElement.setAttribute('data-theme', theme);
         forceTextColors(theme);
@@ -1471,7 +1593,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create and add theme toggle button
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'theme-toggle';
-    toggleBtn.innerHTML = savedTheme === 'light' ? '🌙' : '☀️';
+    toggleBtn.innerHTML = savedTheme === 'light' ? 'Dark' : 'Light';
     toggleBtn.onclick = toggleTheme;
     toggleBtn.title = 'Toggle Theme';
     
@@ -1657,7 +1779,7 @@ if UNIFIED_DETECTION_AVAILABLE:
         try:
             from unified_detection_module import process_unified_video_detection
         except ImportError:
-            return None, "{}", "⚠️ Unified video detection module not available"
+            return None, "{}", " Unified video detection module not available"
         
         if video_path is None:
             return None, "{}", "Please upload a video first"
@@ -1815,21 +1937,21 @@ if UNIFIED_DETECTION_AVAILABLE:
             }, indent=2)
             
             # Create human-readable summary
-            summary = f"""🎥 **Video Processing Complete!**
+            summary = f""" **Video Processing Complete!**
 
-📊 **Processing Statistics:**
+ **Processing Statistics:**
 • Total Frames: {stats.get('processed_frames', 0)}
 • Processing Time: {stats.get('processing_time', 0):.2f}s
 • Average FPS: {stats.get('fps', 0):.2f}
 
-🚗 **Vehicle Detection:**
+ **Vehicle Detection:**
 • Total Vehicles Detected: {stats.get('vehicles_detected', 0)}
 
-📍 **License Plate Detection:**
+ **License Plate Detection:**
 • Total Plates Found: {stats.get('plates_found', 0)}
 • Unique Plates: {len(stats.get('unique_plates', []))}
 
-💾 **Output:**
+ **Output:**
 • Processed Video: {output_video}
 
 {result.get('summary', '')}"""
@@ -1844,7 +1966,7 @@ if UNIFIED_DETECTION_AVAILABLE:
                 'error': error_msg
             }, indent=2)
             
-            summary = f"❌ **Video Processing Failed**\n\nError: {error_msg}"
+            summary = f" **Video Processing Failed**\n\nError: {error_msg}"
             return None, json_output, summary
 else:
     def process_unified_detection_all(image, conf_threshold=0.5):
@@ -1905,9 +2027,9 @@ if sys.platform.startswith("win"):
 
 MODEL_CHOICES = [
     "yolo26n",
-    "yolo26s",
-    "yolo26m",
-    "yolov8s",
+    # "yolo26s",
+    # "yolo26m",
+    # "yolov8s",
 ]
 
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
@@ -2135,7 +2257,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                     progress_callback(progress, f"Processing... {fps_processed:.1f} FPS")
             
             try:
-                # 🚀 GPU-ACCELERATED INFERENCE with AMP
+                #  GPU-ACCELERATED INFERENCE with AMP
                 with torch.cuda.amp.autocast(enabled=use_amp):
                     results = model.predict(
                         source=frame,
@@ -2157,15 +2279,15 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                         total_detections += len(result.boxes)
                         all_detections.append(result.boxes)
                     
-                    # 🎨 COLOR DETECTION for JSON output
+                    #  COLOR DETECTION for JSON output
                     frame_colors = []
                     if COLOR_DETECTOR_AVAILABLE and (frame_idx % max(1, ocr_every_n) == 0):
                         try:
-                            print(f"[DEBUG] 🎨 Extracting colors from frame {frame_idx}...")
+                            print(f"[DEBUG]  Extracting colors from frame {frame_idx}...")
                             colors = detect_image_colors(frame)
                             if colors:
                                 frame_colors = colors[:10]  # Top 10 colors
-                                print(f"[DEBUG] ✅ Found {len(frame_colors)} colors: {[c['color'] for c in frame_colors[:5]]}")
+                                print(f"[DEBUG]  Found {len(frame_colors)} colors: {[c['color'] for c in frame_colors[:5]]}")
                                 
                                 # Store colors for JSON
                                 all_color_results.append({
@@ -2175,9 +2297,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                     'dominant_color': frame_colors[0] if frame_colors else None
                                 })
                         except Exception as e:
-                            print(f"[DEBUG] ❌ Color extraction failed: {e}")
+                            print(f"[DEBUG]  Color extraction failed: {e}")
                     
-                    # 🔥 GPU-ACCELERATED OCR processing - DISABLED for speed
+                    #  GPU-ACCELERATED OCR processing - DISABLED for speed
                     # Only run OCR every 30 frames to save time
                     ocr_results = []
                     frame_all_text = []  # Initialize frame_all_text
@@ -2185,11 +2307,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                     
                     if run_full_ocr and enable_ocr:
                         try:
-                            print(f"[DEBUG] 🔥 Running GPU OCR on frame {frame_idx} (every 30 frames)...")
+                            print(f"[DEBUG]  Running GPU OCR on frame {frame_idx} (every 30 frames)...")
                             
                             # Force GPU for PaddleOCR
                             try:
-                                print(f"[DEBUG] 🚀 DIRECT GPU PaddleOCR for video frame {frame_idx}...")
+                                print(f"[DEBUG]  DIRECT GPU PaddleOCR for video frame {frame_idx}...")
                                 from optimized_paddleocr_gpu import extract_text_optimized
                                 direct_result = extract_text_optimized(
                                     frame,
@@ -2211,7 +2333,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                         'device': direct_result.get('device', 'GPU'),
                                         'processing_time': direct_result.get('processing_time', 0)
                                     })
-                                    print(f"[DEBUG] ✅ GPU SUCCESS: '{direct_result['text']}' (conf: {direct_result['confidence']:.3f})")
+                                    print(f"[DEBUG]  GPU SUCCESS: '{direct_result['text']}' (conf: {direct_result['confidence']:.3f})")
                                 
                                 # Add individual regions
                                 if direct_result.get('text_regions'):
@@ -2226,15 +2348,15 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                                 'bounding_box': region.get('bbox'),
                                                 'device': direct_result.get('device', 'GPU')
                                             })
-                                            print(f"[DEBUG] ✅ GPU Region SUCCESS: '{region_text}'")
+                                            print(f"[DEBUG]  GPU Region SUCCESS: '{region_text}'")
                                 else:
-                                    print(f"[DEBUG] ❌ GPU returned empty: '{direct_result.get('text', '')}'")
+                                    print(f"[DEBUG]  GPU returned empty: '{direct_result.get('text', '')}'")
                                     
                             except Exception as e:
-                                print(f"[DEBUG] ❌ GPU PaddleOCR failed: {e}")
+                                print(f"[DEBUG]  GPU PaddleOCR failed: {e}")
                                 # Fallback to CPU if GPU fails
                                 try:
-                                    print(f"[DEBUG] 💻 CPU fallback for frame {frame_idx}...")
+                                    print(f"[DEBUG]  CPU fallback for frame {frame_idx}...")
                                     direct_result = extract_text_optimized(
                                         frame,
                                         confidence_threshold=0.1,
@@ -2252,9 +2374,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                             'type': 'direct_frame_text',
                                             'device': 'CPU'
                                         })
-                                        print(f"[DEBUG] ✅ CPU Fallback SUCCESS: '{direct_result['text']}'")
+                                        print(f"[DEBUG]  CPU Fallback SUCCESS: '{direct_result['text']}'")
                                 except Exception as e2:
-                                    print(f"[DEBUG] ❌ CPU fallback also failed: {e2}")
+                                    print(f"[DEBUG]  CPU fallback also failed: {e2}")
                             
                             # Store all OCR results with frame metadata
                             for text_item in frame_all_text:
@@ -2279,13 +2401,13 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                 # Different colors for different text types
                                 if text_type == 'license_plate':
                                     color = (0, 255, 0)  # Green for license plates
-                                    prefix = "🚗"
+                                    prefix = ""
                                 elif 'gpu' in text_item.get('method', ''):
                                     color = (255, 0, 255)  # Magenta for GPU text
-                                    prefix = "🔥"
+                                    prefix = ""
                                 else:
                                     color = (0, 255, 255)  # Cyan for CPU text
-                                    prefix = "💻"
+                                    prefix = ""
                                 
                                 text_label = f"{prefix} {text} ({confidence:.2f}) [{device}]"
                                 (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
@@ -2328,7 +2450,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                             print(f"[DEBUG] Frame {frame_idx}: Found {len(frame_all_text)} text items, {len(frame_colors)} colors")
                                     
                         except Exception as e:
-                            print(f"[DEBUG] ❌ Video OCR failed on frame {frame_idx}: {e}")
+                            print(f"[DEBUG]  Video OCR failed on frame {frame_idx}: {e}")
                             import traceback
                             traceback.print_exc()
                     
@@ -2353,7 +2475,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         final_fps = actual_processed / total_time if total_time > 0 else 0
         speedup = skip_frames
         
-        print(f"[INFO] ✅ ULTRA-FAST processing complete!")
+        print(f"[INFO]  ULTRA-FAST processing complete!")
         print(f"[INFO] Total time: {total_time:.1f}s ({total_time/60:.1f} minutes)")
         print(f"[INFO] Processing speed: {final_fps:.1f} FPS")
         print(f"[INFO] Frames processed: {actual_processed}/{total_frames}")
@@ -2443,9 +2565,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             json_results['colors_by_frames'][frame_num].extend(color_item['colors'])
         
         json_str = json_module.dumps(json_results, indent=2, ensure_ascii=False)
-        print(f"[INFO] 🔥 GPU-ACCELERATED processing complete!")
-        print(f"[INFO] 📝 OCR detected {len(all_ocr_results)} text instances ({text_summary.get('gpu_text_found', 0)} GPU, {text_summary.get('cpu_text_found', 0)} CPU)")
-        print(f"[INFO] 🎨 Color detection completed on {len(all_color_results)} frames")
+        print(f"[INFO]  GPU-ACCELERATED processing complete!")
+        print(f"[INFO]  OCR detected {len(all_ocr_results)} text instances ({text_summary.get('gpu_text_found', 0)} GPU, {text_summary.get('cpu_text_found', 0)} CPU)")
+        print(f"[INFO]  Color detection completed on {len(all_color_results)} frames")
         
         # Verify output
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
@@ -2477,7 +2599,7 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
     """
     try:
         if not all_detections:
-            return "🎯 No objects detected in video"
+            return " No objects detected in video"
         
         # Aggregate all detections
         category_counts = {}
@@ -2509,21 +2631,21 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
         
         # Create summary
         summary_lines = []
-        summary_lines.append(f"🎯 **Advanced Video Processing Complete!**")
-        summary_lines.append(f"⚡ **Mode:** {mode.upper()} | ⏱️ **Time:** {processing_time:.1f}s")
-        summary_lines.append(f"📊 **Total Objects Detected:** {total_objects}")
-        summary_lines.append(f"🎨 **Advanced Color Shades:** 56 Shades Enabled")
+        summary_lines.append(f" **Advanced Video Processing Complete!**")
+        summary_lines.append(f" **Mode:** {mode.upper()} | **Time:** {processing_time:.1f}s")
+        summary_lines.append(f" **Total Objects Detected:** {total_objects}")
+        summary_lines.append(f" **Advanced Color Shades:** 56 Shades Enabled")
         summary_lines.append("")
         
         # Category summary
-        summary_lines.append("**📋 By Category:**")
+        summary_lines.append("** By Category:**")
         for category, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True):
             summary_lines.append(f"  • {count} {category}(s)")
         
         summary_lines.append("")
         
         # Top objects
-        summary_lines.append("**🔍 Top Objects:**")
+        summary_lines.append("** Top Objects:**")
         top_objects = sorted(object_counts.items(), key=lambda x: x[1], reverse=True)[:10]
         for obj_name, count in top_objects:
             summary_lines.append(f"  • {count} {obj_name}(s)")
@@ -2534,21 +2656,21 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
         summary_lines.append("")
         
         # Advanced color shades detection info
-        summary_lines.append("**🎨 Advanced Color Shades Detection:**")
-        summary_lines.append(f"  • 🔴 Red Family: 10 Shades (Misty Rose → Maroon)")
-        summary_lines.append(f"  • 🔵 Blue Family: 10 Shades (Ice Blue → Midnight Blue)")
-        summary_lines.append(f"  • 🟢 Green Family: 10 Shades (Mint → Emerald)")
-        summary_lines.append(f"  • 🟡 Yellow Family: 10 Shades (Light Yellow → Deep Yellow)")
-        summary_lines.append(f"  • 🟣 Purple/Pink: 9 Shades (Lavender → Indigo)")
-        summary_lines.append(f"  • ⚫ Neutral: 7 Shades (White → Black)")
-        summary_lines.append(f"  • 🧠 AI Model: MobileNetV2 + HSV + LAB Analysis")
-        summary_lines.append(f"  • ⚡ Real-time: <15ms per detection")
+        summary_lines.append("** Advanced Color Shades Detection:**")
+        summary_lines.append(f"  •  Red Family: 10 Shades (Misty Rose → Maroon)")
+        summary_lines.append(f"  •  Blue Family: 10 Shades (Ice Blue → Midnight Blue)")
+        summary_lines.append(f"  • Green Family: 10 Shades (Mint → Emerald)")
+        summary_lines.append(f"  • Yellow Family: 10 Shades (Light Yellow → Deep Yellow)")
+        summary_lines.append(f"  • Purple/Pink: 9 Shades (Lavender → Indigo)")
+        summary_lines.append(f"  •  Neutral: 7 Shades (White → Black)")
+        summary_lines.append(f"  •  AI Model: MobileNetV2 + HSV + LAB Analysis")
+        summary_lines.append(f"  •  Real-time: <15ms per detection")
         
         return "\n".join(summary_lines)
         
     except Exception as e:
         print(f"[ERROR] Failed to generate detection summary: {e}")
-        return f"🎯 Detection summary generation failed: {str(e)}"
+        return f" Detection summary generation failed: {str(e)}"
 
 
 def _classify_object_with_category(class_name, class_id):
@@ -2578,91 +2700,91 @@ def _classify_object_with_category(class_name, class_id):
         'fire hydrant': ('Fire Hydrant', 'Traffic', (0, 0, 255)),  # Blue
         
         # License Plate - Special Category
-        'license_plate': ('🚗 License Plate', 'License Plate', (0, 255, 0)),  # Green
+        'license_plate': (' License Plate', 'License Plate', (0, 255, 0)),  # Green
         
         # Animals - Enhanced Classification
-        'bird': ('🐦 Bird', 'Bird', (255, 105, 180)),  # Pink - Light Pink for birds
-        'cat': ('🐱 Cat', 'Animal', (255, 0, 255)),  # Magenta
-        'dog': ('🐕 Dog', 'Animal', (255, 0, 255)),  # Magenta
-        'horse': ('🐴 Horse', 'Animal', (255, 0, 255)),  # Magenta
-        'sheep': ('🐑 Sheep', 'Animal', (255, 0, 255)),  # Magenta
-        'cow': ('🐄 Cow', 'Animal', (255, 0, 255)),  # Magenta
-        'elephant': ('🐘 Elephant', 'Animal', (255, 0, 255)),  # Magenta
-        'bear': ('🐻 Bear', 'Animal', (255, 0, 255)),  # Magenta
-        'zebra': ('🦓 Zebra', 'Animal', (255, 0, 255)),  # Magenta
-        'giraffe': ('🦒 Giraffe', 'Animal', (255, 0, 255)),  # Magenta
+        'bird': (' Bird', 'Bird', (255, 105, 180)),  # Pink - Light Pink for birds
+        'cat': (' Cat', 'Animal', (255, 0, 255)),  # Magenta
+        'dog': (' Dog', 'Animal', (255, 0, 255)),  # Magenta
+        'horse': (' Horse', 'Animal', (255, 0, 255)),  # Magenta
+        'sheep': (' Sheep', 'Animal', (255, 0, 255)),  # Magenta
+        'cow': (' Cow', 'Animal', (255, 0, 255)),  # Magenta
+        'elephant': (' Elephant', 'Animal', (255, 0, 255)),  # Magenta
+        'bear': (' Bear', 'Animal', (255, 0, 255)),  # Magenta
+        'zebra': (' Zebra', 'Animal', (255, 0, 255)),  # Magenta
+        'giraffe': (' Giraffe', 'Animal', (255, 0, 255)),  # Magenta
         
         # Everyday Items - Enhanced Categories
-        'cup': ('☕ Cup', 'Drinkware', (139, 69, 19)),  # Brown
-        'bottle': ('🍶 Bottle', 'Drinkware', (139, 69, 19)),  # Brown
-        'wine glass': ('🍷 Wine Glass', 'Drinkware', (139, 69, 19)),  # Brown
-        'bowl': ('🥣 Bowl', 'Tableware', (160, 82, 45)),  # Sienna
+        'cup': (' Cup', 'Drinkware', (139, 69, 19)),  # Brown
+        'bottle': (' Bottle', 'Drinkware', (139, 69, 19)),  # Brown
+        'wine glass': (' Wine Glass', 'Drinkware', (139, 69, 19)),  # Brown
+        'bowl': (' Bowl', 'Tableware', (160, 82, 45)),  # Sienna
         
         # Electronics - Enhanced Categories  
-        'cell phone': ('📱 Cell Phone', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'laptop': ('💻 Laptop', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'tv': ('📺 TV', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'mouse': ('🖱️ Mouse', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'remote': ('🎮 Remote', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'keyboard': ('⌨️ Keyboard', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
-        'microwave': ('📦 Microwave', 'Appliance', (128, 128, 128)),  # Gray
-        'oven': ('🔥 Oven', 'Appliance', (128, 128, 128)),  # Gray
-        'toaster': ('🍞 Toaster', 'Appliance', (128, 128, 128)),  # Gray
-        'refrigerator': ('❄️ Refrigerator', 'Appliance', (128, 128, 128)),  # Gray
-        'sink': ('🚰 Sink', 'Appliance', (128, 128, 128)),  # Gray
+        'cell phone': (' Cell Phone', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'laptop': (' Laptop', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'tv': (' TV', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'mouse': (' Mouse', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'remote': (' Remote', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'keyboard': (' Keyboard', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
+        'microwave': (' Microwave', 'Appliance', (128, 128, 128)),  # Gray
+        'oven': (' Oven', 'Appliance', (128, 128, 128)),  # Gray
+        'toaster': (' Toaster', 'Appliance', (128, 128, 128)),  # Gray
+        'refrigerator': (' Refrigerator', 'Appliance', (128, 128, 128)),  # Gray
+        'sink': (' Sink', 'Appliance', (128, 128, 128)),  # Gray
         
         # Personal Items - Enhanced Categories
-        'backpack': ('🎒 Backpack', 'Personal', (255, 0, 0)),  # Blue
-        'handbag': ('👜 Handbag', 'Personal', (255, 0, 0)),  # Blue
-        'suitcase': ('🧳 Suitcase', 'Personal', (255, 0, 0)),  # Blue
-        'umbrella': ('☂️ Umbrella', 'Personal', (255, 0, 0)),  # Blue
-        'tie': ('👔 Tie', 'Clothing', (128, 0, 128)),  # Purple
+        'backpack': (' Backpack', 'Personal', (255, 0, 0)),  # Blue
+        'handbag': (' Handbag', 'Personal', (255, 0, 0)),  # Blue
+        'suitcase': (' Suitcase', 'Personal', (255, 0, 0)),  # Blue
+        'umbrella': (' Umbrella', 'Personal', (255, 0, 0)),  # Blue
+        'tie': (' Tie', 'Clothing', (128, 0, 128)),  # Purple
         
         # Sports & Recreation
-        'sports ball': ('⚽ Sports Ball', 'Sports', (255, 0, 0)),  # Blue
-        'baseball bat': ('🏏 Baseball Bat', 'Sports', (255, 0, 0)),  # Blue
-        'baseball glove': ('🧤 Baseball Glove', 'Sports', (255, 0, 0)),  # Blue
-        'skateboard': ('🛹 Skateboard', 'Sports', (255, 0, 0)),  # Blue
-        'surfboard': ('🏄 Surfboard', 'Sports', (255, 0, 0)),  # Blue
-        'tennis racket': ('🎾 Tennis Racket', 'Sports', (255, 0, 0)),  # Blue
-        'frisbee': ('🥏 Frisbee', 'Sports', (255, 0, 0)),  # Blue
-        'kite': ('🪁 Kite', 'Sports', (255, 0, 0)),  # Blue
-        'skis': ('🎿 Skis', 'Sports', (255, 0, 0)),  # Blue
-        'snowboard': ('🏂 Snowboard', 'Sports', (255, 0, 0)),  # Blue
+        'sports ball': (' Sports Ball', 'Sports', (255, 0, 0)),  # Blue
+        'baseball bat': (' Baseball Bat', 'Sports', (255, 0, 0)),  # Blue
+        'baseball glove': (' Baseball Glove', 'Sports', (255, 0, 0)),  # Blue
+        'skateboard': (' Skateboard', 'Sports', (255, 0, 0)),  # Blue
+        'surfboard': (' Surfboard', 'Sports', (255, 0, 0)),  # Blue
+        'tennis racket': (' Tennis Racket', 'Sports', (255, 0, 0)),  # Blue
+        'frisbee': (' Frisbee', 'Sports', (255, 0, 0)),  # Blue
+        'kite': (' Kite', 'Sports', (255, 0, 0)),  # Blue
+        'skis': (' Skis', 'Sports', (255, 0, 0)),  # Blue
+        'snowboard': (' Snowboard', 'Sports', (255, 0, 0)),  # Blue
         
         # Food Items
-        'banana': ('🍌 Banana', 'Food', (0, 255, 0)),  # Green
-        'apple': ('🍎 Apple', 'Food', (0, 255, 0)),  # Green
-        'sandwich': ('🥪 Sandwich', 'Food', (0, 255, 0)),  # Green
-        'orange': ('🍊 Orange', 'Food', (0, 255, 0)),  # Green
-        'broccoli': ('🥦 Broccoli', 'Food', (0, 255, 0)),  # Green
-        'carrot': ('🥕 Carrot', 'Food', (0, 255, 0)),  # Green
-        'hot dog': ('🌭 Hot Dog', 'Food', (0, 255, 0)),  # Green
-        'pizza': ('🍕 Pizza', 'Food', (0, 255, 0)),  # Green
-        'donut': ('🍩 Donut', 'Food', (0, 255, 0)),  # Green
-        'cake': ('🎂 Cake', 'Food', (0, 255, 0)),  # Green
+        'banana': (' Banana', 'Food', (0, 255, 0)),  # Green
+        'apple': (' Apple', 'Food', (0, 255, 0)),  # Green
+        'sandwich': (' Sandwich', 'Food', (0, 255, 0)),  # Green
+        'orange': (' Orange', 'Food', (0, 255, 0)),  # Green
+        'broccoli': (' Broccoli', 'Food', (0, 255, 0)),  # Green
+        'carrot': (' Carrot', 'Food', (0, 255, 0)),  # Green
+        'hot dog': (' Hot Dog', 'Food', (0, 255, 0)),  # Green
+        'pizza': (' Pizza', 'Food', (0, 255, 0)),  # Green
+        'donut': (' Donut', 'Food', (0, 255, 0)),  # Green
+        'cake': (' Cake', 'Food', (0, 255, 0)),  # Green
         
         # Furniture
-        'chair': ('🪑 Chair', 'Furniture', (139, 69, 19)),  # Brown
-        'couch': ('🛋️ Couch', 'Furniture', (139, 69, 19)),  # Brown
-        'potted plant': ('🪴 Potted Plant', 'Furniture', (139, 69, 19)),  # Brown
-        'bed': ('🛏️ Bed', 'Furniture', (139, 69, 19)),  # Brown
-        'dining table': ('🍽️ Dining Table', 'Furniture', (139, 69, 19)),  # Brown
-        'toilet': ('🚽 Toilet', 'Furniture', (139, 69, 19)),  # Brown
+        'chair': (' Chair', 'Furniture', (139, 69, 19)),  # Brown
+        'couch': (' Couch', 'Furniture', (139, 69, 19)),  # Brown
+        'potted plant': (' Potted Plant', 'Furniture', (139, 69, 19)),  # Brown
+        'bed': (' Bed', 'Furniture', (139, 69, 19)),  # Brown
+        'dining table': (' Dining Table', 'Furniture', (139, 69, 19)),  # Brown
+        'toilet': (' Toilet', 'Furniture', (139, 69, 19)),  # Brown
         
         # Tableware
-        'fork': ('🍴 Fork', 'Tableware', (160, 82, 45)),  # Sienna
-        'knife': ('🔪 Knife', 'Tableware', (160, 82, 45)),  # Sienna
-        'spoon': ('🥄 Spoon', 'Tableware', (160, 82, 45)),  # Sienna
+        'fork': (' Fork', 'Tableware', (160, 82, 45)),  # Sienna
+        'knife': (' Knife', 'Tableware', (160, 82, 45)),  # Sienna
+        'spoon': (' Spoon', 'Tableware', (160, 82, 45)),  # Sienna
         
         # Other Objects
-        'book': ('📚 Book', 'Object', (128, 128, 128)),  # Gray
-        'clock': ('🕐 Clock', 'Object', (128, 128, 128)),  # Gray
-        'vase': ('🏺 Vase', 'Object', (128, 128, 128)),  # Gray
-        'scissors': ('✂️ Scissors', 'Object', (128, 128, 128)),  # Gray
-        'teddy bear': ('🧸 Teddy Bear', 'Toy', (255, 182, 193)),  # Light Pink
-        'hair drier': ('💨 Hair Drier', 'Object', (128, 128, 128)),  # Gray
-        'toothbrush': ('🪥 Toothbrush', 'Personal', (255, 0, 0)),  # Blue
+        'book': (' Book', 'Object', (128, 128, 128)),  # Gray
+        'clock': (' Clock', 'Object', (128, 128, 128)),  # Gray
+        'vase': (' Vase', 'Object', (128, 128, 128)),  # Gray
+        'scissors': (' Scissors', 'Object', (128, 128, 128)),  # Gray
+        'teddy bear': (' Teddy Bear', 'Toy', (255, 182, 193)),  # Light Pink
+        'hair drier': (' Hair Drier', 'Object', (128, 128, 128)),  # Gray
+        'toothbrush': (' Toothbrush', 'Personal', (255, 0, 0)),  # Blue
     }
     
     # Get classification
@@ -2743,26 +2865,26 @@ def _detect_gender_from_person_crop(person_crop):
             # Decision logic based on combined features
             if hair_complexity > 0.12:  # More complex hair patterns suggest longer hair
                 if avg_brightness > 90:
-                    gender = "Girl 👧"
+                    gender = "Girl "
                 else:
-                    gender = "Woman 👩"
+                    gender = "Woman "
             else:
                 if avg_brightness > 90:
-                    gender = "Boy 👦"
+                    gender = "Boy "
                 else:
-                    gender = "Man 👨"
+                    gender = "Man "
             
             # Add some variation based on feature patterns
             import random
             if random.random() < 0.2:  # 20% variation for more realistic results
                 if "Girl" in gender:
-                    gender = "Boy 👦"
+                    gender = "Boy "
                 elif "Boy" in gender:
-                    gender = "Girl 👧"
+                    gender = "Girl "
                 elif "Woman" in gender:
-                    gender = "Man 👨"
+                    gender = "Man "
                 else:
-                    gender = "Woman 👩"
+                    gender = "Woman "
             
             print(f"[DEBUG] ResNetV2 gender detected: {gender}")
             return gender
@@ -2778,9 +2900,9 @@ def _detect_gender_from_person_crop(person_crop):
             # Basic color heuristic
             import random
             if avg_brightness > 100:
-                gender = random.choice(["Girl 👧", "Boy 👦"])
+                gender = random.choice(["Girl ", "Boy "])
             else:
-                gender = random.choice(["Woman 👩", "Man 👨"])
+                gender = random.choice(["Woman ", "Man "])
             
             print(f"[DEBUG] Fallback gender detected: {gender}")
             return gender
@@ -2902,7 +3024,7 @@ def _get_detections_summary(boxes, names):
     if len(object_details) > 10:
         objects_str += f" and {len(object_details) - 10} more..."
     
-    return f"🎯 Detected: {' | '.join(summary_parts)}\n📋 Objects: {objects_str}"
+    return f" Detected: {' | '.join(summary_parts)}\n Objects: {objects_str}"
 
 
 # Global cache for license plate results to avoid re-detection on every frame
@@ -3154,7 +3276,7 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
             if plate_text and len(plate_text) >= 4:
                 cleaned = _clean_license_plate_text(plate_text)
                 if cleaned:
-                    print(f"[DEBUG] ✅ Direct detection found license plate: {cleaned}")
+                    print(f"[DEBUG]  Direct detection found license plate: {cleaned}")
                     return plate_crop, cleaned
         
         return None, ""
@@ -3312,7 +3434,7 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
             try:
                 plate_crop, plate_text = _detect_license_plate_direct(annotated)
                 if plate_text and len(plate_text) >= 4:
-                    print(f"[DEBUG] ✅ Direct detection found license plate: {plate_text}")
+                    print(f"[DEBUG]  Direct detection found license plate: {plate_text}")
                     # Draw the detected plate
                     if plate_crop is not None and plate_crop.size > 0:
                         # Find where the plate was detected (we need the coordinates)
@@ -3373,7 +3495,7 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                     try:
                         if _detect_charger_in_image(crop):
                             charger_detected = True
-                            enhanced_label = f"{display_name} + 🔌 Charger"
+                            enhanced_label = f"{display_name} +  Charger"
                             display_name = enhanced_label
                     except Exception as e:
                         print(f"[DEBUG] Charger detection failed: {e}")
@@ -3404,7 +3526,7 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                                         license_plate_text = cleaned
                                         _license_plate_cache[cache_key] = license_plate_text
                                         plate_found = True
-                                        print(f"[DEBUG] ✅ License plate detected on {class_name}: {license_plate_text}")
+                                        print(f"[DEBUG]  License plate detected on {class_name}: {license_plate_text}")
                             
                             # STEP 2: If no plate found, try OCR on entire vehicle crop
                             if not plate_found:
@@ -3448,9 +3570,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                                 if best_text:
                                     license_plate_text = best_text
                                     _license_plate_cache[cache_key] = license_plate_text
-                                    print(f"[DEBUG] ✅ License plate detected on {class_name}: {license_plate_text}")
+                                    print(f"[DEBUG]  License plate detected on {class_name}: {license_plate_text}")
                                 else:
-                                    print(f"[DEBUG] ❌ No license plate text found on {class_name}")
+                                    print(f"[DEBUG]  No license plate text found on {class_name}")
                                 
                         except Exception as e:
                             print(f"[DEBUG] License plate extraction failed: {e}")
@@ -3615,11 +3737,11 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
         vehicles_detected = _detect_vehicles_in_image_fallback(image_bgr)
         
         if not vehicles_detected:
-            print(f"[DEBUG] ❌ No vehicles detected. Skipping text extraction.")
+            print(f"[DEBUG]  No vehicles detected. Skipping text extraction.")
             print(f"[DEBUG] Reason: License plates and vehicle text only extracted when vehicles are present.")
             return result
         
-        print(f"[DEBUG] ✅ Vehicles detected: {[v['class_name'] for v in vehicles_detected]}")
+        print(f"[DEBUG]  Vehicles detected: {[v['class_name'] for v in vehicles_detected]}")
         print(f"[DEBUG] Proceeding with text extraction...")
         
         # Continue with existing text extraction logic...
@@ -3682,7 +3804,7 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
                             }
                         }
                         detected_vehicles.append(vehicle_info)
-                        print(f"[DEBUG] 🚗 Vehicle detected: {class_name} (conf: {confidence:.3f})")
+                        print(f"[DEBUG]  Vehicle detected: {class_name} (conf: {confidence:.3f})")
         
         return detected_vehicles
         
@@ -3711,7 +3833,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
         try:
             # Import PaddleOCR modules
             from optimized_paddleocr_gpu import extract_text_optimized, extract_license_plates_optimized
-            print("[DEBUG] 🚀 Trying Optimized PaddleOCR GPU for license plate")
+            print("[DEBUG]  Trying Optimized PaddleOCR GPU for license plate")
             
             # Extract text with optimized GPU processing
             paddleocr_result = extract_text_optimized(
@@ -3729,7 +3851,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     confidence = paddleocr_result["confidence"]
                     device = paddleocr_result["device"]
                     all_candidates.append(("optimized_paddleocr", cleaned, confidence, device))
-                    print(f"[DEBUG] ✅ Optimized PaddleOCR found: {cleaned} (conf: {confidence:.3f}, device: {device})")
+                    print(f"[DEBUG]  Optimized PaddleOCR found: {cleaned} (conf: {confidence:.3f}, device: {device})")
                     
                     # Also try specialized license plate extraction
                     paddle_plates = extract_license_plates_optimized(
@@ -3744,18 +3866,18 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                             plate_confidence = plate_info.get('confidence', 0.85)
                             plate_device = plate_info.get('device', 'Unknown')
                             all_candidates.append(("optimized_paddleocr_plate", plate_text, plate_confidence, plate_device))
-                            print(f"[DEBUG] ✅ Optimized PaddleOCR specialized found: {plate_text} (device: {plate_device})")
+                            print(f"[DEBUG]  Optimized PaddleOCR specialized found: {plate_text} (device: {plate_device})")
             
         except ImportError:
             print("[DEBUG] Optimized PaddleOCR not available, trying alternatives...")
         except Exception as e:
-            print(f"[DEBUG] ❌ Optimized PaddleOCR failed: {e}")
+            print(f"[DEBUG]  Optimized PaddleOCR failed: {e}")
         
         # Method 2: Legacy PaddleOCR (SECONDARY if optimized fails)
         if not all_candidates:
             try:
                 from paddleocr_integration import extract_text_with_paddleocr, extract_license_plates_with_paddleocr, preprocess_image_for_paddleocr
-                print("[DEBUG] 🔄 Trying Legacy PaddleOCR for license plate")
+                print("[DEBUG]  Trying Legacy PaddleOCR for license plate")
                 
                 # Preprocess for better PaddleOCR results
                 processed_plate = preprocess_image_for_paddleocr(plate_crop)
@@ -3771,7 +3893,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     cleaned = _clean_license_plate_text(paddleocr_result)
                     if cleaned and len(cleaned) >= 6:
                         all_candidates.append(("legacy_paddleocr", cleaned, 0.8, "CPU"))
-                        print(f"[DEBUG] ✅ Legacy PaddleOCR found: {cleaned}")
+                        print(f"[DEBUG]  Legacy PaddleOCR found: {cleaned}")
                         
                         # Also try specialized license plate extraction
                         paddle_plates = extract_license_plates_with_paddleocr(
@@ -3783,17 +3905,17 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                             plate_text = plate_info.get('text', '')
                             if plate_text and plate_text != cleaned:
                                 all_candidates.append(("legacy_paddleocr_plate", plate_text, 0.75, "CPU"))
-                                print(f"[DEBUG] ✅ Legacy PaddleOCR specialized found: {plate_text}")
+                                print(f"[DEBUG]  Legacy PaddleOCR specialized found: {plate_text}")
                 
             except ImportError:
                 print("[DEBUG] Legacy PaddleOCR not available...")
             except Exception as e:
-                print(f"[DEBUG] ❌ Legacy PaddleOCR failed: {e}")
+                print(f"[DEBUG]  Legacy PaddleOCR failed: {e}")
         
         # Method 3: LightOnOCR (FALLBACK when PaddleOCR fails)
         if LIGHTON_AVAILABLE and not all_candidates:
             try:
-                print("[DEBUG] 🔧 Using LightOnOCR fallback for license plate")
+                print("[DEBUG]  Using LightOnOCR fallback for license plate")
                 # Preprocess the license plate crop
                 processed_plate = _preprocess_license_plate(plate_crop)
                 lighton_result = extract_text_with_lighton(processed_plate, confidence_threshold=0.2)
@@ -3801,14 +3923,14 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     cleaned = _clean_license_plate_text(lighton_result)
                     if cleaned and len(cleaned) >= 6:
                         all_candidates.append(("lighton", cleaned, 0.7, "CPU"))
-                        print(f"[DEBUG] ✅ LightOnOCR found: {cleaned}")
+                        print(f"[DEBUG]  LightOnOCR found: {cleaned}")
             except Exception as e:
-                print(f"[DEBUG] ❌ LightOnOCR failed for plate: {e}")
+                print(f"[DEBUG]  LightOnOCR failed for plate: {e}")
         
         # Method 4: Tesseract OCR (LAST FALLBACK when all OCR methods fail)
         if not all_candidates and TESSERACT_AVAILABLE:
             try:
-                print("[DEBUG] 🛠️ Using Tesseract as last fallback for license plate")
+                print("[DEBUG]  Using Tesseract as last fallback for license plate")
                 # Preprocess for Tesseract
                 gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
                 
@@ -3861,17 +3983,17 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                                 if cleaned and len(cleaned) >= 6:
                                     confidence = 0.6 if config_type == "strict" else 0.5
                                     all_candidates.append((f"tesseract_{method_name}_{config_type}", cleaned, confidence, "CPU"))
-                                    print(f"[DEBUG] ✅ Tesseract {method_name} {config_type} found: {cleaned}")
+                                    print(f"[DEBUG]  Tesseract {method_name} {config_type} found: {cleaned}")
                         except:
                             continue
                 
             except Exception as e:
-                print(f"[DEBUG] ❌ Tesseract fallback failed: {e}")
+                print(f"[DEBUG]  Tesseract fallback failed: {e}")
         
         # Method 5: Morphological operations + OCR (EXTRA FALLBACK)
         if not all_candidates and TESSERACT_AVAILABLE:
             try:
-                print("[DEBUG] 🔍 Trying morphological operations for license plate")
+                print("[DEBUG]  Trying morphological operations for license plate")
                 gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
                 
                 # Remove noise
@@ -3899,13 +4021,13 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                             cleaned = _clean_license_plate_text(text)
                             if cleaned and len(cleaned) >= 6:
                                 all_candidates.append(("morphological", cleaned, 0.5, "CPU"))
-                                print(f"[DEBUG] ✅ Morphological found: {cleaned}")
+                                print(f"[DEBUG]  Morphological found: {cleaned}")
                                 break
                     except:
                         continue
                         
             except Exception as e:
-                print(f"[DEBUG] ❌ Morphological method failed: {e}")
+                print(f"[DEBUG]  Morphological method failed: {e}")
         
         # Select the best result from all candidates
         if all_candidates:
@@ -3921,12 +4043,12 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                 # Select the best result among valid candidates (prefer higher confidence, then GPU over CPU)
                 best_candidate = max(valid_candidates, key=lambda x: (x[2], 1 if x[3] != "CPU" else 0))
                 best_result = best_candidate[1]
-                print(f"[DEBUG] ✅ Best valid result: {best_result} (method: {best_candidate[0]}, device: {best_candidate[3]})")
+                print(f"[DEBUG]  Best valid result: {best_result} (method: {best_candidate[0]}, device: {best_candidate[3]})")
                 return best_result
             else:
                 # If no valid Indian plates, return the highest confidence candidate
                 best_candidate = max(all_candidates, key=lambda x: (x[2], 1 if x[3] != "CPU" else 0))
-                print(f"[DEBUG] ⚠️ Best candidate (not valid Indian): {best_candidate[1]} (method: {best_candidate[0]})")
+                print(f"[DEBUG]  Best candidate (not valid Indian): {best_candidate[1]} (method: {best_candidate[0]})")
                 return best_candidate[1]
     
     except Exception as e:
@@ -4164,7 +4286,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         estimated_max_width = expected_chars * max_char_width
         
         if not (estimated_min_width <= w <= estimated_max_width * 2):
-            print(f"[DEBUG] ❌ Plate size doesn't match text length: {w}px vs {expected_chars} chars")
+            print(f"[DEBUG]  Plate size doesn't match text length: {w}px vs {expected_chars} chars")
             return False
         
         # Method 2: Visual character verification
@@ -4192,7 +4314,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         
         # Allow some tolerance (some characters might be merged or split)
         if not (visual_char_count >= expected_chars * 0.4 and visual_char_count <= expected_chars * 2.0):
-            print(f"[DEBUG] ❌ Visual character count doesn't match text")
+            print(f"[DEBUG]  Visual character count doesn't match text")
             # Don't immediately reject, continue with other validations
         
         # Method 3: Cross-validate with different OCR methods
@@ -4253,7 +4375,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         # Method 4: Plate structure validation
         # Check if the detected text follows realistic license plate patterns
         if not _is_realistic_license_plate_pattern(plate_text):
-            print(f"[DEBUG] ❌ Unreliable license plate pattern: {plate_text}")
+            print(f"[DEBUG]  Unreliable license plate pattern: {plate_text}")
             return False
         
         # Final decision based on all validations
@@ -4281,9 +4403,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         is_valid = validation_score >= 2
         
         if is_valid:
-            print(f"[DEBUG] ✅ License plate validation PASSED: {plate_text}")
+            print(f"[DEBUG]  License plate validation PASSED: {plate_text}")
         else:
-            print(f"[DEBUG] ❌ License plate validation FAILED: {plate_text}")
+            print(f"[DEBUG]  License plate validation FAILED: {plate_text}")
         
         return is_valid
         
@@ -4311,14 +4433,14 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         has_letter = any(c.isalpha() for c in plate_upper)
         
         if not (has_digit and has_letter):
-            print(f"[DEBUG] ❌ Plate missing digits or letters: {plate_text}")
+            print(f"[DEBUG]  Plate missing digits or letters: {plate_text}")
             return False
         
         # Rule 2: Reject patterns that look like OCR errors
         # Too many repeated characters might indicate OCR errors
         repeated_chars = plate_upper.count(plate_upper[0]) if plate_upper else 0
         if repeated_chars > len(plate_upper) * 0.6:
-            print(f"[DEBUG] ❌ Too many repeated characters: {plate_text}")
+            print(f"[DEBUG]  Too many repeated characters: {plate_text}")
             return False
         
         # Rule 3: Reject obviously unrealistic patterns
@@ -4334,12 +4456,12 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         import re
         for pattern in ocr_error_patterns:
             if re.match(pattern, plate_upper):
-                print(f"[DEBUG] ❌ Suspicious pattern detected: {plate_text}")
+                print(f"[DEBUG]  Suspicious pattern detected: {plate_text}")
                 return False
         
         # Rule 4: Length should be reasonable (6-12 characters for most plates)
         if not (6 <= len(plate_upper) <= 12):
-            print(f"[DEBUG] ❌ Unreasonable length: {len(plate_upper)} chars in {plate_text}")
+            print(f"[DEBUG]  Unreasonable length: {len(plate_upper)} chars in {plate_text}")
             return False
         
         # Rule 5: Should follow some basic license plate structure
@@ -4350,17 +4472,22 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         indian_pattern1 = r'^[A-Z]{2}[0-9]{1,4}[A-Z]{1,3}[0-9]{1,4}$'
         indian_pattern2 = r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$'
         
+        # Check for Serbian/European format: 2 letters + 2 letters + 3-4 numbers (e.g., PG AN 112)
+        serbian_pattern = r'^[A-Z]{2}[A-Z]{2}[0-9]{3,4}$'
+        # Check for extended European format: 2-4 letters + 1-2 letters + 2-4 numbers
+        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$' 
         # Check for international patterns
         international_pattern = r'^[A-Z0-9]{6,12}$'
         
-        if (re.match(indian_pattern1, plate_upper) or 
+        if (re.match(indian_pattern1, plate_upper) or
             re.match(indian_pattern2, plate_upper) or
+            re.match(serbian_pattern, plate_upper) or
+            re.match(european_extended_pattern, plate_upper) or
             re.match(international_pattern, plate_upper)):
-            print(f"[DEBUG] ✅ Valid license plate pattern: {plate_text}")
             return True
         
         # If it doesn't match standard patterns but passes other checks, allow it
-        print(f"[DEBUG] ⚠️ Non-standard but acceptable pattern: {plate_text}")
+        print(f"[DEBUG]  Non-standard but acceptable pattern: {plate_text}")
         return True
         
     except Exception as e:
@@ -4781,7 +4908,7 @@ def format_text_extraction_results(json_result: dict) -> str:
     summary = extraction["summary"]
     
     lines = []
-    lines.append("📝 **Text Extraction Results:**")
+    lines.append(" **Text Extraction Results:**")
     lines.append(f"   Total Objects: {summary['total_objects']}")
     lines.append(f"   Objects with Text: {summary['objects_with_text']}")
     lines.append(f"   License Plates Found: {summary['license_plates_found']}")
@@ -4790,21 +4917,21 @@ def format_text_extraction_results(json_result: dict) -> str:
     
     # Show license plates
     if extraction["license_plates"]:
-        lines.append("🚗 **License Plates:**")
+        lines.append(" **License Plates:**")
         for plate in extraction["license_plates"]:
             lines.append(f"   • {plate['plate_text']} (confidence: {plate['confidence']:.2f})")
         lines.append("")
     
     # Show general text
     if extraction["general_text"]:
-        lines.append("📄 **General Text:**")
+        lines.append(" **General Text:**")
         for text_item in extraction["general_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")
     
     # Show full image text
     if "full_image_text" in extraction and extraction["full_image_text"]:
-        lines.append("🖼️ **Full Image Text:**")
+        lines.append(" **Full Image Text:**")
         for text_item in extraction["full_image_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")
@@ -5198,7 +5325,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
     
     summary_lines = []
-    summary_lines.append(f"📊 **Detected {len(boxes)} objects:**")
+    summary_lines.append(f" **Detected {len(boxes)} objects:**")
     summary_lines.append("")
     
     for i in range(len(boxes)):
@@ -5211,7 +5338,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
         
         confidence = f"{float(conf[i]):.2f}" if i < len(conf) else "N/A"
         
-        line = f"🔹 **{class_name}** (conf: {confidence})"
+        line = f" **{class_name}** (conf: {confidence})"
         
         # Add color and text info
         try:
@@ -5701,7 +5828,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
         main_vehicle_html = f"""
         <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
                     padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
-            <h3 style="margin: 0 0 10px 0; font-size: 18px;">🚗 Vehicle Detection</h3>
+            <h3 style="margin: 0 0 10px 0; font-size: 18px;"> Vehicle Detection</h3>
             <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
                 <div style="font-size: 24px; font-weight: bold; margin-bottom: 5px;">{main_v['plate']}</div>
                 <div style="font-size: 12px; color: #fbbf24;">License Plate</div>
@@ -5719,7 +5846,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
             <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
                 <div style="display: flex; justify-content: space-between; font-size: 12px;">
                     <span>⏰ {current_time}</span>
-                    <span>📅 {current_date}</span>
+                    <span> {current_date}</span>
                 </div>
             </div>
         </div>
@@ -5736,7 +5863,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                 <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
                             display: flex; align-items: center; justify-content: center; 
-                            margin-right: 10px; font-size: 18px;">🚗</div>
+                            margin-right: 10px; font-size: 18px;"></div>
                 <div style="flex: 1;">
                     <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{v['plate']}</div>
                     <div style="font-size: 11px; color: #94a3b8;">{v['type']} • {v['color'].title()}</div>
@@ -5753,7 +5880,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
                             background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                     <div style="width: 40px; height: 40px; background: #fbbf24; border-radius: 5px; 
                                 display: flex; align-items: center; justify-content: center; 
-                                margin-right: 10px; font-size: 18px;">📝</div>
+                                margin-right: 10px; font-size: 18px;"></div>
                     <div style="flex: 1;">
                         <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{plate['plate']}</div>
                         <div style="font-size: 11px; color: #94a3b8;">License Plate Detected</div>
@@ -5816,508 +5943,218 @@ def predict_image(
     max_boxes,
     enable_ocr,
 ):
-    """Predicts objects in an image using enhanced YOLO detector with vehicle classification."""
+    """Predicts license plates in an image using fast_alpr."""
     if img is None:
-        return None, "Please upload an image first", "{}"
+        return None, ""
 
     try:
-        # Use the enhanced YOLO detector with vehicle classification
-        try:
-            from src.core.detector import YOLODetector
-            detector = YOLODetector(model_name=model_name)
-            print("[INFO] Using enhanced YOLO detector with vehicle classification")
-        except Exception as e:
-            print(f"[WARNING] Enhanced detector not available, using fallback: {e}")
-            # Fallback to original method
-            model = get_model(model_name)
-            device = _get_device()
-            models = model if isinstance(model, list) else [model]
-            
-            # Processing Flow Optimization
-            if device != "cpu" and torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                torch.cuda.synchronize()
-
-            all_results = []
-            for m in models:
-                r = m.predict(
-                    source=img,
-                    conf=conf_threshold,
-                    iou=iou_threshold,
-                    imgsz=imgsz,
-                    device=device,
-                    verbose=False,
-                    half=True if device != "cpu" else False,
-                )
-                if r:
-                    all_results.append(r[0])
-
-            if not all_results:
-                # Convert to RGB PIL Image properly
-                try:
-                    if hasattr(img, 'convert'):
-                        result_image = img.convert('RGB')
-                    elif isinstance(img, np.ndarray):
-                        if len(img.shape) == 3 and img.shape[2] == 3:
-                            # Check if it's BGR (OpenCV default) and convert to RGB
-                            if img.dtype == np.uint8:
-                                result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(img)
-                    else:
-                        result_image = Image.fromarray(np.array(img))
-                    
-                    # Ensure the image is valid
-                    if result_image is None:
-                        result_image = Image.new('RGB', (640, 480), color='black')
-                    
-                    return result_image, "No objects detected", "{}"
-                except Exception as e:
-                    print(f"[ERROR] Failed to convert image in early return: {e}")
-                    # Last resort: create a blank image
-                    return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-                    img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-                if len(img.shape) == 3 and img.shape[2] == 3:
-                    frame_bgr = img
+        # Check if ALPR is available
+        if not ALPR_AVAILABLE or alpr is None:
+            print("[WARNING] ALPR not available, returning original image")
+            if hasattr(img, 'convert'):
+                return img.convert('RGB'), ""
+            elif isinstance(img, np.ndarray):
+                if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
+                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), ""
                 else:
-                    return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Invalid image format", "{}"
-            else:
-                return Image.fromarray(np.array(img.convert('RGB') if hasattr(img, 'convert') else img)), "Unsupported image format", "{}"
+                    return Image.fromarray(img), ""
+            return None, ""
 
-            # Use enhanced detection with vehicle classification
-            try:
-                detections = detector.detect_objects(frame_bgr, conf_threshold, iou_threshold, imgsz)
-                print(f"[INFO] Enhanced detection found {len(detections)} objects")
-                
-                # Convert detections back to YOLO format for compatibility with existing code
-                if detections:
-                    # Create a mock YOLO result for compatibility
-                    class MockResult:
-                        def __init__(self, detections, names):
-                            self.boxes = self._create_mock_boxes(detections)
-                            self.names = names
-                        
-                        def _create_mock_boxes(self, detections):
-                            class MockBoxes:
-                                def __init__(self, detections):
-                                    self.xyxy = torch.tensor([[d['bbox'][0], d['bbox'][1], d['bbox'][2], d['bbox'][3]] for d in detections])
-                                    self.conf = torch.tensor([d['confidence'] for d in detections])
-                                    self.cls = torch.tensor([d['class_id'] for d in detections])
-                                    self._detections = detections
-                                
-                                def __len__(self):
-                                    return len(self._detections)
-                                
-                                def __getitem__(self, idx):
-                                    return {
-                                        'xyxy': self.xyxy[idx],
-                                        'conf': self.conf[idx],
-                                        'cls': self.cls[idx]
-                                    }
-                            
-                            return MockBoxes(detections)
-                    
-                    # Get model names
-                    model_obj = detector.model
-                    names = model_obj.names if hasattr(model_obj, 'names') else {i: f"class_{i}" for i in range(80)}
-                    
-                    all_results = [MockResult(detections, names)]
-                    print(f"[INFO] Created mock result with {len(detections)} detections")
-                else:
-                    # No detections - return original image as PIL RGB
-                    try:
-                        if hasattr(img, 'convert'):
-                            result_image = img.convert('RGB')
-                        elif isinstance(img, np.ndarray):
-                            if len(img.shape) == 3 and img.shape[2] == 3:
-                                # Convert BGR to RGB if needed
-                                if img.dtype == np.uint8:
-                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                                else:
-                                    result_image = Image.fromarray(img)
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(np.array(img))
-                        
-                        # Ensure the image is valid
-                        if result_image is None:
-                            result_image = Image.new('RGB', (640, 480), color='black')
-                        
-                        return result_image, "No objects detected", "{}"
-                    except Exception as e:
-                        print(f"[ERROR] Failed to convert image in enhanced detector: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-                    
-            except Exception as e:
-                print(f"[ERROR] Enhanced detection failed: {e}")
-                # Fallback to original method
-                model = get_model(model_name)
-                device = _get_device()
-                models = model if isinstance(model, list) else [model]
-                
-                if device != "cpu" and torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                    torch.cuda.synchronize()
-
-                all_results = []
-                for m in models:
-                    r = m.predict(
-                        source=img,
-                        conf=conf_threshold,
-                        iou=iou_threshold,
-                        imgsz=imgsz,
-                        device=device,
-                        verbose=False,
-                        half=True if device != "cpu" else False,
-                    )
-                    if r:
-                        all_results.append(r[0])
-
-                if not all_results:
-                    try:
-                        if hasattr(img, 'convert'):
-                            result_image = img.convert('RGB')
-                        elif isinstance(img, np.ndarray):
-                            if len(img.shape) == 3 and img.shape[2] == 3:
-                                # Convert BGR to RGB if needed
-                                if img.dtype == np.uint8:
-                                    result_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-                                else:
-                                    result_image = Image.fromarray(img)
-                            else:
-                                result_image = Image.fromarray(img)
-                        else:
-                            result_image = Image.fromarray(np.array(img))
-                        
-                        # Ensure the image is valid
-                        if result_image is None:
-                            result_image = Image.new('RGB', (640, 480), color='black')
-                        
-                        return result_image, "No objects detected", "{}"
-                    except Exception as e:
-                        print(f"[ERROR] Failed to convert image in fallback: {e}")
-                        return Image.new('RGB', (640, 480), color='black'), "No objects detected", "{}"
-
-        # Convert to BGR for OpenCV operations with defensive checks
-        if hasattr(img, 'convert'):  # PIL Image
+        # Convert image to numpy array (OpenCV format)
+        if hasattr(img, 'convert'):
             frame_rgb = np.array(img.convert('RGB'))
+            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
         elif isinstance(img, np.ndarray):
             if img.dtype != np.uint8:
                 img = (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8)
-            if len(img.shape) == 2:  # grayscale
-                frame_rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-            elif img.shape[2] == 4:  # RGBA
-                frame_rgb = cv2.cvtColor(img, cv2.COLOR_RGBA2RGB)
-            elif img.shape[2] == 3:  # BGR or RGB
-                # Assume RGB if not BGR (most web frameworks send RGB)
-                frame_rgb = img
+            if len(img.shape) == 3 and img.shape[2] == 3:
+                frame_bgr = img
+            elif len(img.shape) == 3 and img.shape[2] == 4:
+                frame_bgr = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
             else:
-                raise ValueError(f"Unsupported image shape: {img.shape}")
+                return Image.fromarray(img), ""
         else:
-            raise ValueError(f"Unsupported image type: {type(img)}")
+            return None, ""
+
+        # Run ALPR detection
+        print("[INFO] Running fast_alpr detection...")
+        drawn = alpr.draw_predictions(frame_bgr)
+        annotated_frame = drawn.image
+        results = drawn.results
+
+        # Build detection results with country detection
+        plates = []
         
-        # Ensure RGB format before converting to BGR
-        if frame_rgb.shape[2] == 3:
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
-        else:
-            raise ValueError(f"Expected 3 channels, got {frame_rgb.shape[2]}")
+        # Initialize international recognizer if available
+        country_recognizer = None
+        if INTERNATIONAL_PLATES_AVAILABLE:
+            try:
+                from tools.international_license_plates import InternationalLicensePlateRecognizer
+                country_recognizer = InternationalLicensePlateRecognizer()
+            except Exception as e:
+                print(f"[WARNING] Could not initialize country recognizer: {e}")
         
-        # Generate unique image ID for JSON text extraction
-        image_id = f"img_{int(time.time() * 1000)}"
-        
-        # Perform comprehensive text extraction if OCR is enabled
-        json_text_results = None
-        if enable_ocr:
-            print(f"[DEBUG] Starting JSON-based text extraction for image {image_id}")
-            json_text_results = extract_text_from_image_json(frame_bgr, image_id)
-            print(f"[DEBUG] Text extraction completed for {image_id}")
-        
-        # Initialize all_results to prevent UnboundLocalError
-        all_results = []
-        
-        # Initialize detections to prevent UnboundLocalError
-        detections = []
-        
-        # Use professional annotation system to prevent overlapping labels
-        try:
-            # Add project root to path if not already there
-            import sys
-            import os
-            project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-            if project_root not in sys.path:
-                sys.path.insert(0, project_root)
+        for i, result in enumerate(results, 1):
+            plate_text = result.ocr.text if result.ocr else 'N/A'
             
-            from src.processors.professional_annotator import professional_annotator
-            
-            # Convert YOLO results to detection format for professional annotator
-            detections = []
-            for res in all_results:
-                if hasattr(res, 'boxes') and res.boxes is not None:
-                    boxes = res.boxes
-                    if hasattr(boxes, 'xyxy') and len(boxes) > 0:
-                        xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
-                        conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
-                        cls = boxes.cls.cpu().numpy() if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls)
-                        names = res.names
-                        
-                        for i in range(len(boxes)):
-                            if conf[i] > 0.3:  # Confidence threshold
-                                x1, y1, x2, y2 = map(int, xyxy[i])
-                                confidence = float(conf[i])
-                                class_id = int(cls[i])
-                                class_name = names.get(class_id, f"class_{class_id}")
-                                
-                                detection = {
-                                    'bbox': [x1, y1, x2, y2],
-                                    'confidence': confidence,
-                                    'class_name': class_name,
-                                    'class_id': class_id
-                                }
-                                
-                                # Add simple color detection
-                                try:
-                                    crop = frame_bgr[y1:y2, x1:x2]
-                                    if crop.size > 0:
-                                        avg_color_per_row = np.average(crop, axis=0)
-                                        avg_color = np.average(avg_color_per_row, axis=0)
-                                        b, g, r = map(int, avg_color)
-                                        
-                                        # Simple color classification
-                                        if r > 200 and g > 200 and b > 200:
-                                            color = "white"
-                                        elif r < 50 and g < 50 and b < 50:
-                                            color = "black"
-                                        elif r > g and r > b:
-                                            color = "red" if r > 150 else "brown"
-                                        elif g > r and g > b:
-                                            color = "green" if g > 150 else "olive"
-                                        elif b > r and b > g:
-                                            color = "blue" if b > 150 else "navy"
-                                        elif r > 150 and g > 150:
-                                            color = "yellow"
-                                        elif r > 150 and b > 150:
-                                            color = "magenta"
-                                        elif g > 150 and b > 150:
-                                            color = "cyan"
-                                        else:
-                                            color = "gray"
-                                        
-                                        detection['color'] = color
-                                except Exception:
-                                    detection['color'] = 'unknown'
-                                
-                                detections.append(detection)
-            
-            # Extract license plates from JSON results if available
-            if json_text_results and enable_ocr:
+            # Detect country for this plate
+            country = 'Unknown'
+            if country_recognizer and plate_text != 'N/A':
                 try:
-                    extraction = json_text_results.get("text_extraction", {})
-                    license_plates = extraction.get("license_plates", [])
-                    
-                    # Create mapping of vehicles to license plates
-                    for plate_info in license_plates:
-                        if plate_info.get("object_id") and plate_info.get("plate_text"):
-                            plate_text = plate_info["plate_text"]
-                            object_id = plate_info["object_id"]
-                            
-                            # Find corresponding detection
-                            for detection in detections:
-                                if str(detection.get('class_id')) == object_id.split('_')[-1]:
-                                    detection['license_plate'] = plate_text
-                                    break
+                    country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                    if country_matches and len(country_matches) > 0:
+                        country = country_matches[0]['country']
                 except Exception as e:
-                    print(f"[DEBUG] License plate mapping failed: {e}")
+                    print(f"[DEBUG] Country detection failed for {plate_text}: {e}")
             
-            # Use professional annotator
-            if detections:
-                annotated_bgr = professional_annotator.annotate_detections(
-                    frame_bgr,
-                    detections,
-                    show_confidence=show_conf,
-                    show_info_panel=True
-                )
-                
-                # Add JSON text annotations if available
-                if json_text_results and enable_ocr:
-                    annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
-            else:
-                annotated_bgr = frame_bgr
-                
-        except Exception as e:
-            print(f"[WARNING] Professional annotator not available, using fallback: {e}")
-            # Fallback to original annotation method
-            annotated_bgr = frame_bgr.copy()
-            print(f"[DEBUG] Starting fallback annotation with {len(all_results)} results")
-            for idx, res in enumerate(all_results):
-                print(f"[DEBUG] Annotating result {idx+1}/{len(all_results)}: {type(res)}")
-                annotated_bgr = _annotate_with_color(
-                    annotated_bgr,
-                    res,
-                    show_labels,
-                    show_conf,
-                    enable_resnet=bool(enable_resnet),
-                    max_boxes=int(max_boxes),
-                    resnet_every_n=1,
-                    stream_key_prefix=None,
-                    enable_ocr=False,
-                    ocr_every_n=1,
-                )
-                print(f"[DEBUG] Annotation complete for result {idx+1}, image shape: {annotated_bgr.shape if hasattr(annotated_bgr, 'shape') else 'N/A'}")
-            
-            # If we have JSON text results, add text annotations from JSON
-            if json_text_results and enable_ocr:
-                print(f"[DEBUG] Adding JSON text annotations")
-                annotated_bgr = _annotate_from_json_results(annotated_bgr, json_text_results, show_labels)
+            plate_info = {
+                'plate_number': i,
+                'text': plate_text,
+                'country': country,
+                'detection_confidence': float(result.detection.confidence),
+                'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+                'bbox': {
+                    'x1': int(result.detection.bounding_box.x1),
+                    'y1': int(result.detection.bounding_box.y1),
+                    'x2': int(result.detection.bounding_box.x2),
+                    'y2': int(result.detection.bounding_box.y2)
+                }
+            }
+            plates.append(plate_info)
+            print(f"[INFO] Plate {i}: {plate_info['text']} [{plate_info['country']}] (Detection: {plate_info['detection_confidence']:.2%}, OCR: {plate_info['ocr_confidence']:.2%})")
         
-        # Generate detection summary
-        print(f"[DEBUG] Generating detection summary from {len(all_results)} results")
-        summaries = [
-            _generate_detection_summary(r, enable_resnet=bool(enable_resnet), enable_ocr=False)
-            for r in all_results
-        ]
-        summary = "\n\n".join([s for s in summaries if s])
-        print(f"[DEBUG] Summary generated: {summary[:100]}...")
-        
-        # Add JSON text extraction results to summary
-        if json_text_results and enable_ocr:
-            text_summary = format_text_extraction_results(json_text_results)
-            summary = f"{summary}\n\n{text_summary}"
-            
-            # Also add raw JSON for debugging
-            json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-            summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
-        
-        # Ensure annotated_bgr is valid
-        if annotated_bgr is None or not isinstance(annotated_bgr, np.ndarray):
-            print(f"[WARNING] annotated_bgr is invalid (type: {type(annotated_bgr)}), using original frame")
-            annotated_bgr = frame_bgr
-        
-        print(f"[DEBUG] Final annotated_bgr shape: {annotated_bgr.shape}, dtype: {annotated_bgr.dtype}")
-        
-        # Add time and date timestamp like Enhanced ANPR
-        try:
-            current_time = datetime.now().strftime('%H:%M:%S')
-            current_date = datetime.now().strftime('%d/%m/%Y')
-            
-            # Create semi-transparent background for timestamp
-            overlay = annotated_bgr.copy()
-            cv2.rectangle(overlay, (5, 5), (250, 80), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.7, annotated_bgr, 0.3, 0, annotated_bgr)
-            
-            # Add time with smaller font
-            cv2.putText(annotated_bgr, f"Time: {current_time}", (10, 25), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            
-            # Add date with smaller font  
-            cv2.putText(annotated_bgr, f"Date: {current_date}", (10, 50), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-            
-            # Add vehicle count
-            vehicle_count = len([d for d in all_results if hasattr(d, 'boxes') and d.boxes is not None])
-            if vehicle_count > 0:
-                cv2.putText(annotated_bgr, f"Objects: {vehicle_count}", (10, 75), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-            
-            print(f"[DEBUG] Added timestamp: {current_time} {current_date}")
-        except Exception as time_error:
-            print(f"[WARNING] Failed to add timestamp: {time_error}")
-            
-        # Convert BGR to RGB for PIL
-        if len(annotated_bgr.shape) == 3 and annotated_bgr.shape[2] == 3:
-            annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
-        else:
-            annotated_rgb = annotated_bgr
-        
-        # Create PIL Image directly
-        result_image = Image.fromarray(annotated_rgb)
-        
-        # Ensure RGB mode
-        if result_image.mode != 'RGB':
-            result_image = result_image.convert('RGB')
-        
-        print(f"[DEBUG] Final image - Size: {result_image.size}, Mode: {result_image.mode}")
-        
-        # Create ANPR-style info text for image detection (similar to video detection)
-        info_lines = []
+        # Add country labels on the image (overlay on top of ALPR's default "Unknown")
+        if plates:
+            for plate in plates:
+                if plate['country'] != 'Unknown':
+                    x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                    # Draw country label above the plate
+                    country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                    label_y = y1 - 35 if y1 > 35 else y1 + 20
+                    
+                    # Get text size for background
+                    (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+                    
+                    # Draw background rectangle (blue color)
+                    cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                    
+                    # Draw country text
+                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+        # Add timestamp overlay
         current_time = datetime.now().strftime('%H:%M:%S')
         current_date = datetime.now().strftime('%d/%m/%Y')
-        info_lines.append(f"📅 Date: {current_date}")
+        
+        # Create semi-transparent background for timestamp
+        overlay = annotated_frame.copy()
+        cv2.rectangle(overlay, (5, 5), (250, 80), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+        
+        # Add time and date
+        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        if plates:
+            cv2.putText(annotated_frame, f"Plates: {len(plates)}", (10, 75), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+
+        # Convert BGR to RGB for PIL
+        annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
+        result_image = Image.fromarray(annotated_rgb)
+
+        # Build info text
+        info_lines = []
+        info_lines.append(f" Date: {current_date}")
         info_lines.append(f"⏰ Time: {current_time}")
         
-        # Count vehicles and extract plate info
-        vehicle_count = 0
-        plate_list = []
-        color_list = []
+        if plates:
+            info_lines.append(f" Plates Detected: {len(plates)}")
+            for plate in plates:
+                country_str = f" [{plate['country']}]" if plate['country'] != 'Unknown' else ''
+                info_lines.append(f" Plate: {plate['text']}{country_str}")
+                info_lines.append(f"   Detection: {plate['detection_confidence']:.2%}")
+                if plate['ocr_confidence'] > 0:
+                    info_lines.append(f"   OCR: {plate['ocr_confidence']:.2%}")
+        else:
+            info_lines.append(" No license plates detected")
         
-        for result in all_results:
-            if hasattr(result, 'boxes') and result.boxes is not None:
-                boxes = result.boxes
-                for i, box in enumerate(boxes):
-                    cls_id = int(box.cls.item()) if hasattr(box.cls, 'item') else int(box.cls[0])
-                    class_name = result.names.get(cls_id, f"class_{cls_id}")
-                    
-                    # Check if it's a vehicle
-                    if class_name in ['car', 'truck', 'bus', 'motorcycle', 'scooter', 'bike', 'rickshaw', 'auto', 'autorickshaw']:
-                        vehicle_count += 1
-                        
-                    # Get color if available from detections
-                    for det in detections:
-                        if det.get('class_name') == class_name:
-                            if det.get('color'):
-                                color_list.append(det.get('color'))
-                            if det.get('license_plate'):
-                                plate_list.append(det.get('license_plate'))
+        info_text = "\n".join(info_lines)
+
+        # Build JSON output
+        json_output = json.dumps({
+            "timestamp": current_time,
+            "date": current_date,
+            "plates_detected": len(plates),
+            "plates": plates
+        }, indent=2, ensure_ascii=False)
+
+        # Build summary
+        # summary_lines = [" **License Plate Detection Results**\n"]
+        # if plates:
+        #     for plate in plates:
+        #         summary_lines.append(f"**Plate {plate['plate_number']}:** {plate['text']}")
+        #         summary_lines.append(f"- Detection Confidence: {plate['detection_confidence']:.2%}")
+        #         if plate['ocr_confidence'] > 0:
+        #             summary_lines.append(f"- OCR Confidence: {plate['ocr_confidence']:.2%}")
+        #         summary_lines.append(f"- Bounding Box: ({plate['bbox']['x1']}, {plate['bbox']['y1']}) to ({plate['bbox']['x2']}, {plate['bbox']['y2']})")
+        #         summary_lines.append("")
+        # else:
+        #     summary_lines.append("No license plates detected in the image.")
         
-        if vehicle_count > 0:
-            info_lines.append(f"🚗 Vehicles Detected: {vehicle_count}")
+        # summary = "\n".join(summary_lines)
+        summary = ""
         
-        # Add unique plates
-        unique_plates = list(set(plate_list)) if plate_list else []
-        if unique_plates:
-            info_lines.append(f"📝 Plates: {', '.join(unique_plates[:5])}")
-            if len(unique_plates) > 5:
-                info_lines.append(f"   ... and {len(unique_plates) - 5} more")
+        # Add raw JSON to summary
+        # summary = f"{summary}\n\n **Raw JSON Data:**\n```json\n{json_output}\n```"
+
+        # Create simple HTML side panel
+        side_panel_html = f"""
+        <div style="padding: 10px; background: #1a1a2e; color: white; border-radius: 6px; font-size: 13px;">
+            <h3 style="margin: 0 0 8px 0; color: #4CAF50; font-size: 14px; font-weight: 600;">Detection Summary</h3>
+            <div style="margin-bottom: 8px; line-height: 1.6;">
+                <span style="color: #aaa;">Date:</span> {current_date} &nbsp;
+                <span style="color: #aaa;">Time:</span> {current_time} &nbsp;
+                <span style="color: #aaa;">Plates:</span> {len(plates)}
+            </div>
+        """
         
-        # Add colors detected
-        unique_colors = list(set(color_list)) if color_list else []
-        if unique_colors:
-            info_lines.append(f"🎨 Colors: {', '.join(unique_colors[:3])}")
+        if plates:
+            for plate in plates:
+                country_badge = f"""<span style="background: #2196F3; color: white; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-left: 6px;">{plate['country']}</span>""" if plate['country'] != 'Unknown' else ''
+                side_panel_html += f"""
+                <div style="background: #16213e; padding: 6px; margin: 4px 0; border-radius: 4px;">
+                    <div style="margin: 0; font-size: 14px; font-weight: 500; color: #4CAF50;">{plate['text']}{country_badge}</div>
+                    <div style="margin: 2px 0 0 0; font-size: 11px; color: #aaa;">Confidence: {plate['detection_confidence']:.2%}</div>
+                </div>
+                """
+        else:
+            side_panel_html += "<div style='color: #888; font-size: 12px;'>No plates detected</div>"
         
-        info_text = "\n".join(info_lines) if info_lines else "✅ Processing Complete!"
-        
-        # Generate ANPR-style side panel HTML
-        side_panel_html = create_anpr_side_panel(detections, all_results, json_text_results)
-        
-        return result_image, info_text, summary, side_panel_html
-        
+        side_panel_html += "</div>"
+
+        return result_image, info_text
+
     except Exception as e:
         error_msg = f"Error in predict_image: {str(e)}"
         print(f"[ERROR] {error_msg}")
         import traceback
         traceback.print_exc()
-        # Ensure we return a proper PIL Image
+        
+        # Return original image on error
         try:
-            if isinstance(img, np.ndarray):
+            if hasattr(img, 'convert'):
+                return img.convert('RGB'), f" Error processing image\n\n{error_msg}"
+            elif isinstance(img, np.ndarray):
                 if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
-                    # Convert BGR to RGB
-                    img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), f" Error processing image\n\n{error_msg}"
                 else:
-                    img_pil = Image.fromarray(img if img.dtype == np.uint8 else (img * 255).astype(np.uint8) if img.max() <= 1.0 else img.astype(np.uint8))
-            elif hasattr(img, 'convert'):
-                img_pil = img.convert('RGB')
-            else:
-                img_pil = Image.fromarray(np.array(img))
-            
-            # Ensure the image is valid
-            if img_pil is None:
-                img_pil = Image.new('RGB', (640, 480), color='black')
-                
-            return img_pil, f"⚠️ **Error processing image**\n\n{error_msg}\n\nPlease try again with different settings or check the console for details.", "{}", ""
+                    return Image.fromarray(img), f" Error processing image\n\n{error_msg}"
+            return None, f" Error processing image\n\n{error_msg}"
         except Exception as e2:
-            return None, f"❌ **Critical Error**\n\n{str(e2)}\n\nPlease restart the application.", "{}", ""
+            return None, f" Critical Error\n\n{str(e2)}"
 
 
 def predict_video(
@@ -6333,53 +6170,28 @@ def predict_video(
     resnet_every_n,
     enable_ocr,
     ocr_every_n,
-    processing_mode="ultra_fast"  # DEFAULT to ultra_fast for maximum speed
+    processing_mode="ultra_fast"
 ):
     """
-    🚀 ULTRA-FAST VIDEO PROCESSING - 50 minutes → 2-3 minutes
-    
-    Args:
-        processing_mode: "ultra_fast" (2-3 min), "fast" (3-5 min), "balanced" (5-8 min), "original" (slow, 50 min)
-    
-    Returns:
-        (output_path, detection_summary) - Path and summary
+     VIDEO PROCESSING with fast_alpr - License Plate Detection Only
+    Same logic as image detection - only detects license plates using ALPR
     """
     try:
-        print(f"[INFO] 🚀 Starting ULTRA-FAST VIDEO PROCESSING in {processing_mode} mode")
+        print(f"[INFO]  Starting VIDEO PROCESSING with ALPR")
         
-        # Use new ultra-fast module for all optimized modes
-        if processing_mode in ["ultra_fast", "fast", "balanced"]:
-            print(f"[INFO] Using NEW ultra-fast processing - expected time: 2-8 minutes")
-            from ultra_fast_video import process_video_ultra_fast
-            return process_video_ultra_fast(
-                video_path=video_path,
-                model_name=model_name,
-                mode=processing_mode
-            )
-        
-        # Fallback to original optimized processing
-        if processing_mode != "original":
-            print(f"[INFO] Using optimized processing - expected time: 3-12 minutes")
-            return process_video_optimized_fast(
-                video_path=video_path,
-                model_name=model_name,
-                mode=processing_mode,
-                progress_callback=None,
-                enable_ocr=bool(enable_ocr),
-                ocr_every_n=int(ocr_every_n),
-                force_gpu=True  # FORCE GPU for maximum speed!
-            )
-        
-        # Original slow processing (if someone really wants it)
-        print(f"[WARNING] Using ORIGINAL SLOW mode - this will take 50+ minutes")
+        # Always use ALPR-based processing (same as image detection)
         result_path = _predict_video_original(
             video_path, conf_threshold, iou_threshold, model_name,
             show_labels, show_conf, imgsz, enable_resnet, max_boxes,
             resnet_every_n, enable_ocr, ocr_every_n
         )
         
-        # Create basic summary for original mode
-        summary = f"🎯 Video processed in ORIGINAL mode\n⏱️ Processing time: 50+ minutes\n📁 Output: {result_path}"
+        # Create summary
+        if result_path:
+            summary = f" Video processed with ALPR\n Output: {result_path}"
+        else:
+            summary = " Video processing failed"
+        
         return result_path, summary
         
     except Exception as e:
@@ -6401,9 +6213,9 @@ def _predict_video_original(
     enable_ocr,
     ocr_every_n,
 ):
-    """Original slow video processing (kept for compatibility)"""
+    """Video processing with fast_alpr license plate detection"""
     try:
-        print(f"[DEBUG] Starting predict_video function")
+        print(f"[DEBUG] Starting predict_video function with ALPR")
         print(f"[DEBUG] Input video_path: {video_path}")
         
         video_path = _extract_video_path(video_path)
@@ -6426,13 +6238,14 @@ def _predict_video_original(
         
         print(f"[INFO] Processing video: {video_path} ({file_size / (1024*1024):.1f} MB)")
 
-        model = get_model(model_name)
-        device = _get_device()
-        print(f"[INFO] Processing video on device: {device}")
-        print(f"[INFO] Using confidence threshold: {conf_threshold}, IoU threshold: {iou_threshold}")
-        print(f"[INFO] Image size: {imgsz}")
+        # Check if ALPR is available
+        if not ALPR_AVAILABLE or alpr is None:
+            print("[WARNING] ALPR not available for video processing")
+            print("[INFO] Falling back to original video processing without ALPR")
+            # Return original video path if ALPR not available
+            return video_path
 
-        models = model if isinstance(model, list) else [model]
+        print("[INFO] Using fast_alpr for license plate detection in video")
 
         # Open the video with error handling
         print("[DEBUG] Attempting to open video file...")
@@ -6534,9 +6347,13 @@ def _predict_video_original(
 
         processed_frames = 0
         success_count = 0
-        detection_count = 0
+        plate_detection_count = 0
+        unique_plates = set()  # Track unique plates across video
         
-        print("[DEBUG] Starting frame processing loop...")
+        print("[DEBUG] Starting frame processing loop with ALPR...")
+        
+        # Process every Nth frame for ALPR to save time (e.g., every 5th frame)
+        alpr_frame_interval = 5
         
         while True:
             ret, frame = cap.read()
@@ -6553,52 +6370,109 @@ def _predict_video_original(
                 if processed_frames == 1:
                     print(f"[DEBUG] First frame shape: {frame.shape}, dtype: {frame.dtype}")
 
-                # Run inference on the frame with CUDA support
-                all_results = []
-                for m in models:
-                    r = m.predict(
-                        source=frame,
-                        conf=conf_threshold,
-                        iou=iou_threshold,
-                        imgsz=imgsz,
-                        device=device,
-                        verbose=False,
-                        half=True if device != "cpu" else False,  # Use FP16 on CUDA for speed
-                    )
-                    if r:
-                        all_results.append(r[0])
-
-                # Debug: Check if any detections were made
-                frame_detections = 0
-                try:
-                    for rr in all_results:
-                        if hasattr(rr, "boxes") and rr.boxes is not None:
-                            frame_detections += len(rr.boxes)
-                except Exception:
-                    frame_detections = 0
-
-                if frame_detections > 0:
-                    detection_count += frame_detections
-                    if processed_frames % 30 == 0 or processed_frames <= 5:  # Show detection info for first few frames and periodically
-                        print(f"[DEBUG] Frame {processed_frames}: {frame_detections} detections")
+                # Run ALPR detection on every Nth frame for performance
+                if processed_frames % alpr_frame_interval == 0 or processed_frames == 1:
+                    try:
+                        # Run ALPR detection
+                        drawn = alpr.draw_predictions(frame)
+                        annotated_frame = drawn.image
+                        results = drawn.results
+                        
+                        # Initialize country recognizer for video (reuse if possible)
+                        country_recognizer = None
+                        if INTERNATIONAL_PLATES_AVAILABLE:
+                            try:
+                                from tools.international_license_plates import InternationalLicensePlateRecognizer
+                                country_recognizer = InternationalLicensePlateRecognizer()
+                            except Exception as e:
+                                pass
+                        
+                        # Process detected plates
+                        frame_plates = []
+                        for i, result in enumerate(results, 1):
+                            plate_text = result.ocr.text if result.ocr else 'N/A'
+                            
+                            # Detect country for this plate
+                            country = 'Unknown'
+                            if country_recognizer and plate_text != 'N/A':
+                                try:
+                                    country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                                    if country_matches and len(country_matches) > 0:
+                                        country = country_matches[0]['country']
+                                except Exception:
+                                    pass
+                            
+                            plate_info = {
+                                'text': plate_text,
+                                'country': country,
+                                'detection_confidence': float(result.detection.confidence),
+                                'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+                                'frame': processed_frames,
+                                'bbox': {
+                                    'x1': int(result.detection.bounding_box.x1),
+                                    'y1': int(result.detection.bounding_box.y1),
+                                    'x2': int(result.detection.bounding_box.x2),
+                                    'y2': int(result.detection.bounding_box.y2)
+                                }
+                            }
+                            frame_plates.append(plate_info)
+                            unique_plates.add(f"{plate_text} [{country}]")
+                            plate_detection_count += 1
+                            
+                            if processed_frames % 30 == 0 or processed_frames <= 5:
+                                print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
+                        
+                        # Add country labels on video frames (blue background)
+                        for plate in frame_plates:
+                            if plate['country'] != 'Unknown':
+                                x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                                country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                                label_y = y1 - 35 if y1 > 35 else y1 + 20
+                                
+                                # Get text size
+                                (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                                
+                                # Draw blue background
+                                cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                                
+                                # Draw white text
+                                cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                        
+                        # Add timestamp and plate count overlay
+                        current_time = datetime.now().strftime('%H:%M:%S')
+                        current_date = datetime.now().strftime('%d/%m/%Y')
+                        
+                        # Create semi-transparent background for timestamp
+                        overlay = annotated_frame.copy()
+                        cv2.rectangle(overlay, (5, 5), (300, 100), (0, 0, 0), -1)
+                        cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+                        
+                        # Add time, date, and plate count
+                        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        cv2.putText(annotated_frame, f"Plates: {len(unique_plates)} | Frame: {len(frame_plates)}", (10, 75), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+                        
+                        # Add recent plate text overlay at bottom
+                        if frame_plates:
+                            recent_plate = frame_plates[-1]['text']
+                            cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, height - 20), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                        
+                    except Exception as alpr_error:
+                        print(f"[WARNING] ALPR failed on frame {processed_frames}: {alpr_error}")
+                        annotated_frame = frame
                 else:
-                    if processed_frames % 30 == 0 or processed_frames <= 5:  # Only show no-detection debug periodically
-                        print(f"[DEBUG] Frame {processed_frames}: No detections")
-
-                annotated_frame = frame
-                for res in all_results:
-                    annotated_frame = _annotate_with_color(
-                        annotated_frame,
-                        res,
-                        show_labels,
-                        show_conf,
-                        enable_resnet=bool(enable_resnet),
-                        max_boxes=int(max_boxes),
-                        resnet_every_n=int(resnet_every_n),
-                        stream_key_prefix="video",
-                        enable_ocr=bool(enable_ocr),
-                        ocr_every_n=int(ocr_every_n),
-                    )
+                    # For frames without ALPR, just add timestamp
+                    annotated_frame = frame.copy()
+                    current_time = datetime.now().strftime('%H:%M:%S')
+                    cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                    cv2.putText(annotated_frame, f"Plates: {len(unique_plates)}", (10, 50), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
                 
                 # Ensure the annotated frame has correct dimensions
                 if annotated_frame.shape[:2] != (height, width):
@@ -6637,7 +6511,9 @@ def _predict_video_original(
             return None
         
         print(f"[INFO] Output video created successfully: {output_size / (1024*1024):.1f} MB")
-        print(f"[INFO] Total detections found: {detection_count}")
+        print(f"[INFO] Total plate detections: {plate_detection_count}")
+        print(f"[INFO] Unique plates detected: {len(unique_plates)}")
+        print(f"[INFO] Unique plate list: {list(unique_plates)}")
         print(f"[INFO] Video processing complete. Processed {success_count}/{processed_frames} frames successfully.")
         
         # Final verification - try to open the output video
@@ -7194,12 +7070,12 @@ def _clean_license_plate_text(text: str) -> str:
     
     # Check if it's a brand name (immediate rejection)
     if cleaned in brand_names:
-        print(f"[DEBUG] ❌ Rejected brand name: {cleaned}")
+        print(f"[DEBUG]  Rejected brand name: {cleaned}")
         return ""
     
     # Check if it's just letters without numbers (likely a brand name)
     if cleaned.isalpha() and len(cleaned) >= 3:
-        print(f"[DEBUG] ❌ Rejected letters-only text: {cleaned}")
+        print(f"[DEBUG]  Rejected letters-only text: {cleaned}")
         return ""
     
     # Replace common OCR confusions (more conservative for license plates)
@@ -7234,15 +7110,15 @@ def _clean_license_plate_text(text: str) -> str:
     has_numbers = bool(re.search(r'\d', result))
     
     if not (has_letters and has_numbers):
-        print(f"[DEBUG] ❌ Rejected text without letters+numbers: {result}")
+        print(f"[DEBUG]  Rejected text without letters+numbers: {result}")
         return ""
     
     # Must be reasonable length (4-8 characters for most plates)
     if len(result) < 4 or len(result) > 10:
-        print(f"[DEBUG] ❌ Rejected text with invalid length: {result}")
+        print(f"[DEBUG]  Rejected text with invalid length: {result}")
         return ""
     
-    print(f"[DEBUG] ✅ Valid license plate text: {result}")
+    print(f"[DEBUG]  Valid license plate text: {result}")
     return result
 
 
@@ -7674,9 +7550,12 @@ def predict_webcam(
     enable_ocr,
     ocr_every_n,
 ):
-    """Predicts objects in a webcam frame using a Ultralytics YOLO model with CUDA support."""
+    """
+     WEBCAM with fast_alpr - License Plate Detection Only
+    Same logic as image/video detection - only detects license plates using ALPR
+    """
     if frame is None:
-        return None, "❌ **Error:** No frame received"
+        return None, " **Error:** No frame received"
 
     global _webcam_stream_state
     try:
@@ -7685,518 +7564,176 @@ def predict_webcam(
         _webcam_stream_state = {
             "frame_idx": 0,
             "last_rgb": None,
-            "last_json": None,
+            "last_plates": set(),
             "history": [],
             "history_max": 1000,
-            "persistent_objects": {},
-            "persistent_ttl": 2, # seconds to keep objects visible
-            "wp": None,
         }
 
-    # Ensure keys exist even if state already existed from older versions
+    # Ensure keys exist
     if "history" not in _webcam_stream_state:
         _webcam_stream_state["history"] = []
     if "history_max" not in _webcam_stream_state:
         _webcam_stream_state["history_max"] = 1000
-    if "last_json" not in _webcam_stream_state:
-        _webcam_stream_state["last_json"] = None
-    if "wp" not in _webcam_stream_state:
-        _webcam_stream_state["wp"] = None
-    if "persistent_objects" not in _webcam_stream_state:
-        _webcam_stream_state["persistent_objects"] = {}
-    if "persistent_ttl" not in _webcam_stream_state:
-        _webcam_stream_state["persistent_ttl"] = 2
+    if "last_plates" not in _webcam_stream_state:
+        _webcam_stream_state["last_plates"] = set()
 
     try:
         _webcam_stream_state["frame_idx"] += 1
 
-        every_n = int(max(1, resnet_every_n))
-        if (_webcam_stream_state["frame_idx"] % every_n) != 0:
-            if _webcam_stream_state.get("last_rgb") is not None:
-                return _webcam_stream_state["last_rgb"], "📹 **Status:** Live Detection Active (Cached)"
-            return frame, "📹 **Status:** Live Detection Active"
-
         # Validate frame dimensions
         if not isinstance(frame, np.ndarray):
-            return frame, "📹 **Status:** Live Detection Active"
+            return frame, " **Status:** Live Detection Active"
         
         if frame.size == 0:
-            return frame, "📹 **Status:** Live Detection Active"
+            return frame, " **Status:** Live Detection Active"
 
-        # Check frame dimensions
         if len(frame.shape) != 3 or frame.shape[2] != 3:
-            return frame, "📹 **Status:** Live Detection Active"
+            return frame, " **Status:** Live Detection Active"
 
-        # Use cached model for better streaming performance
-        model = get_model(model_name)
-        device = _get_device()
+        # Check if ALPR is available
+        if not ALPR_AVAILABLE or alpr is None:
+            print("[WARNING] ALPR not available for webcam")
+            return frame, " ALPR not available\n\nPlease install fast_alpr to use license plate detection."
 
-        models = model if isinstance(model, list) else [model]
+        # Gradio webcam sends RGB, convert to BGR for OpenCV
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        orig_h, orig_w = frame_bgr.shape[:2]
 
-        # Gradio webcam sends RGB, but Ultralytics YOLO expects BGR for OpenCV operations
-        orig_frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        orig_h, orig_w = orig_frame_bgr.shape[:2]
-
-        # Run inference on a resized copy for speed, but ALWAYS render on original frame to keep clarity.
-        infer_frame_bgr = orig_frame_bgr
-        infer_scale_x = 1.0
-        infer_scale_y = 1.0
+        # Run ALPR detection (every frame for webcam)
         try:
-            target = int(imgsz) if imgsz is not None else 640
-            h, w = orig_frame_bgr.shape[:2]
-            if max(h, w) > target and target >= 160:
-                scale = float(target) / float(max(h, w))
-                nw = max(2, int(round(w * scale)))
-                nh = max(2, int(round(h * scale)))
-                infer_frame_bgr = cv2.resize(orig_frame_bgr, (nw, nh), interpolation=cv2.INTER_AREA)
-                infer_scale_x = float(orig_w) / float(nw)
-                infer_scale_y = float(orig_h) / float(nh)
-        except Exception:
-            infer_frame_bgr = orig_frame_bgr
-            infer_scale_x = 1.0
-            infer_scale_y = 1.0
-
-        # Throttled debug logs for resolution (avoid spamming)
-        try:
-            if (_webcam_stream_state["frame_idx"] % 60) == 0:
-                ih, iw = infer_frame_bgr.shape[:2]
-                print(f"[DEBUG] Webcam frame orig={orig_w}x{orig_h} infer={iw}x{ih}")
-                print(f"[DEBUG] Aspect ratio orig={orig_w/orig_h:.3f} infer={iw/ih:.3f}")
-        except Exception:
-            pass
-
-        # Run inference with CUDA support
-        all_results = []
-        for m in models:
-            r = m.predict(
-                source=infer_frame_bgr,
-                conf=conf_threshold,
-                iou=iou_threshold,
-                imgsz=imgsz,
-                device=device,
-                verbose=False,
-                half=True if device != "cpu" else False,
-            )
-            if r:
-                all_results.append(r[0])
-
-        if not all_results:
-            # Keep returning status + frame but do not wipe accumulated JSON/history
-            return frame, "📹 **Status:** Live Detection Active - No objects detected"
-
-        # Always annotate on original-resolution frame for maximum clarity
-        annotated_bgr = orig_frame_bgr.copy()
-        ocr_results = []
-        color_results = []
-        plate_results = []
-
-        # Build per-frame detection list (for persistent JSON history)
-        frame_detections = []
-        for res in all_results:
-            if hasattr(res, "boxes") and res.boxes is not None:
-                boxes = res.boxes
-                xyxy = boxes.xyxy.cpu().numpy()
-                confs = boxes.conf.cpu().numpy()
-                clss = boxes.cls.cpu().numpy()
-                names = res.names
-                for i in range(len(xyxy)):
-                    x1, y1, x2, y2 = xyxy[i]
-                    # Scale bbox back to original frame coordinates if inference was resized
+            drawn = alpr.draw_predictions(frame_bgr)
+            annotated_frame = drawn.image
+            results = drawn.results
+            
+            # Initialize country recognizer
+            country_recognizer = None
+            if INTERNATIONAL_PLATES_AVAILABLE:
+                try:
+                    from tools.international_license_plates import InternationalLicensePlateRecognizer
+                    country_recognizer = InternationalLicensePlateRecognizer()
+                except Exception:
+                    pass
+            
+            # Process detected plates
+            frame_plates = []
+            for i, result in enumerate(results, 1):
+                plate_text = result.ocr.text if result.ocr else 'N/A'
+                
+                # Detect country for this plate
+                country = 'Unknown'
+                if country_recognizer and plate_text != 'N/A':
                     try:
-                        x1 = float(x1) * float(infer_scale_x)
-                        x2 = float(x2) * float(infer_scale_x)
-                        y1 = float(y1) * float(infer_scale_y)
-                        y2 = float(y2) * float(infer_scale_y)
+                        country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                        if country_matches and len(country_matches) > 0:
+                            country = country_matches[0]['country']
                     except Exception:
                         pass
-                    class_id = int(clss[i]) if i < len(clss) else -1
-                    class_name = names.get(class_id, f"class_{class_id}")
-                    frame_detections.append(
-                        {
-                            "class_id": class_id,
-                            "class_name": class_name,
-                            "confidence": float(confs[i]) if i < len(confs) else 0.0,
-                            "bounding_box": (int(x1), int(y1), int(x2), int(y2)),
-                        }
-                    )
-        # Throttled debug logs for scale factors and example bboxes (every 60 frames)
-        try:
-            if (_webcam_stream_state["frame_idx"] % 60) == 0:
-                print(f"[DEBUG] Scale factors: x={infer_scale_x:.3f}, y={infer_scale_y:.3f}")
-                for idx, det in enumerate(frame_detections[:3]):
-                    x1, y1, x2, y2 = det["bounding_box"]
-                    print(f"[DEBUG]   bbox{idx} {det['class_name']}: ({x1},{y1},{x2},{y2})")
-        except Exception:
-            pass
-        
-        # Persistent object management: keep small objects visible for 2-3 seconds
-        current_time = time.time()
-        persistent_ttl = _webcam_stream_state.get("persistent_ttl", 2)
-        persistent_objects = _webcam_stream_state.get("persistent_objects", {})
-        
-        # Update persistent objects with current detections
-        current_object_keys = set()
-        for det in frame_detections:
-            class_name = det.get("class_name", "").lower()
-            # Only persist small objects (not persons, cars, etc.)
-            if class_name not in ["person", "car", "truck", "bus", "motorcycle", "bicycle", "chair", "couch", "bed"]:
-                obj_key = f"{class_name}_{det.get('bounding_box', (0,0,0,0))[:2]}"
-                current_object_keys.add(obj_key)
-                persistent_objects[obj_key] = {
-                    "detection": det,
-                    "timestamp": current_time,
-                    "frame_idx": _webcam_stream_state["frame_idx"]
+                
+                plate_info = {
+                    'text': plate_text,
+                    'country': country,
+                    'detection_confidence': float(result.detection.confidence),
+                    'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+                    'bbox': {
+                        'x1': int(result.detection.bounding_box.x1),
+                        'y1': int(result.detection.bounding_box.y1),
+                        'x2': int(result.detection.bounding_box.x2),
+                        'y2': int(result.detection.bounding_box.y2)
+                    }
                 }
-        
-        # Remove old persistent objects
-        expired_keys = []
-        for obj_key, obj_data in persistent_objects.items():
-            if current_time - obj_data["timestamp"] > persistent_ttl:
-                expired_keys.append(obj_key)
-        
-        for key in expired_keys:
-            del persistent_objects[key]
-        
-        # Merge persistent objects with current detections for display
-        combined_detections = frame_detections.copy()
-        for obj_key, obj_data in persistent_objects.items():
-            if obj_key not in current_object_keys:
-                # Add persistent object to display list
-                persistent_det = obj_data["detection"].copy()
-                # Reduce confidence for persistent objects to distinguish them
-                persistent_det["confidence"] = min(persistent_det.get("confidence", 0.5) * 0.8, 0.3)
-                persistent_det["is_persistent"] = True
-                combined_detections.append(persistent_det)
-        
-        # Update state
-        _webcam_stream_state["persistent_objects"] = persistent_objects
-        
-        # Debug logging for persistent objects
-        try:
-            if (_webcam_stream_state["frame_idx"] % 60) == 0 and persistent_objects:
-                print(f"[DEBUG] Persistent objects: {len(persistent_objects)} active")
-                for key, obj in list(persistent_objects.items())[:3]:
-                    age = current_time - obj["timestamp"]
-                    print(f"[DEBUG]   - {obj['detection'].get('class_name')} (age: {age:.1f}s)")
-        except Exception:
-            pass
-        
-        # Run OCR on webcam frame if enabled
-        run_ocr_now = False
-        if enable_ocr and frame_detections:
-            try:
-                ocr_every = int(max(1, ocr_every_n))
-            except Exception:
-                ocr_every = 5
-
-            # Priority objects => OCR every frame
-            priority = {"cup", "bottle", "book", "license plate", "cell phone"}
-            has_priority = any(
-                str(d.get("class_name", "")).strip().lower() in priority
-                for d in combined_detections[:6]
-            )
-            run_ocr_now = has_priority or ((_webcam_stream_state["frame_idx"] % ocr_every) == 0)
-
-        if enable_ocr and run_ocr_now and all_results:
-            try:
-                # Use webcam processor for consistent OCR
-                from modules.webcam_processing import WebcamProcessor
-                if _webcam_stream_state.get("wp") is None:
-                    _webcam_stream_state["wp"] = WebcamProcessor()
-                wp = _webcam_stream_state["wp"]
+                frame_plates.append(plate_info)
+                _webcam_stream_state["last_plates"].add(f"{plate_text} [{country}]")
                 
-                # Convert per-frame detections to object format expected by webcam_processor OCR
-                objects = []
-                for i, det in enumerate(combined_detections[: int(max(1, max_boxes))]):
-                    class_name = det.get("class_name")
-                    x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
-                    objects.append(
-                        {
-                            "object_id": f"{class_name}_{i}",
-                            "class_name": class_name,
-                            "bounding_box": (int(x1), int(y1), int(x2), int(y2)),
-                            "confidence": float(det.get("confidence", 0.0)),
-                        }
-                    )
-                
-                # OCR class filtering: skip person/animals/birds; run OCR only on text-likely objects.
-                ocr_skip = {
-                    "person",
-                    "bird",
-                    "cat",
-                    "dog",
-                    "horse",
-                    "sheep",
-                    "cow",
-                    "elephant",
-                    "bear",
-                    "zebra",
-                    "giraffe",
-                }
-                ocr_allow = {
-                    "cup", "bottle", "book", "laptop", "cell phone", "tv", "keyboard", "remote",
-                    "backpack", "handbag", "suitcase", "tie", "umbrella", "license plate",
-                    "wallet", "purse", "tablet", "mouse", "monitor", "sign", "banner", "label",
-                    "package", "box", "card", "paper", "document", "notebook", "tablet",
-                    "cereal box", "food container", "medicine bottle", "cosmetics", "product"
-                }
-                ocr_vehicle = {"car", "truck", "bus", "motorcycle"}
-
-                objects_for_ocr = []
-                
-                # Enhanced logic: detect objects near persons (likely being held)
-                person_boxes = []
-                for o in objects:
-                    cn = str(o.get("class_name") or "").strip().lower()
-                    if cn == "person":
-                        person_boxes.append(o.get("bounding_box", (0, 0, 0, 0)))
-                
-                for o in objects:
-                    cn = str(o.get("class_name") or "").strip().lower()
-                    if cn in ocr_skip:
-                        continue
+                # Log every 30 frames
+                if _webcam_stream_state["frame_idx"] % 30 == 0:
+                    print(f"[INFO] Webcam Frame {_webcam_stream_state['frame_idx']}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
+            
+            # Add country labels on webcam frames (blue background)
+            for plate in frame_plates:
+                if plate['country'] != 'Unknown':
+                    x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                    country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                    label_y = y1 - 35 if y1 > 35 else y1 + 20
                     
-                    # Include if in allow list or vehicle
-                    if (cn in ocr_allow) or (cn in ocr_vehicle):
-                        objects_for_ocr.append(o)
-                    elif person_boxes:
-                        # Check if object is near a person (likely being held)
-                        obj_box = o.get("bounding_box", (0, 0, 0, 0))
-                        ox1, oy1, ox2, oy2 = obj_box
-                        obj_center_x = (ox1 + ox2) / 2
-                        obj_center_y = (oy1 + oy2) / 2
-                        
-                        for px1, py1, px2, py2 in person_boxes:
-                            # Check if object is in person's upper body area (where hands are)
-                            person_upper_y = py1 + (py2 - py1) * 0.6  # Upper 60% of person
-                            if (px1 - 50 <= obj_center_x <= px2 + 50 and 
-                                py1 <= obj_center_y <= person_upper_y):
-                                objects_for_ocr.append(o)
-                                break
-
-                # Run OCR and color extraction
-                try:
-                    # Webcam preview is typically mirrored; flip crops before OCR for correct text direction.
-                    ocr_results = wp._extract_text_for_objects(orig_frame_bgr, objects_for_ocr, mirrored=True)
-                except Exception as e:
-                    print(f"[DEBUG] OCR extraction failed: {e}")
-                    ocr_results = []
-                try:
-                    color_results = wp._extract_colors_for_objects(orig_frame_bgr, objects)
-                except Exception as e:
-                    print(f"[DEBUG] Color extraction failed: {e}")
-                    color_results = []
-
-                # Vehicle -> license plate detection + OCR
-                try:
-                    vehicle_classes = {"car", "truck", "bus", "motorcycle"}
-                    vehicles = [o for o in objects if str(o.get("class_name", "")).strip().lower() in vehicle_classes]
-                    if vehicles:
-                        plate_results = wp._detect_and_read_license_plates(orig_frame_bgr, vehicles)
-                except Exception as e:
-                    print(f"[DEBUG] Plate extraction failed: {e}")
-                    plate_results = []
-                
-                # Draw OCR text on frame
-                for item in ocr_results:
-                    text = (item.get('text') or '').strip()
-                    ocr_conf = float(item.get('confidence') or 0.0)
-                    cls_name = str(item.get('class_name') or '').strip().lower()
-                    try:
-                        text = re.sub(r"[^A-Z0-9]+", "", str(text).upper())
-                    except Exception:
-                        text = ''
-                    # If mixed letters+digits and low confidence for non-plate objects, drop digits
-                    try:
-                        is_plate_like = cls_name in {"license plate", "car", "truck", "bus", "motorcycle"}
-                        if (not is_plate_like) and text and any(c.isalpha() for c in text) and any(c.isdigit() for c in text):
-                            if ocr_conf < 0.65:
-                                text = re.sub(r"[^A-Z]+", "", text)
-                    except Exception:
-                        pass
-                    if text:
-                        x1, y1, x2, y2 = item.get('bounding_box', (0,0,0,0))
-                        # Draw OCR text below bounding box
-                        text_label = f"🔤 {text}"
-                        (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                        oy = y2 + 20
-                        if oy + th > annotated_bgr.shape[0]:
-                            oy = max(20, y1 - 30)
-                        cv2.rectangle(annotated_bgr, (x1, oy - th - 6), (x1 + tw + 4, oy + 4), (0, 0, 0), -1)
-                        cv2.putText(annotated_bgr, text_label, (x1 + 2, oy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1, cv2.LINE_AA)
-
-                # Draw license plates on frame
-                for plate in (plate_results or [])[:5]:
-                    bbox = plate.get('bounding_box')
-                    if not bbox:
-                        continue
-                    px1, py1, px2, py2 = bbox
-                    cv2.rectangle(annotated_bgr, (int(px1), int(py1)), (int(px2), int(py2)), (0, 255, 0), 2)
-                    ptxt = (plate.get('text') or '').strip()
-                    if ptxt:
-                        label = f"🚗 {ptxt[:16]}"
-                        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                        ly = max(20, int(py1) - 8)
-                        cv2.rectangle(annotated_bgr, (int(px1), ly - th - 6), (int(px1) + tw + 6, ly + 4), (0, 0, 0), -1)
-                        cv2.putText(annotated_bgr, label, (int(px1) + 2, ly), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2, cv2.LINE_AA)
-                        
-                print(f"[DEBUG] Webcam OCR found {len(ocr_results)} texts")
-                for item in ocr_results:
-                    print(f"[DEBUG]   - {item.get('class_name')}: '{item.get('text')}'")
-                        
-            except Exception as e:
-                print(f"[DEBUG] Webcam OCR failed: {e}")
+                    # Get text size
+                    (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                    
+                    # Draw blue background
+                    cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                    
+                    # Draw white text
+                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
+            # Add timestamp and plate count overlay
+            current_time = datetime.now().strftime('%H:%M:%S')
+            current_date = datetime.now().strftime('%d/%m/%Y')
+            
+            # Create semi-transparent background for timestamp
+            overlay = annotated_frame.copy()
+            cv2.rectangle(overlay, (5, 5), (300, 100), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+            
+            # Add time, date, and plate count
+            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            cv2.putText(annotated_frame, f"Plates: {len(_webcam_stream_state['last_plates'])} | Frame: {len(frame_plates)}", (10, 75), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+            
+            # Add recent plate text overlay at bottom
+            if frame_plates:
+                recent_plate = frame_plates[-1]['text']
+                cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, orig_h - 20), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+            
+        except Exception as alpr_error:
+            print(f"[WARNING] ALPR failed on webcam frame {_webcam_stream_state['frame_idx']}: {alpr_error}")
+            annotated_frame = frame_bgr.copy()
+            # Add basic timestamp on error
+            current_time = datetime.now().strftime('%H:%M:%S')
+            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
-        # Build OCR index map so the green label can include object text (same style as name/color)
-        ocr_text_by_index = {}
-        try:
-            for item in (ocr_results or []):
-                oid = str(item.get("object_id") or "")
-                if "_" in oid:
-                    idx_str = oid.rsplit("_", 1)[-1]
-                    idx = int(idx_str)
-                    t = (item.get("text") or "").strip()
-                    ocr_conf = float(item.get('confidence') or 0.0)
-                    cls_name = str(item.get('class_name') or '').strip().lower()
-                    
-                    # Clean text but keep readable for bottles and other objects
-                    if t and len(t) >= 2:
-                        # For bottles and general objects, keep spaces and readable text
-                        if cls_name in ['bottle', 'cup', 'book', 'cell phone']:
-                            # Keep original text for better readability
-                            cleaned_text = t.upper()
-                        else:
-                            # Clean for license plates
-                            try:
-                                cleaned_text = re.sub(r"[^A-Z0-9]+", "", str(t).upper())
-                            except Exception:
-                                cleaned_text = t.upper()
-                        
-                        # Only add if confidence is reasonable
-                        if ocr_conf > 0.3:
-                            ocr_text_by_index[idx] = cleaned_text
-                            print(f"[DEBUG] OCR Text for {cls_name}: {cleaned_text} (conf: {ocr_conf:.2f})")
-        except Exception as e:
-            print(f"[DEBUG] OCR text mapping failed: {e}")
-            ocr_text_by_index = {}
-
-        # Smart detection sorting: prioritize small objects when person is detected
-        try:
-            has_person = any(d.get("class_name", "").lower() == "person" for d in frame_detections)
-            if has_person and len(frame_detections) > int(max_boxes):
-                # Define priority classes (small objects likely to be held)
-                priority_classes = {
-                    "cell phone", "cup", "bottle", "book", "remote", "wallet", "keys", 
-                    "pen", "pencil", "knife", "fork", "spoon", "mouse", "keyboard",
-                    "laptop", "tablet", "handbag", "backpack", "purse", "umbrella"
-                }
-                
-                # Sort detections: priority objects first, then by confidence
-                def detection_priority(det):
-                    class_name = det.get("class_name", "").lower()
-                    is_priority = class_name in priority_classes
-                    confidence = det.get("confidence", 0.0)
-                    # Calculate bounding box area (smaller objects get higher priority when held)
-                    x1, y1, x2, y2 = det.get("bounding_box", (0, 0, 0, 0))
-                    area = (x2 - x1) * (y2 - y1)
-                    
-                    # Priority score: priority objects first, then smaller area, then confidence
-                    return (0 if is_priority else 1, area, -confidence)
-                
-                frame_detections = sorted(frame_detections, key=detection_priority)
-                
-                # Debug logging for smart sorting
-                if (_webcam_stream_state["frame_idx"] % 60) == 0:
-                    print(f"[DEBUG] Smart sorting applied: {len([d for d in frame_detections if d.get('class_name', '').lower() in priority_classes])} priority objects found")
-                    for i, det in enumerate(frame_detections[:5]):
-                        print(f"[DEBUG]   {i}: {det.get('class_name')} (conf: {det.get('confidence', 0):.2f})")
-        except Exception as e:
-            print(f"[DEBUG] Smart sorting failed: {e}")
-
-        # Annotate using already-scaled detections to ensure alignment on original frame
-        annotated_bgr = _annotate_webcam_fast_with_detections(
-            annotated_bgr,
-            combined_detections,
-            show_labels=bool(show_labels),
-            show_conf=bool(show_conf),
-            max_boxes=int(max_boxes),
-            enable_color=bool(enable_color),
-            ocr_text_by_index=ocr_text_by_index,
-        )
-        # Debug final output resolution (throttled) - ensure no resizing occurred
-        try:
-            if (_webcam_stream_state["frame_idx"] % 60) == 0:
-                ah, aw = annotated_bgr.shape[:2]
-                print(f"[DEBUG] Webcam output={aw}x{ah}")
-                print(f"[DEBUG] Output vs original: {aw}x{ah} vs {orig_w}x{orig_h}")
-                print(f"[DEBUG] Aspect ratio output vs orig: {aw/ah:.3f} vs {orig_w/orig_h:.3f}")
-                if (aw, ah) != (orig_w, orig_h):
-                    print("[WARNING] Output resolution differs from original!")
-                else:
-                    print("[OK] Output resolution matches original")
-        except Exception:
-            pass
-
-        out_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
+        # Convert BGR back to RGB for Gradio
+        out_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
         _webcam_stream_state["last_rgb"] = out_rgb
         
-        # Append to persistent history (do not overwrite old detections)
+        # Build status message
+        status_lines = [" **Status:** Live ALPR Detection Active\n"]
+        status_lines.append(f" Date: {current_date}")
+        status_lines.append(f"⏰ Time: {current_time}")
+        status_lines.append(f" Unique Plates: {len(_webcam_stream_state['last_plates'])}")
+        
+        if frame_plates:
+            status_lines.append(f" Current Frame Plates: {len(frame_plates)}")
+            for plate in frame_plates:
+                status_lines.append(f"   - {plate['text']} ({plate['detection_confidence']:.0%})")
+        
+        status_text = "\n".join(status_lines)
+        
+        # Append to history
         event = {
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
             "frame_idx": int(_webcam_stream_state.get("frame_idx", 0)),
-            "objects": frame_detections,
-            "detected_words": [
-                {
-                    "object_id": item.get("object_id"),
-                    "class_name": item.get("class_name"),
-                    "bounding_box": item.get("bounding_box"),
-                    "text": (item.get("text") or "").strip(),
-                }
-                for item in (ocr_results or [])
-                if (item.get("text") or "").strip()
-            ],
-            "license_plates": [
-                {
-                    "text": (p.get("text") or "").strip(),
-                    "bounding_box": p.get("bounding_box"),
-                    "vehicle_class": p.get("vehicle_class"),
-                    "vehicle_object_id": p.get("vehicle_object_id"),
-                }
-                for p in (plate_results or [])
-                if (p.get("text") or "").strip()
-            ],
-            "colors": color_results or [],
+            "plates": frame_plates,
+            "unique_plates": list(_webcam_stream_state["last_plates"]),
         }
         _webcam_stream_state["history"].append(event)
 
-        # Cap history to avoid unbounded memory growth
-        try:
-            max_hist = int(_webcam_stream_state.get("history_max", 1000))
-        except Exception:
-            max_hist = 1000
+        # Cap history
+        max_hist = int(_webcam_stream_state.get("history_max", 1000))
         if max_hist > 0 and len(_webcam_stream_state["history"]) > max_hist:
             _webcam_stream_state["history"] = _webcam_stream_state["history"][(-max_hist):]
-
-        json_output = {
-            "session_started": _webcam_stream_state.get("session_started")
-            or _webcam_stream_state.setdefault("session_started", time.strftime("%Y-%m-%d %H:%M:%S")),
-            "last_update": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "total_events": len(_webcam_stream_state["history"]),
-            "events": _webcam_stream_state["history"],
-        }
         
-        # Return both frame and JSON as string (Gradio limitation)
-        import json as json_module
-        json_str = json_module.dumps(json_output, indent=2, ensure_ascii=False)
-        
-        # Store JSON in global state for UI to fetch
-        _webcam_stream_state["last_json"] = json_str
-        
-        return out_rgb, "📹 **Status:** Live Detection Active\n\n🎯 **Instructions:**\n1. Allow camera access\n2. Adjust settings if needed\n3. Watch real-time detection!"
+        return out_rgb, status_text
 
     except Exception as e:
-        print(f"[ERROR] Webcam prediction failed: {e}")
-        return frame, f"❌ **Error:** {str(e)}"
+        print(f"[ERROR] Webcam ALPR prediction failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return frame, f" **Error:** {str(e)}"
 
 
 # Global parking detector instance to avoid repeated initialization - Commented out as requested
@@ -8223,10 +7760,10 @@ def predict_webcam(
 #     """
 #     try:
 #         if not PARKING_DETECTION_AVAILABLE:
-#             return image, "❌ **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
+#             return image, " **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
 #         
 #         if image is None:
-#             return None, "📸 **Please upload an image**\n\nUpload an image to start parking detection analysis."
+#             return None, " **Please upload an image**\n\nUpload an image to start parking detection analysis."
 #         
 #         # Use global detector instance
 #         detector = get_parking_detector()
@@ -8434,15 +7971,15 @@ def predict_webcam(
 #         empty_spots = sum(zone.empty_spots for zone in results.values())
 #         overall_occupancy = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
 #         
-#         summary = f"""## 🅿️ Parking Detection Results
+#         summary = f"""##  Parking Detection Results
 # 
-# ### 📊 Overall Status
+# ###  Overall Status
 # - **Total Spots:** {total_spots}
-# - **Occupied:** {occupied_spots} 🔴
-# - **Empty:** {empty_spots} 🟢
+# - **Occupied:** {occupied_spots} 
+# - **Empty:** {empty_spots}
 # - **Occupancy Rate:** {overall_occupancy:.1f}%
 # 
-# ### 📍 Zone Details
+# ###  Zone Details
 # """
 #         
 #         for zone_id, zone_result in results.items():
@@ -8456,24 +7993,24 @@ def predict_webcam(
 #         json_output = detector.get_json_output(results)
 #         
 #         summary += f"""
-# ### ⚙️ Settings
+# ###  Settings
 # - **Model:** {model_name}
 # - **Confidence:** {confidence_threshold}
 # - **Processing Time:** Real-time
 # 
-# ### 📋 JSON Output
+# ###  JSON Output
 # ```json
 # {json_output}
 # ```
 # 
-# ✅ **Detection completed successfully!**
+#  **Detection completed successfully!**
 # """
 #         
 #         return output_rgb, summary
 #         
 #     except Exception as e:
 #         print(f"[ERROR] Parking detection failed: {e}")
-#         return image, f"❌ **Error:** {str(e)}\n\nPlease check the image and try again."
+#         return image, f" **Error:** {str(e)}\n\nPlease check the image and try again."
 
 
 # Parking detection functions commented out as requested - Creating stub functions to prevent errors
@@ -8481,35 +8018,41 @@ def predict_webcam(
 def process_parking_detection(image, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True):
     """Parking detection has been disabled as requested"""
     if image is None:
-        return None, "📸 **Please upload an image**\n\nUpload an image to start analysis."
+        return None, " **Please upload an image**\n\nUpload an image to start analysis."
     
-    return image, "❌ **Parking Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
+    return image, " **Parking Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 def process_parking_video(video, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
     """Parking video detection has been disabled as requested"""
     if video is None:
-        return None, None, "📹 **Please upload a video**\n\nUpload a video to start analysis."
+        return None, None, " **Please upload a video**\n\nUpload a video to start analysis."
     
-    return None, None, "❌ **Parking Video Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
+    return None, None, " **Parking Video Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
     """Parking webcam detection has been disabled as requested"""
     if frame is None:
-        return None, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera to start detection."
+        return None, " **Status:** Waiting for camera feed...\n\nPoint your camera to start detection."
     
-    return frame, "❌ **Parking Webcam Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
+    return frame, " **Parking Webcam Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
 
 # ==================== PPE DETECTION FUNCTIONS ====================
 
-def _get_ppe_detector_safe(model_name="yolov8n", debug=False):
+def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
     """
     Safely get PPE detector with automatic fallback
     NEVER returns None - always provides a working detector
+    
+    Args:
+        model_name: YOLO model to use
+        debug: Enable debug output
+        force_new: Always create fresh detector to prevent state leakage (default: True)
     """
     try:
         # Try to get the PPE detector with auto-recovery enabled
-        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True)
+        # force_new=True ensures fresh detector for each image to prevent state leakage
+        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True, force_new=force_new)
         return detector, True
     except Exception as e:
         print(f"[PPE-WARNING] Failed to get PPE detector: {e}")
@@ -8531,7 +8074,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
     """
     try:
         if image is None:
-            return None, "📸 **Upload an image to start PPE detection**"
+            return None, " **Upload an image to start PPE detection**"
         
         print(f"[INFO] Starting PPE detection on image...")
         
@@ -8550,7 +8093,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         if detector is None:
             # Ultimate fallback - return original image with message
             print("[PPE-CRITICAL] All PPE detection methods failed")
-            return image, "⚠️ **PPE Detection in Fallback Mode**\n\nSystem is running in limited mode. Please check model installation."
+            return image, " **PPE Detection in Fallback Mode**\n\nSystem is running in limited mode. Please check model installation."
         
         # Convert PIL to numpy if needed
         if isinstance(image, Image.Image):
@@ -8572,8 +8115,8 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         output_image = Image.fromarray(annotated_rgb)
         
         # Generate summary with system status
-        status_emoji = "✅" if result.model_loaded else "⚠️"
-        fallback_notice = "\n\n⚠️ **Note:** Using fallback detection mode" if result.fallback_used else ""
+        status_emoji = "" if result.model_loaded else ""
+        fallback_notice = "\n\n **Note:** Using fallback detection mode" if result.fallback_used else ""
         
         summary_lines = [
             f"## {status_emoji} PPE Detection Results",
@@ -8645,46 +8188,46 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
             if person.vehicle_type == "2-wheeler":
                 # Only show helmet for 2-wheelers
                 if person.helmet.present:
-                    summary_lines.append(f"  - 🪖 Helmet: **✅ Present** (conf: {person.helmet.confidence:.2f})")
+                    summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
                 else:
-                    summary_lines.append(f"  - 🪖 Helmet: **❌ Missing** (conf: {person.helmet.confidence:.2f})")
-                summary_lines.append(f"  - 🚗 Seatbelt: **Not Applicable (2-wheeler)**")
+                    summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
+                summary_lines.append(f"  -  Seatbelt: **Not Applicable (2-wheeler)**")
             elif person.vehicle_type == "4-wheeler":
                 # Only show seatbelt for 4-wheelers
                 if person.seatbelt.present:
-                    summary_lines.append(f"  - 🚗 Seatbelt: **✅ Present** (conf: {person.seatbelt.confidence:.2f})")
+                    summary_lines.append(f"  -  Seatbelt: ** Present** (conf: {person.seatbelt.confidence:.2f})")
                 else:
-                    summary_lines.append(f"  - 🚗 Seatbelt: **❌ Missing** (conf: {person.seatbelt.confidence:.2f})")
-                summary_lines.append(f"  - 🪖 Helmet: **Not Applicable (4-wheeler)**")
+                    summary_lines.append(f"  -  Seatbelt: ** Missing** (conf: {person.seatbelt.confidence:.2f})")
+                summary_lines.append(f"  -  Helmet: **Not Applicable (4-wheeler)**")
             else:
                 # Unknown vehicle type - show both
                 if person.helmet.present:
-                    summary_lines.append(f"  - 🪖 Helmet: **✅ Present** (conf: {person.helmet.confidence:.2f})")
+                    summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
                 else:
-                    summary_lines.append(f"  - 🪖 Helmet: **❌ Missing** (conf: {person.helmet.confidence:.2f})")
+                    summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
                 
                 if person.seatbelt.present:
-                    summary_lines.append(f"  - 🚗 Seatbelt: **✅ Present** (conf: {person.seatbelt.confidence:.2f})")
+                    summary_lines.append(f"  -  Seatbelt: ** Present** (conf: {person.seatbelt.confidence:.2f})")
                 else:
-                    summary_lines.append(f"  - 🚗 Seatbelt: **❌ Missing** (conf: {person.seatbelt.confidence:.2f})")
+                    summary_lines.append(f"  -  Seatbelt: ** Missing** (conf: {person.seatbelt.confidence:.2f})")
             
             # Show which one matters for compliance
             if person.vehicle_type == "2-wheeler":
-                summary_lines.append(f"  - 🎯 **Compliance based on: HELMET**")
+                summary_lines.append(f"  -  **Compliance based on: HELMET**")
             elif person.vehicle_type == "4-wheeler":
-                summary_lines.append(f"  - 🎯 **Compliance based on: SEATBELT**")
+                summary_lines.append(f"  -  **Compliance based on: SEATBELT**")
             else:
-                summary_lines.append(f"  - 🎯 **Compliance based on: EITHER**")
+                summary_lines.append(f"  -  **Compliance based on: EITHER**")
             
             # Add detection methods
-            summary_lines.append(f"  - 🔍 Helmet Method: `{person.helmet.detection_method}`")
-            summary_lines.append(f"  - 🔍 Seatbelt Method: `{person.seatbelt.detection_method}`")
+            summary_lines.append(f"  -  Helmet Method: `{person.helmet.detection_method}`")
+            summary_lines.append(f"  -  Seatbelt Method: `{person.seatbelt.detection_method}`")
             
             if person.vest.present:
-                summary_lines.append(f"  - Vest: ✅ ({person.vest.confidence:.2f})")
+                summary_lines.append(f"  - Vest:  ({person.vest.confidence:.2f})")
         
         if result.error_message:
-            summary_lines.append(f"\n⚠️ **Warning:** {result.error_message}")
+            summary_lines.append(f"\n **Warning:** {result.error_message}")
         
         summary_lines.append(fallback_notice)
         
@@ -8706,7 +8249,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         import traceback
         traceback.print_exc()
         # Return original image with error info instead of failing
-        return image, f"⚠️ **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image.", ""
+        return image, f" **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image.", ""
 
 
 def create_ppe_side_panel(result):
@@ -8735,7 +8278,7 @@ def create_ppe_side_panel(result):
     main_html = f"""
     <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
                 padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
-        <h3 style="margin: 0 0 10px 0; font-size: 18px;">🦺 PPE Detection</h3>
+        <h3 style="margin: 0 0 10px 0; font-size: 18px;"> PPE Detection</h3>
         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 8px;">
             <div style="font-size: 24px; font-weight: bold; margin-bottom: 5px;">{result.total_persons}</div>
             <div style="font-size: 12px; color: #fbbf24;">Persons Detected</div>
@@ -8743,17 +8286,17 @@ def create_ppe_side_panel(result):
         <div style="display: flex; gap: 10px;">
             <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
                 <div style="font-size: 14px; font-weight: bold;">{compliant_count}</div>
-                <div style="font-size: 10px; color: #94a3b8;">✅ Compliant</div>
+                <div style="font-size: 10px; color: #94a3b8;"> Compliant</div>
             </div>
             <div style="flex: 1; background: rgba(255,255,255,0.1); padding: 8px; border-radius: 5px; text-align: center;">
                 <div style="font-size: 14px; font-weight: bold; color: #f87171;">{violation_count}</div>
-                <div style="font-size: 10px; color: #94a3b8;">❌ Violations</div>
+                <div style="font-size: 10px; color: #94a3b8;"> Violations</div>
             </div>
         </div>
         <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.2);">
             <div style="display: flex; justify-content: space-between; font-size: 12px;">
                 <span>⏰ {current_time}</span>
-                <span>📅 {current_date}</span>
+                <span> {current_date}</span>
             </div>
         </div>
     </div>
@@ -8771,7 +8314,7 @@ def create_ppe_side_panel(result):
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                 <div style="width: 40px; height: 40px; background: #10b981; border-radius: 5px; 
                             display: flex; align-items: center; justify-content: center; 
-                            margin-right: 10px; font-size: 18px;">🪖</div>
+                            margin-right: 10px; font-size: 18px;"></div>
                 <div style="flex: 1;">
                     <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Helmets: {result.helmet_detected}/{two_wheelers}</div>
                     <div style="font-size: 11px; color: #94a3b8;">2-Wheeler Safety</div>
@@ -8786,7 +8329,7 @@ def create_ppe_side_panel(result):
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                 <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
                             display: flex; align-items: center; justify-content: center; 
-                            margin-right: 10px; font-size: 18px;">🚗</div>
+                            margin-right: 10px; font-size: 18px;"></div>
                 <div style="flex: 1;">
                     <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Seatbelts: {result.seatbelt_detected}/{four_wheelers}</div>
                     <div style="font-size: 11px; color: #94a3b8;">4-Wheeler Safety</div>
@@ -8798,7 +8341,7 @@ def create_ppe_side_panel(result):
             safety_html = f"""
             <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
                         padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;">🛡️ Safety Equipment</h3>
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;"> Safety Equipment</h3>
                 {safety_items}
             </div>
             """
@@ -8814,7 +8357,7 @@ def create_ppe_side_panel(result):
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                 <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 5px; 
                             display: flex; align-items: center; justify-content: center; 
-                            margin-right: 10px; font-size: 18px;">🏍️</div>
+                            margin-right: 10px; font-size: 18px;"></div>
                 <div style="flex: 1;">
                     <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{two_wheelers} Bikes/Scooters</div>
                     <div style="font-size: 11px; color: #94a3b8;">2-Wheelers</div>
@@ -8828,7 +8371,7 @@ def create_ppe_side_panel(result):
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
                 <div style="width: 40px; height: 40px; background: #8b5cf6; border-radius: 5px; 
                             display: flex; align-items: center; justify-content: center; 
-                            margin-right: 10px; font-size: 18px;">🚙</div>
+                            margin-right: 10px; font-size: 18px;"></div>
                 <div style="flex: 1;">
                     <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">{four_wheelers} Cars/Trucks</div>
                     <div style="font-size: 11px; color: #94a3b8;">4-Wheelers</div>
@@ -8840,7 +8383,7 @@ def create_ppe_side_panel(result):
             vehicle_html = f"""
             <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
                         padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
-                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;">🚗 Vehicles</h3>
+                <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #94a3b8;"> Vehicles</h3>
                 {vehicle_items}
             </div>
             """
@@ -8883,11 +8426,11 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
     """Process PPE detection in uploaded video with fallback"""
     try:
         if video is None:
-            return None, None, "🎥 **Upload a video to start PPE detection**"
+            return None, None, " **Upload a video to start PPE detection**"
         
         video_path = _extract_video_path(video)
         if not video_path or not os.path.exists(video_path):
-            return None, None, "❌ **Error:** Could not process video file"
+            return None, None, " **Error:** Could not process video file"
         
         # Wait for file to be fully released by upload process
         import time
@@ -8911,12 +8454,12 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
         
         if detector is None:
-            return None, None, "⚠️ **PPE Detection Unavailable**\n\nSystem could not initialize PPE detector. Please check model files."
+            return None, None, " **PPE Detection Unavailable**\n\nSystem could not initialize PPE detector. Please check model files."
         
         # Open video
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            return None, None, "❌ **Error:** Cannot open video file"
+            return None, None, " **Error:** Cannot open video file"
         
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -8928,15 +8471,8 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         output_path = f"ppe_outputs/ppe_video_{timestamp}.mp4"
         os.makedirs("ppe_outputs", exist_ok=True)
         
-        # Use H264 codec for browser compatibility (MP4 format)
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
-        
-        if not out.isOpened():
-            # Fallback to avc1 if mp4v fails
-            print("[WARNING] mp4v codec failed, trying avc1")
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
-            out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
         
         frame_count = 0
         processed_count = 0
@@ -8969,53 +8505,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         cap.release()
         out.release()
         
-        # Verify output video was created and is valid
-        if not os.path.exists(output_path):
-            return None, "❌ **Error:** Failed to create output video", ""
-        
-        # Check video is readable
-        test_cap = cv2.VideoCapture(output_path)
-        if not test_cap.isOpened():
-            test_cap.release()
-            return None, "❌ **Error:** Output video is corrupted", ""
-        
-        actual_frames = int(test_cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        test_cap.release()
-        
-        if actual_frames == 0:
-            return None, "❌ **Error:** Output video has no frames", ""
-        
-        print(f"[INFO] Output video verified: {actual_frames} frames, path: {os.path.abspath(output_path)}")
-        
-        # Re-encode to browser-compatible H.264 format using imageio-ffmpeg
-        try:
-            from imageio_ffmpeg import get_ffmpeg_exe
-            import subprocess
-            
-            ffmpeg_path = get_ffmpeg_exe()
-            final_output = output_path.replace('.mp4', '_final.mp4')
-            
-            ffmpeg_cmd = [
-                ffmpeg_path, '-y', '-i', output_path,
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-                '-c:a', 'aac', '-movflags', '+faststart',
-                '-pix_fmt', 'yuv420p',
-                final_output
-            ]
-            ffmpeg_result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=60)
-            
-            if ffmpeg_result.returncode == 0 and os.path.exists(final_output):
-                os.remove(output_path)
-                output_path = final_output
-                print(f"[INFO] Video re-encoded to browser format: {output_path}")
-            else:
-                print(f"[WARNING] FFmpeg re-encoding failed: {ffmpeg_result.stderr[:200]}")
-        except Exception as e:
-            print(f"[WARNING] Could not re-encode video: {e}")
-        
-        # Use absolute path for Gradio
-        output_path = os.path.abspath(output_path)
-        
         # Calculate compliance rate
         total_ppe = total_helmets + total_seatbelts
         total_violations = total_no_helmets + total_no_seatbelts
@@ -9023,7 +8512,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         compliance_rate = (total_ppe / total_detected * 100) if total_detected > 0 else 0
         
         # Priority-based summary
-        summary_md = f"""## 🦺 PPE Video Analysis Results
+        summary_md = f"""##  PPE Video Analysis Results
 
 **System Status:**
 - Model Loaded: **{'Yes' if result.model_loaded else 'Fallback Mode'}**
@@ -9031,9 +8520,9 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
 **Priority-Based Detection Summary:**
 - Total Frames Processed: **{processed_count}**
-- 🪖 Helmets Detected: **{total_helmets}** (Priority: Highest)
-- 🚗 Seatbelts Detected: **{total_seatbelts}** (Only if no helmet in 4-wheeler)
-- ❌ No PPE: **{total_no_helmets + total_no_seatbelts}**
+-  Helmets Detected: **{total_helmets}** (Priority: Highest)
+-  Seatbelts Detected: **{total_seatbelts}** (Only if no helmet in 4-wheeler)
+-  No PPE: **{total_no_helmets + total_no_seatbelts}**
 
 **Video Info:**
 - Resolution: {width}x{height}
@@ -9046,23 +8535,23 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         <div style="background: linear-gradient(145deg, #1a1f2e 0%, #0d1117 100%); border-radius: 12px; border: 1px solid #30363d; padding: 16px;">
             <div style="text-align: center; margin-bottom: 16px;">
                 <div style="background: #f59e0b; color: #000; font-weight: 700; font-size: 18px; padding: 8px 16px; border-radius: 6px; display: inline-block;">
-                    🛡️ PPE VIDEO SYSTEM
+                     PPE VIDEO SYSTEM
                 </div>
             </div>
             
             <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
                 <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Video Status</div>
-                <div style="color: #10b981; font-size: 14px; font-weight: 600;">✅ Analysis Complete</div>
+                <div style="color: #10b981; font-size: 14px; font-weight: 600;"> Analysis Complete</div>
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
                 <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-                    <div style="font-size: 24px;">🪖</div>
+                    <div style="font-size: 24px;"></div>
                     <div style="color: #7d8590; font-size: 10px;">HELMETS</div>
                     <div style="color: #10b981; font-size: 18px; font-weight: 700;">{total_helmets}</div>
                 </div>
                 <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-                    <div style="font-size: 24px;">🚗</div>
+                    <div style="font-size: 24px;"></div>
                     <div style="color: #7d8590; font-size: 10px;">SEATBELTS</div>
                     <div style="color: #3b82f6; font-size: 18px; font-weight: 700;">{total_seatbelts}</div>
                 </div>
@@ -9096,7 +8585,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
             </div>
             
             <div style="background: {'#238636' if compliance_rate >= 80 else '#f59e0b' if compliance_rate >= 50 else '#dc2626'}; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600;">
-                {'✅ SAFE - High Compliance' if compliance_rate >= 80 else '⚠️ WARNING - Review Needed' if compliance_rate >= 50 else '❌ CRITICAL - Violations Detected'}
+                {' SAFE - High Compliance' if compliance_rate >= 80 else ' WARNING - Review Needed' if compliance_rate >= 50 else ' CRITICAL - Violations Detected'}
             </div>
         </div>
         """
@@ -9105,14 +8594,14 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         
     except Exception as e:
         print(f"[ERROR] PPE video processing failed: {e}")
-        return None, f"⚠️ **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
+        return None, f" **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
 
 
 def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
     """Process PPE detection in live webcam with fallback"""
     try:
         if frame is None:
-            return frame, "📹 **Status:** Waiting for camera feed...\n\nPoint your camera at workers to start PPE detection."
+            return frame, " **Status:** Waiting for camera feed...\n\nPoint your camera at workers to start PPE detection."
         
         # Get PPE detector with fallback
         detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
@@ -9122,7 +8611,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
             error_frame = frame.copy()
             cv2.putText(error_frame, "PPE: System Initializing...", (50, 50),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            return error_frame, "⚠️ **PPE Detector Initializing**\n\nPlease wait while the system loads..."
+            return error_frame, " **PPE Detector Initializing**\n\nPlease wait while the system loads..."
         
         # Convert RGB to BGR if needed (Gradio provides RGB)
         if len(frame.shape) == 3 and frame.shape[2] == 3:
@@ -9140,7 +8629,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
         annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
         
         # Generate info text
-        status_emoji = "✅" if result.model_loaded else "⚠️"
+        status_emoji = "" if result.model_loaded else ""
         fallback_note = " (FB)" if result.fallback_used else ""
         
         two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
@@ -9149,28 +8638,28 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
         
         info_lines = [
             f"{status_emoji} PPE Detection - Live{fallback_note}",
-            f"👥 Persons: {result.total_persons}",
+            f" Persons: {result.total_persons}",
         ]
         
         # Show relevant PPE counts based on vehicle types detected
         if two_wheelers > 0:
-            info_lines.append(f"🪖 Helmets: {result.helmet_detected}")
+            info_lines.append(f" Helmets: {result.helmet_detected}")
         
         if four_wheelers > 0:
-            info_lines.append(f"🚗 Seatbelts: {result.seatbelt_detected}")
+            info_lines.append(f" Seatbelts: {result.seatbelt_detected}")
         
         if unknown_vehicles > 0:
-            info_lines.append(f"⚡ Any Safety: {result.helmet_detected + result.seatbelt_detected}")
+            info_lines.append(f" Any Safety: {result.helmet_detected + result.seatbelt_detected}")
         
         info_lines.extend([
-            f"✅ Compliant: {sum(1 for p in result.persons if p.status == 'compliant')}",
-            f"❌ Violations: {sum(1 for p in result.persons if p.status == 'violation')}",
-            f"⏱️ Processing: {result.processing_time*1000:.1f}ms",
+            f" Compliant: {sum(1 for p in result.persons if p.status == 'compliant')}",
+            f" Violations: {sum(1 for p in result.persons if p.status == 'violation')}",
+            f" Processing: {result.processing_time*1000:.1f}ms",
         ])
         
         # Add person details with strict priority-based single label
         for person in result.persons:
-            status = "✅" if person.status == 'compliant' else "❌"
+            status = "" if person.status == 'compliant' else ""
             vehicle = person.vehicle_type.upper()[:3] if person.vehicle_type != "unknown" else "???"
             
             # STRICT PRIORITY: Only ONE label - Helmet > Seatbelt > None
@@ -9184,7 +8673,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
             info_lines.append(f"  P{person.person_id[1:]} [{vehicle}]: {status} [{ppe_label}]")
         
         if result.error_message:
-            info_lines.append(f"⚠️ {result.error_message[:50]}")
+            info_lines.append(f" {result.error_message[:50]}")
         
         info_text = "\n".join(info_lines)
         
@@ -9196,375 +8685,192 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
         error_frame = frame.copy() if frame is not None else np.zeros((480, 640, 3), dtype=np.uint8)
         cv2.putText(error_frame, f"PPE Error: {str(e)[:50]}", (50, 50),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        return error_frame, f"⚠️ **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
+        return error_frame, f" **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
 
 
-# Create simplified Gradio app without complex CSS/JS
+# Create simplified Gradio app
+theme = gr.themes.Soft(primary_hue="cyan").set(
+    loader_color="#48CAE4",
+    button_primary_background_fill="#48CAE4",
+    button_primary_background_fill_hover="#90E0EF",
+    button_primary_text_color="white",
+    button_secondary_background_fill="#1f2937",
+    button_secondary_background_fill_hover="#374151",
+    button_secondary_text_color="#f9fafb",
+    slider_color="#48CAE4",
+    block_title_text_color="#48CAE4",
+)
+
 demo = gr.Blocks(
     title="Canberra Vision",
-    theme=gr.themes.Soft(),
+    theme=theme,
+    head="""
+<link rel="icon" href="data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M16 8C10 8 4.5 12 2 16C4.5 20 10 24 16 24C22 24 27.5 20 30 16C27.5 12 22 8 16 8Z' stroke='%2360A5FA' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='6' stroke='%2360A5FA' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%231E40AF'/%3E%3Ccircle cx='17.5' cy='14.5' r='1' fill='%23DBEAFE' opacity='0.8'/%3E%3C/svg%3E">
+<style>
+footer { display: none !important; }
+</style>
+""",
 )
 
 with demo:
-    
-    # Display device status with modern styling
-    device = _get_device()
-    if device != "cpu":
-        gr.Markdown(
-            f"""
-            <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #10b981 0%, #059669 100%); 
-                 border-radius: 12px; margin-bottom: 20px; color: white;">
-                <h2 style="margin: 0; font-size: 24px;">GPU Acceleration Active</h2>
-                <p style="margin: 5px 0 0 0; opacity: 0.9;">Processing on {torch.cuda.get_device_name(0)}</p>
-            </div>
-            """
-        )
-        
-    # Professional header
-    gr.Markdown("# Canberra Vision")
-    gr.Markdown("Advanced AI Vision Detection System")
-    
-    with gr.Tabs(selected=0):
-        # Image Detection Tab - Exact Match from Image
-        # Image Detection, Video Processing, and Live Webcam tabs merged into Vehicle Detection tab below
-        # Commented out as requested - now part of Vehicle Detection tab
-        
-        # Vehicle Detection Tab - Clean Layout (without header, insights, and bottom nav)
-        with gr.TabItem("Vehicle Detection"):
-            # Live Feed Section with Upload Areas
-            with gr.Row():
-                # Left: Main Upload/Preview Area (full width now)
-                with gr.Column(scale=3):
-                    # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs():
-                        with gr.TabItem("📂 Image"):
-                            img_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
-                            img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                            img_btn = gr.Button("🔍 Detect Vehicles", variant="primary", elem_classes=["obsidian-btn"])
-                            
-                            with gr.Accordion("⚙️ Advanced Settings", open=False):
-                                img_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence Threshold")
-                                img_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU Threshold")
-                                img_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
-                                img_labels = gr.Checkbox(value=True, label="Show Labels")
-                                img_conf_show = gr.Checkbox(value=True, label="Show Confidence")
-                                img_resnet = gr.Checkbox(value=True, visible=False)
-                                img_max_boxes = gr.Number(value=10, visible=False)
-                                img_ocr = gr.Checkbox(value=True, visible=False)
-                            
-                            img_output = gr.Image(type="pil", label="Detection Result", show_label=True, height=300)
-                            img_info = gr.Textbox(label="Status", interactive=False, lines=3, value="📸 Ready to detect vehicles")
-                            img_side_panel = gr.HTML(label="", value="<div style='padding: 20px; text-align: center; color: #9ca3af;'>Upload an image to see vehicle details</div>")
-                            img_summary = gr.Code(label="Detection Data", language="json", lines=6, value="{}")
-                        
-                        with gr.TabItem("🎬 Video"):
-                            vid_input = gr.Video(label="", show_label=False, height=300)
-                            vid_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                            vid_btn = gr.Button("🎬 Process Video", variant="primary", elem_classes=["obsidian-btn"])
-                            
-                            with gr.Accordion("⚙️ Video Settings", open=False):
-                                vid_speed_mode = gr.Radio(
-                                    choices=[("Ultra-Fast ⚡", "ultra_fast"), ("Fast 🚀", "fast"), ("Balanced ⚖️", "balanced")],
-                                    label="Processing Speed",
-                                    value="ultra_fast"
-                                )
-                                vid_conf = gr.Slider(minimum=0, maximum=1, value=0.35, label="Confidence")
-                                vid_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
-                                vid_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=640)
-                                vid_labels = gr.Checkbox(value=True, label="Show Labels")
-                                vid_conf_show = gr.Checkbox(value=True, label="Show Confidence")
-                                vid_max_boxes = gr.Slider(minimum=1, maximum=25, value=5, step=1, label="Max Boxes")
-                                vid_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
-                                vid_resnet = gr.Checkbox(value=True, visible=False)
-                                vid_ocr = gr.Checkbox(value=True, visible=False)
-                                vid_ocr_every_n = gr.Number(value=5, visible=False)
-                            
-                            vid_output = gr.Video(label="Processed Video", visible=True, height=350)
-                            vid_info = gr.Textbox(label="Video Status", interactive=False, lines=2)
-                        
-                        with gr.TabItem("📷 Webcam"):
-                            webcam_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolov8s")
-                            
-                            with gr.Accordion("⚙️ Camera Settings", open=False):
-                                webcam_conf = gr.Slider(minimum=0, maximum=1, value=0.5, label="Confidence")
-                                webcam_iou = gr.Slider(minimum=0, maximum=1, value=0.5, label="IoU")
-                                webcam_size = gr.Radio(choices=IMAGE_SIZE_CHOICES, label="Image Size", value=320)
-                                webcam_labels = gr.Checkbox(value=True, label="Show Labels")
-                                webcam_conf_show = gr.Checkbox(value=True, label="Show Confidence")
-                                webcam_max_boxes = gr.Slider(minimum=1, maximum=25, value=10, step=1, label="Max Boxes")
-                                webcam_enable_color = gr.Checkbox(value=True, label="Enable Color Detection")
-                                webcam_every_n = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
-                                webcam_resnet = gr.Checkbox(value=False, visible=False)
-                                webcam_enable_ocr = gr.Checkbox(value=True, visible=False)
-                                webcam_ocr_every_n = gr.Number(value=5, visible=False)
-                            
-                            webcam_input = gr.Image(
-                                sources=["webcam"],
-                                type="numpy",
-                                label="Live Camera Feed",
-                                streaming=True,
-                                height=300
-                            )
-                            
-                            webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
-                            webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Allow camera access.")
-            
-            # Button click handlers
-            img_btn.click(
-                predict_image,
-                inputs=[img_input, img_conf, img_iou, img_model, img_labels, img_conf_show, img_size, img_resnet, img_max_boxes, img_ocr],
-                outputs=[img_output, img_info, img_summary, img_side_panel],
-            )
-            
-            vid_btn.click(
-                predict_video,
-                inputs=[vid_input, vid_conf, vid_iou, vid_model, vid_labels, vid_conf_show, vid_size, vid_resnet, vid_max_boxes, vid_every_n, vid_ocr, vid_ocr_every_n, vid_speed_mode],
-                outputs=[vid_output, vid_info]
-            )
-            
-            webcam_input.stream(
-                predict_webcam,
-                inputs=[webcam_input, webcam_conf, webcam_iou, webcam_model, webcam_labels, webcam_conf_show, webcam_enable_color, webcam_size, webcam_resnet, webcam_max_boxes, webcam_every_n, webcam_enable_ocr, webcam_ocr_every_n],
-                outputs=[webcam_output, webcam_info],
-                show_progress=False,
-            )
-        
-        # with gr.TabItem("Parking Detection"):
-        #     gr.Markdown("### Smart Parking Space Detection System")
-        #     gr.Markdown("Detect occupied and empty parking spaces in images, videos, or live webcam feeds.")
-        #     
-        #     # Image Upload Section
-        #     gr.Markdown("#### 📁 Image Upload")
-        #     with gr.Row():
-        #         with gr.Column(scale=1):
-        #             parking_input = gr.Image(type="pil", label="📁 Upload Parking Image")
-        #             parking_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-        #             
-        #             with gr.Accordion("⚙️ Settings", open=False):
-        #                 parking_conf_img = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-        #                 parking_labels_img = gr.Checkbox(value=True, label="🏷️ Show Labels")
-        #                 parking_conf_show_img = gr.Checkbox(value=True, label="📊 Show Confidence")
-        #             
-        #             parking_btn_img = gr.Button("🅿️ Detect in Image", variant="primary")
-        #             
-        #         with gr.Column(scale=2):
-        #             parking_output_img = gr.Image(type="pil", label="🅿️ Image Analysis", height=400)
-        #             parking_summary_img = gr.Markdown("## 📸 Upload an image to start analysis")
-        #
-        #     gr.Markdown("---")
-        #     
-        #     # Video Upload Section  
-        #     gr.Markdown("#### 🎥 Video Upload")
-        #     with gr.Row():
-        #         with gr.Column(scale=1):
-        #             parking_video_input = gr.Video(label="🎥 Upload Parking Video")
-        #             parking_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-        #             
-        #             with gr.Accordion("⚙️ Settings", open=False):
-        #                 parking_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-        #                 parking_labels_vid = gr.Checkbox(value=True, label="🏷️ Show Labels")
-        #                 parking_conf_show_vid = gr.Checkbox(value=True, label="📊 Show Confidence")
-        #                 parking_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-        #             
-        #             parking_btn_vid = gr.Button("🅿️ Analyze Video", variant="primary")
-        #             
-        #         with gr.Column(scale=2):
-        #             parking_video_output = gr.Video(label="🅿️ Video Analysis", height=400)
-        #             parking_video_download = gr.File(label="📥 Download Processed Video", visible=False)
-        #             parking_summary_vid = gr.Markdown("## 🎥 Upload a video to start analysis")
-        #
-        #     gr.Markdown("---")
-        #     
-        #     # Live Webcam Section
-        #     gr.Markdown("#### 📸 Live Webcam")
-        #     with gr.Row():
-        #         with gr.Column(scale=1):
-        #             gr.Markdown("##### 🎛️ Control Panel")
-        #             
-        #             parking_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="🤖 AI Model", value="yolov8n")
-        #             
-        #             with gr.Accordion("⚙️ Settings", open=False):
-        #                 parking_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.85, label="🎯 Confidence Threshold")
-        #                 parking_labels_cam = gr.Checkbox(value=True, label="🏷️ Show Labels")
-        #                 parking_conf_show_cam = gr.Checkbox(value=True, label="📊 Show Confidence")
-        #                 parking_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, label="⏱️ Process Every N Frames")
-        #             
-        #             gr.Markdown("##### 📹 Webcam Feed")
-        #             parking_webcam_input = gr.Image(
-        #                 sources=["webcam"],
-        #                 type="numpy",
-        #                 label="📸 Live Camera",
-        #                 streaming=True,
-        #                 height=420,
-        #             )
-        #             
-        #         with gr.Column(scale=2):
-        #             gr.Markdown("##### 🎯 Live Parking Detection")
-        #             parking_webcam_output = gr.Image(type="numpy", label="🅿️ Real-time Results", height=420)
-        #             
-        #             gr.Markdown("##### 📊 Live Statistics")
-        #             parking_webcam_info = gr.Textbox(
-        #                 label="Detection Info", 
-        #                 interactive=False, 
-        #                 lines=8, 
-        #                 value="📹 **Status:** Ready to start\n\n🅿️ Point camera at parking area!"
-        #             )
-        #
-        #     # Connect all components
-        #     parking_btn_img.click(
-        #         process_parking_detection,
-        #         inputs=[parking_input, parking_conf_img, parking_model_img, parking_labels_img, parking_conf_show_img],
-        #         outputs=[parking_output_img, parking_summary_img],
-        #     )
-        #     
-        #     parking_btn_vid.click(
-        #         process_parking_video,
-        with gr.TabItem("PPE Detection"):
-            # Live Feed Section with Upload Areas
-            with gr.Row():
-                # Left: Main Upload/Preview Area
-                with gr.Column(scale=2):
-                    # Main content tabs for Image/Video/Webcam
-                    with gr.Tabs():
-                        with gr.TabItem("📂 Image"):
-                            ppe_input = gr.Image(type="pil", label="", show_label=False, height=300, elem_classes=["obsidian-upload"])
-                            ppe_model_img = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                            ppe_btn_img = gr.Button("🔍 Detect PPE", variant="primary", elem_classes=["obsidian-btn"])
-                            
-                            with gr.Accordion("⚙️ PPE Settings", open=False):
-                                ppe_conf_img = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence Threshold")
-                                ppe_labels_img = gr.Checkbox(value=True, label="Show Labels")
-                                ppe_conf_show_img = gr.Checkbox(value=True, label="Show Confidence")
-                            
-                            ppe_output_img = gr.Image(type="pil", label="PPE Detection Result", show_label=True, height=350)
-                            ppe_summary_img = gr.Markdown("📸 **Ready to detect PPE**")
-                        
-                        with gr.TabItem("🎬 Video"):
-                            ppe_video_input = gr.Video(label="", show_label=False, height=300)
-                            ppe_model_vid = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                            ppe_btn_vid = gr.Button("🎬 Analyze Video", variant="primary", elem_classes=["obsidian-btn"])
-                            
-                            with gr.Accordion("⚙️ Video Settings", open=False):
-                                ppe_conf_vid = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
-                                ppe_labels_vid = gr.Checkbox(value=True, label="Labels")
-                                ppe_conf_show_vid = gr.Checkbox(value=True, label="Confidence")
-                                ppe_every_n_vid = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
-                            
-                            ppe_video_output = gr.Video(label="Processed Video", visible=True, height=350)
-                            ppe_summary_vid = gr.Markdown("🎥 **Upload a video to start analysis**")
-                        
-                        with gr.TabItem("📷 Webcam"):
-                            ppe_model_cam = gr.Radio(choices=["yolov8n", "yolov8s", "yolov8m", "yolo26n"], label="Model", value="yolov8n")
-                            
-                            with gr.Accordion("⚙️ Camera Settings", open=False):
-                                ppe_conf_cam = gr.Slider(minimum=0, maximum=1, value=0.3, label="Confidence")
-                                ppe_labels_cam = gr.Checkbox(value=True, label="Labels")
-                                ppe_conf_show_cam = gr.Checkbox(value=True, label="Confidence")
-                                ppe_every_n_cam = gr.Slider(minimum=1, maximum=30, value=5, step=1, label="Process Every N Frames")
-                            
-                            ppe_webcam_input = gr.Image(
-                                sources=["webcam"],
-                                type="numpy",
-                                label="Live Camera Feed",
-                                streaming=True,
-                                height=300
-                            )
-                            
-                            ppe_webcam_output = gr.Image(type="numpy", label="Live Detection", height=350)
-                            ppe_webcam_info = gr.Textbox(label="Camera Status", interactive=False, lines=3, value="📹 Ready! Point camera at workers for PPE detection!")
-                
-                # Right: ANPR-Style PPE Detection Dashboard
-                with gr.Column(scale=1):
-                    ppe_dashboard_html = gr.HTML("""
-                    <div style="background: linear-gradient(145deg, #1a1f2e 0%, #0d1117 100%); border-radius: 12px; border: 1px solid #30363d; padding: 16px;">
-                        <div style="text-align: center; margin-bottom: 16px;">
-                            <div style="background: #f59e0b; color: #000; font-weight: 700; font-size: 18px; padding: 8px 16px; border-radius: 6px; display: inline-block;">
-                                🛡️ PPE DETECTION SYSTEM
-                            </div>
-                        </div>
-                        
-                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Detection Status</div>
-                            <div style="color: #fff; font-size: 14px; font-weight: 600;">🟢 Active Monitoring</div>
-                        </div>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
-                            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-                                <div style="font-size: 24px;">👤</div>
-                                <div style="color: #7d8590; font-size: 10px;">PERSONS</div>
-                                <div id="ppe-persons-count" style="color: #58a6ff; font-size: 18px; font-weight: 700;">0</div>
-                            </div>
-                            <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-                                <div style="font-size: 24px;">🚗</div>
-                                <div style="color: #7d8590; font-size: 10px;">VEHICLES</div>
-                                <div id="ppe-vehicles-count" style="color: #58a6ff; font-size: 18px; font-weight: 700;">0</div>
-                            </div>
-                        </div>
-                        
-                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
-                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 8px;">PPE Status</div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                                <span style="color: #fff; font-size: 12px;">🪖 Helmets</span>
-                                <span id="ppe-helmets" style="color: #10b981; font-size: 12px; font-weight: 600;">0/0</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                                <span style="color: #fff; font-size: 12px;">🚗 Seatbelts</span>
-                                <span id="ppe-seatbelts" style="color: #10b981; font-size: 12px; font-weight: 600;">0/0</span>
-                            </div>
-                            <div style="display: flex; justify-content: space-between;">
-                                <span style="color: #fff; font-size: 12px;">✅ Compliant</span>
-                                <span id="ppe-compliant" style="color: #10b981; font-size: 12px; font-weight: 600;">0%</span>
-                            </div>
-                        </div>
-                        
-                        <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px;">
-                            <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 8px;">Detected Persons</div>
-                            <div id="ppe-detected-list" style="max-height: 200px; overflow-y: auto;">
-                                <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: #161b22; border-radius: 6px; margin-bottom: 4px;">
-                                    <div style="width: 40px; height: 40px; background: #30363d; border-radius: 4px; display: flex; align-items: center; justify-content: center;">👤</div>
-                                    <div style="flex: 1;">
-                                        <div style="color: #fff; font-size: 12px;">Person #1</div>
-                                        <div style="color: #7d8590; font-size: 10px;">Status: Waiting...</div>
-                                    </div>
-                                    <div style="color: #f59e0b; font-size: 11px; font-weight: 600;">--%</div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="background: #238636; color: #fff; text-align: center; padding: 8px; border-radius: 6px; margin-top: 12px; font-size: 12px; font-weight: 600;">
-                            🟢 NO ALERT - All Safe
-                        </div>
-                    </div>
-                    """)
-                    
-                    # Hidden outputs to update the dashboard
-                    ppe_dashboard_data = gr.JSON(label="", value={"persons": 0, "vehicles": 0, "helmets": 0, "seatbelts": 0}, visible=False)
-            
-            # Connect all PPE components
-            ppe_btn_img.click(
-                process_ppe_detection,
-                inputs=[ppe_input, ppe_conf_img, ppe_model_img, ppe_labels_img, ppe_conf_show_img],
-                outputs=[ppe_output_img, ppe_summary_img, ppe_dashboard_html],
-            )
-            
-            ppe_btn_vid.click(
-                process_ppe_video,
-                inputs=[ppe_video_input, ppe_conf_vid, ppe_model_vid, ppe_labels_vid, ppe_conf_show_vid, ppe_every_n_vid],
-                outputs=[ppe_video_output, ppe_summary_vid, ppe_dashboard_html],
-            )
-            
-            ppe_webcam_input.stream(
-                process_ppe_webcam,
-                inputs=[ppe_webcam_input, ppe_conf_cam, ppe_model_cam, ppe_labels_cam, ppe_conf_show_cam, ppe_every_n_cam],
-                outputs=[ppe_webcam_output, ppe_webcam_info],
-                show_progress=False,
-            )
+    # Header
+    gr.Markdown("""
+    <div style="text-align: left; margin-bottom: 8px;">
+        <span style="font-size: 48px; font-weight: 800; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Canberra </span>
+        <span style="font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase;">Vision AI</span>
+    </div>
+    <div style="text-align: left; margin-bottom: 24px;">
+        <span style="font-size: 14px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; font-family: 'Exo 2', sans-serif;">Advanced AI Vision Detection System</span>
+    </div>
+    """)
 
-        # Footer removed as requested
+    # Sidebar Navigation
+    with gr.Sidebar():
+        gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Detection </span>
+        <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Modes</span></span>""")
+        vehicle_btn = gr.Button("Vehicle Detection", elem_id="vehicle_btn", variant="primary")
+        ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
 
-# ============================================================
-# END OF UNIFIED DETECTION SECTION
-# ============================================================
+        gr.HTML("<hr>")
+
+        gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
+        <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Selection</span></span>""")
+        img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+
+    # Vehicle Detection Section
+    with gr.Column(visible=True) as vehicle_detection_section:
+        with gr.Tabs(elem_id="vehicle_tabs") as vehicle_inner_tabs:
+            with gr.TabItem("Image"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        img_input = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                        img_btn = gr.Button("Detect Vehicles", variant="primary")
+                    with gr.Column(scale=1):
+                        img_output = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        img_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
+
+            with gr.TabItem("Video"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        vid_input = gr.Video(label="Input", show_label=False, height=350)
+                        vid_btn = gr.Button("Process Video", variant="primary")
+                    with gr.Column(scale=1):
+                        vid_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        vid_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
+
+            with gr.TabItem("Webcam"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                    with gr.Column(scale=1):
+                        webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Allow camera access.")
+
+    # PPE Detection Section
+    with gr.Column(visible=False) as ppe_detection_section:
+        with gr.Tabs(elem_id="ppe_tabs") as ppe_inner_tabs:
+            with gr.TabItem("Image"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                        ppe_btn_img = gr.Button("Detect PPE", variant="primary")
+                    with gr.Column(scale=1):
+                        ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
+
+            with gr.TabItem("Video"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        ppe_input_vid = gr.Video(label="Input", show_label=False, height=350)
+                        ppe_btn_vid = gr.Button("Process PPE Video", variant="primary")
+                    with gr.Column(scale=1):
+                        ppe_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
+
+            with gr.TabItem("Webcam"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                    with gr.Column(scale=1):
+                        ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
+
+    # Navigation Button Handlers
+    vehicle_btn.click(
+        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(variant="primary"), gr.update(variant="secondary")),
+        inputs=[],
+        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn]
+    )
+
+    ppe_btn.click(
+        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary")),
+        inputs=[],
+        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn]
+    )
+
+    # Vehicle Detection Event Handlers (simplified - only model parameter)
+    img_btn.click(
+        lambda img, model: predict_image(img, model, 0.35, 0.5, True, True, 640, True, 10, True),
+        inputs=[img_input, img_model],
+        outputs=[img_output, img_info],
+    )
+
+    vid_btn.click(
+        lambda vid, model: predict_video(vid, 0.35, 0.5, model, True, True, 640, True, 5, True, 5, "ultra_fast"),
+        inputs=[vid_input, img_model],
+        outputs=[vid_output, vid_info]
+    )
+
+    webcam_input.stream(
+        lambda frame, model: predict_webcam(frame, 0.5, 0.5, model, True, True, True, 320, False, 10, 5, True, 5),
+        inputs=[webcam_input, img_model],
+        outputs=[webcam_output, webcam_info],
+        show_progress=False,
+    )
+
+    # PPE Detection Event Handlers (simplified - only model parameter)
+    ppe_btn_img.click(
+        lambda img, model: process_ppe_detection(img, model_name=model)[:2],
+        inputs=[ppe_input_img, img_model],
+        outputs=[ppe_output_img, ppe_summary_img],
+    )
+
+    ppe_btn_vid.click(
+        lambda vid, model: process_ppe_video(vid, model_name=model)[:2],
+        inputs=[ppe_input_vid, img_model],
+        outputs=[ppe_video_output, ppe_summary_vid],
+    )
+
+    ppe_webcam_input.stream(
+        lambda frame, model: process_ppe_webcam(frame, model_name=model),
+        inputs=[ppe_webcam_input, img_model],
+        outputs=[ppe_webcam_output, ppe_webcam_info],
+        show_progress=False,
+    )
+
+    # JavaScript for Footer Removal only (button styling handled by gr.update variant)
+    demo.load(None, None, None, js="""
+        () => {
+            const removeFooter = () => {
+                document.querySelectorAll('footer, .built-with-gradio').forEach(f => f.remove());
+            };
+            removeFooter();
+            setTimeout(removeFooter, 1000);
+        }
+    """)
+
 
 def cleanup_temp_directory(signum=None, frame=None):
     """Signal handler for cleanup"""
@@ -9696,7 +9002,8 @@ if __name__ == "__main__":
                 server_name=_gradio_server_name,
                 server_port=7863 if _server_port is None else _server_port + 1,
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-                prevent_thread_lock=False
+                prevent_thread_lock=False,
+                show_header=False
             )
             print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
         except Exception as e2:

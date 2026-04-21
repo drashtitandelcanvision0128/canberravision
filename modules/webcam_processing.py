@@ -178,9 +178,9 @@ class WebcamProcessor:
             
             # Simple heuristics for common characters
             if fill_ratio > 0.7:
-                return "■"  # Solid block
+                return ""  # Solid block
             elif fill_ratio < 0.2:
-                return "◯"  # Hollow
+                return ""  # Hollow
             elif w > h * 1.5:
                 return "—"  # Wide
             elif h > w * 1.5:

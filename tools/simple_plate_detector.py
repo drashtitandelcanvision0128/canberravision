@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚗 Simple License Plate Detection Tool
+ Simple License Plate Detection Tool
 =====================================
 
 Easy-to-use tool for detecting license plates in images.
@@ -27,7 +27,7 @@ sys.path.append(str(project_root))
 class SimplePlateDetector:
     def __init__(self):
         self.ocr_available = self.check_ocr_availability()
-        print(f"🔍 OCR Available: {'✅' if self.ocr_available else '❌'}")
+        print(f" OCR Available: {'' if self.ocr_available else ''}")
     
     def check_ocr_availability(self):
         """Check if OCR libraries are available"""
@@ -391,32 +391,32 @@ class SimplePlateDetector:
     
     def process_single_image(self, image_path):
         """Process a single image"""
-        print(f"\n🔍 Processing: {image_path}")
+        print(f"\n Processing: {image_path}")
         
         result = self.detect_license_plates(image_path)
         
         if "error" in result:
-            print(f"❌ Error: {result['error']}")
+            print(f" Error: {result['error']}")
             return
         
-        print(f"✅ Found {result['total_plates']} license plate(s):")
+        print(f" Found {result['total_plates']} license plate(s):")
         
         for i, plate in enumerate(result['plates']):
-            print(f"\n🚗 Plate {i+1}:")
-            print(f"   📝 Text: {plate['text']}")
-            print(f"   🎨 Color: {plate['color']}")
-            print(f"   📊 Confidence: {plate['confidence']:.2f}")
-            print(f"   🔍 Method: {plate['method']}")
-            print(f"   📍 Location: {plate['bbox']}")
+            print(f"\n Plate {i+1}:")
+            print(f"    Text: {plate['text']}")
+            print(f"    Color: {plate['color']}")
+            print(f"    Confidence: {plate['confidence']:.2f}")
+            print(f"    Method: {plate['method']}")
+            print(f"    Location: {plate['bbox']}")
         
         # Save result image
         output_path = image_path.replace('.', '_result.')
         cv2.imwrite(output_path, result['result_image'])
-        print(f"\n💾 Result saved: {output_path}")
+        print(f"\n Result saved: {output_path}")
     
     def process_folder(self, folder_path):
         """Process all images in a folder"""
-        print(f"\n📁 Processing folder: {folder_path}")
+        print(f"\n Processing folder: {folder_path}")
         
         # Supported image extensions
         extensions = ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tiff']
@@ -427,10 +427,10 @@ class SimplePlateDetector:
             image_files.extend(glob.glob(os.path.join(folder_path, ext.upper())))
         
         if not image_files:
-            print("❌ No image files found")
+            print(" No image files found")
             return
         
-        print(f"📊 Found {len(image_files)} image(s)")
+        print(f" Found {len(image_files)} image(s)")
         
         for image_path in image_files:
             self.process_single_image(image_path)
@@ -443,7 +443,7 @@ def main():
     
     args = parser.parse_args()
     
-    print("🚗 Simple License Plate Detection Tool")
+    print(" Simple License Plate Detection Tool")
     print("=" * 50)
     
     detector = SimplePlateDetector()
@@ -452,17 +452,17 @@ def main():
         if os.path.exists(args.image):
             detector.process_single_image(args.image)
         else:
-            print(f"❌ Image not found: {args.image}")
+            print(f" Image not found: {args.image}")
     elif args.folder:
         if os.path.exists(args.folder):
             detector.process_folder(args.folder)
         else:
-            print(f"❌ Folder not found: {args.folder}")
+            print(f" Folder not found: {args.folder}")
     else:
-        print("\n📋 Usage:")
+        print("\n Usage:")
         print("   python tools/simple_plate_detector.py --image path/to/image.jpg")
         print("   python tools/simple_plate_detector.py --folder path/to/images/")
-        print("\n💡 Or place images in 'inputs/' folder and run:")
+        print("\n Or place images in 'inputs/' folder and run:")
         print("   python tools/simple_plate_detector.py --folder inputs/")
 
 if __name__ == "__main__":

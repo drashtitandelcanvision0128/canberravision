@@ -76,8 +76,8 @@ class VideoOutputHandler:
             # Generate thumbnail
             self._generate_thumbnail(str(output_path))
             
-            print(f"[INFO] ✅ Video saved: {output_path}")
-            print(f"[INFO] 📁 File size: {self._get_file_size_mb(output_path):.2f} MB")
+            print(f"[INFO]  Video saved: {output_path}")
+            print(f"[INFO]  File size: {self._get_file_size_mb(output_path):.2f} MB")
             
             return str(output_path)
             
@@ -365,29 +365,29 @@ def get_outputs_info() -> dict:
 
 
 if __name__ == "__main__":
-    print("📹 Video Output Handler for YOLO26")
+    print(" Video Output Handler for YOLO26")
     print("=" * 40)
     
     # Test initialization
     handler = VideoOutputHandler()
     
     # Show output directory structure
-    print(f"📁 Output directory: {handler.output_dir}")
-    print(f"📹 Videos: {handler.videos_dir}")
-    print(f"🖼️  Frames: {handler.frames_dir}")
-    print(f"📸 Thumbnails: {handler.thumbnails_dir}")
+    print(f" Output directory: {handler.output_dir}")
+    print(f" Videos: {handler.videos_dir}")
+    print(f"  Frames: {handler.frames_dir}")
+    print(f" Thumbnails: {handler.thumbnails_dir}")
     
     # Get current summary
     summary = handler.get_output_summary()
-    print(f"\n📊 Current Output Summary:")
+    print(f"\n Current Output Summary:")
     print(f"   Total files: {summary['total_files']}")
     print(f"   Total size: {summary['total_size_mb']:.2f} MB")
     print(f"   Videos: {summary['videos']}")
     print(f"   Frames: {summary['frames']}")
     print(f"   Thumbnails: {summary['thumbnails']}")
     
-    print("\n✅ Video output handler ready!")
-    print("📖 Usage:")
+    print("\n Video output handler ready!")
+    print(" Usage:")
     print("   save_processed_video(input_path, frames)")
     print("   save_detection_frame(frame, frame_num, detections)")
     print("   cleanup_outputs(days_old=7)")

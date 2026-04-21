@@ -306,13 +306,13 @@ def process_unified_detection(image: np.ndarray, conf_threshold: float = 0.5) ->
         
         # Create summary
         summary_lines = [
-            "🎯 UNIFIED DETECTION RESULTS",
+            " UNIFIED DETECTION RESULTS",
             "=" * 40,
-            f"\n🚗 Vehicles: {len(detections['vehicles'])}",
-            f"👥 Persons: {len(detections['ppe'])}",
-            f"📋 Plates: {len(detections['number_plates'])}",
-            f"🅿️ Parking: {len(detections['parking'])} slots",
-            f"\n⚡ Processing: {output['metadata']['processing_time_ms']:.1f}ms"
+            f"\n Vehicles: {len(detections['vehicles'])}",
+            f" Persons: {len(detections['ppe'])}",
+            f" Plates: {len(detections['number_plates'])}",
+            f" Parking: {len(detections['parking'])} slots",
+            f"\n Processing: {output['metadata']['processing_time_ms']:.1f}ms"
         ]
         
         # Add vehicle details
@@ -344,7 +344,7 @@ def process_unified_detection(image: np.ndarray, conf_threshold: float = 0.5) ->
 
 def create_unified_detection_tab():
     """Create the unified detection tab for Gradio interface"""
-    with gr.Tab("🎯 Unified Detection (All-in-One)"):
+    with gr.Tab(" Unified Detection (All-in-One)"):
         gr.Markdown("## Unified Multi-Detection System")
         gr.Markdown("Detects: Objects + Vehicles + License Plates + PPE + Parking in one pass")
         
@@ -365,7 +365,7 @@ def create_unified_detection_tab():
                 )
                 
                 detect_btn = gr.Button(
-                    "🔍 Run Unified Detection",
+                    " Run Unified Detection",
                     variant="primary",
                     size="lg"
                 )

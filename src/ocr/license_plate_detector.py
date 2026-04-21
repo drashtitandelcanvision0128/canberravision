@@ -167,15 +167,15 @@ class LicensePlateDetector:
         
         # Check if it matches license plate patterns
         if self._matches_plate_patterns(cleaned_text):
-            print(f"[DEBUG] ✅ Valid license plate: {cleaned_text}")
+            print(f"[DEBUG]  Valid license plate: {cleaned_text}")
             return True
         
         # Additional heuristics for edge cases
         if self._is_likely_plate_by_heuristics(cleaned_text, confidence):
-            print(f"[DEBUG] ✅ Likely license plate by heuristics: {cleaned_text}")
+            print(f"[DEBUG]  Likely license plate by heuristics: {cleaned_text}")
             return True
         
-        print(f"[DEBUG] ❌ Not a license plate: {cleaned_text}")
+        print(f"[DEBUG]  Not a license plate: {cleaned_text}")
         return False
     
     def _clean_text(self, text: str) -> str:
@@ -268,13 +268,13 @@ class LicensePlateDetector:
         # Pattern: [A-Z]{1,2} [0-9]{4} [A-Z]{2}
         bulgarian_pattern = r'^[A-Z]{1,2}\s?\d{4}\s?[A-Z]{2}$'
         if re.match(bulgarian_pattern, text):
-            print(f"[DEBUG] ✅ Bulgarian format license plate detected: {text}")
+            print(f"[DEBUG]  Bulgarian format license plate detected: {text}")
             return True
         
         # Special case: European format with spaces (e.g., "B 2228 HM", "CA 1234 AB")
         european_pattern = r'^[A-Z]{1,2}\s+\d{3,4}\s+[A-Z]{2,3}$'
         if re.match(european_pattern, text):
-            print(f"[DEBUG] ✅ European format license plate detected: {text}")
+            print(f"[DEBUG]  European format license plate detected: {text}")
             return True
         
         return False

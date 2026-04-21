@@ -398,65 +398,65 @@ def process_anpr_image(input_image):
         display_image = anpr_system.create_anpr_display(image, results)
         
         # Generate detailed information text
-        info_text = f"🔍 ANPR Detection Results\n"
-        info_text += f"⏱️ Processing Time: {results['processing_time']}s\n"
-        info_text += f"📅 Date: {results['date']}\n"
-        info_text += f"🕐 Time: {results['timestamp']}\n"
-        info_text += f"🚗 Vehicles Detected: {len(results['vehicles'])}\n"
-        info_text += f"🚨 Active Alerts: {len(results['alerts'])}\n\n"
+        info_text = f" ANPR Detection Results\n"
+        info_text += f" Processing Time: {results['processing_time']}s\n"
+        info_text += f" Date: {results['date']}\n"
+        info_text += f" Time: {results['timestamp']}\n"
+        info_text += f" Vehicles Detected: {len(results['vehicles'])}\n"
+        info_text += f" Active Alerts: {len(results['alerts'])}\n\n"
         
         for vehicle in results['vehicles']:
-            info_text += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            info_text += f"🚗 Vehicle {vehicle['id']}:\n"
-            info_text += f"📋 License Plate: {vehicle['license_plate']}\n"
-            info_text += f"🏭 Make/Model: {vehicle['make']} {vehicle['model']}\n"
-            info_text += f"🎨 Color: {vehicle['color']}\n"
-            info_text += f"⚡ Speed: {vehicle['speed']} km/h\n"
-            info_text += f"👤 Owner: {vehicle['owner']}\n"
-            info_text += f"📊 Confidence: {vehicle['confidence']:.2f}\n"
-            info_text += f"🚨 Status: {'ALERT' if vehicle['alert'] or vehicle['alerts'] else 'Clear'}\n"
+            info_text += f"\n"
+            info_text += f" Vehicle {vehicle['id']}:\n"
+            info_text += f" License Plate: {vehicle['license_plate']}\n"
+            info_text += f" Make/Model: {vehicle['make']} {vehicle['model']}\n"
+            info_text += f" Color: {vehicle['color']}\n"
+            info_text += f" Speed: {vehicle['speed']} km/h\n"
+            info_text += f" Owner: {vehicle['owner']}\n"
+            info_text += f" Confidence: {vehicle['confidence']:.2f}\n"
+            info_text += f" Status: {'ALERT' if vehicle['alert'] or vehicle['alerts'] else 'Clear'}\n"
             
             # Add vehicle-specific alerts
             if vehicle['alerts']:
-                info_text += "⚠️ Alerts:\n"
+                info_text += " Alerts:\n"
                 for alert in vehicle['alerts']:
                     info_text += f"   • {alert['message']}\n"
             
             info_text += "\n"
         
         # Generate database matches with similarity scores
-        db_matches = f"🗄️ Database Matches & Similar Vehicles\n"
-        db_matches += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        db_matches = f" Database Matches & Similar Vehicles\n"
+        db_matches += f"\n\n"
         
         if results['similar_vehicles']:
             for similar in results['similar_vehicles'][:10]:  # Top 10 matches
                 vehicle = similar['vehicle']
                 similarity = similar['similarity']
-                alert_status = "🚨 ALERT" if vehicle.get('is_stolen') else "✅ Clear"
+                alert_status = " ALERT" if vehicle.get('is_stolen') else " Clear"
                 
-                db_matches += f"📋 {vehicle['license_plate']}\n"
-                db_matches += f"   🏭 Vehicle: {vehicle['make']} {vehicle['model']}\n"
-                db_matches += f"   🎨 Color: {vehicle['color']}\n"
-                db_matches += f"   📊 Match: {similarity:.1%}\n"
-                db_matches += f"   🚨 Status: {alert_status}\n"
+                db_matches += f" {vehicle['license_plate']}\n"
+                db_matches += f"    Vehicle: {vehicle['make']} {vehicle['model']}\n"
+                db_matches += f"    Color: {vehicle['color']}\n"
+                db_matches += f"    Match: {similarity:.1%}\n"
+                db_matches += f"    Status: {alert_status}\n"
                 if vehicle.get('alert_reason'):
-                    db_matches += f"   ⚠️ Reason: {vehicle['alert_reason']}\n"
+                    db_matches += f"    Reason: {vehicle['alert_reason']}\n"
                 db_matches += "\n"
         else:
-            db_matches += "❌ No similar vehicles found in database\n\n"
+            db_matches += " No similar vehicles found in database\n\n"
         
         # Generate active alerts summary
-        alerts_summary = f"🚨 Active Alerts Summary\n"
-        alerts_summary += f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        alerts_summary = f" Active Alerts Summary\n"
+        alerts_summary += f"\n\n"
         
         if results['alerts']:
             for i, alert in enumerate(results['alerts'], 1):
-                severity_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(alert.get('severity', 'medium'), "⚪")
+                severity_icon = {"high": "", "medium": "", "low": ""}.get(alert.get('severity', 'medium'), "")
                 alerts_summary += f"{i}. {severity_icon} {alert['type'].upper()}\n"
-                alerts_summary += f"   📋 Plate: {alert['license_plate']}\n"
-                alerts_summary += f"   📝 Message: {alert['message']}\n\n"
+                alerts_summary += f"    Plate: {alert['license_plate']}\n"
+                alerts_summary += f"    Message: {alert['message']}\n\n"
         else:
-            alerts_summary += "✅ No active alerts\n\n"
+            alerts_summary += " No active alerts\n\n"
         
         # Convert back to RGB for display
         display_image = cv2.cvtColor(display_image, cv2.COLOR_BGR2RGB)
@@ -464,66 +464,66 @@ def process_anpr_image(input_image):
         return display_image, info_text, db_matches, alerts_summary
         
     except Exception as e:
-        error_msg = f"❌ Error processing image: {str(e)}"
+        error_msg = f" Error processing image: {str(e)}"
         return None, error_msg, "", ""
 
 # Create Gradio interface
 def create_anpr_interface():
     """Create the ANPR system interface."""
     with gr.Blocks(title="Enhanced ANPR System") as interface:
-        gr.Markdown("# 🚗 Enhanced ANPR System")
+        gr.Markdown("#  Enhanced ANPR System")
         gr.Markdown("Automatic Number Plate Recognition with Vehicle Analysis")
-        gr.Markdown("🔍 Real-time vehicle detection, license plate recognition, and database matching")
+        gr.Markdown(" Real-time vehicle detection, license plate recognition, and database matching")
         
         with gr.Row():
             with gr.Column(scale=1):
-                input_image = gr.Image(label="📷 Input Image", type="pil")
-                process_btn = gr.Button("🔍 Process Image", variant="primary", size="lg")
+                input_image = gr.Image(label=" Input Image", type="pil")
+                process_btn = gr.Button(" Process Image", variant="primary", size="lg")
                 
-                gr.Markdown("### 📝 System Features")
+                gr.Markdown("###  System Features")
                 gr.Markdown("""
-                - 🚗 **Vehicle Detection**: Advanced YOLO-based detection
-                - 📋 **License Plate Recognition**: OCR with multiple methods
-                - 🏭 **Make/Model Classification**: Deep learning identification
-                - 🎨 **Color Detection**: HSV and K-means analysis
-                - ⚡ **Speed Estimation**: Real-time calculation
-                - 🗄️ **Database Matching**: Similarity scoring
-                - 🚨 **Alert System**: Stolen vehicle detection
+                -  **Vehicle Detection**: Advanced YOLO-based detection
+                -  **License Plate Recognition**: OCR with multiple methods
+                -  **Make/Model Classification**: Deep learning identification
+                -  **Color Detection**: HSV and K-means analysis
+                -  **Speed Estimation**: Real-time calculation
+                -  **Database Matching**: Similarity scoring
+                -  **Alert System**: Stolen vehicle detection
                 """)
                 
             with gr.Column(scale=2):
-                output_image = gr.Image(label="🎯 ANPR Detection Result", type="pil")
+                output_image = gr.Image(label=" ANPR Detection Result", type="pil")
         
         with gr.Row():
             with gr.Column():
                 info_output = gr.Textbox(
-                    label="🔍 Detection Information", 
+                    label=" Detection Information", 
                     lines=20, 
                     max_lines=25
                 )
             
             with gr.Column():
                 db_output = gr.Textbox(
-                    label="🗄️ Database Matches", 
+                    label=" Database Matches", 
                     lines=20, 
                     max_lines=25
                 )
                 
         with gr.Row():
             alerts_output = gr.Textbox(
-                label="🚨 Active Alerts", 
+                label=" Active Alerts", 
                 lines=10, 
                 max_lines=15
             )
         
-        gr.Markdown("## 📸 Example Images")
+        gr.Markdown("##  Example Images")
         with gr.Row():
             with gr.Column():
-                example1_btn = gr.Button("📸 Load Example 1", size="sm")
+                example1_btn = gr.Button(" Load Example 1", size="sm")
             with gr.Column():
-                example2_btn = gr.Button("📸 Load Example 2", size="sm")
+                example2_btn = gr.Button(" Load Example 2", size="sm")
             with gr.Column():
-                example3_btn = gr.Button("📸 Load Example 3", size="sm")
+                example3_btn = gr.Button(" Load Example 3", size="sm")
         
         with gr.Row():
             with gr.Column():
@@ -578,7 +578,7 @@ def create_anpr_interface():
         # Footer
         gr.Markdown("""
         ---
-        🔧 **System Information**: This ANPR system uses advanced computer vision techniques 
+         **System Information**: This ANPR system uses advanced computer vision techniques 
         including YOLO object detection, OCR text extraction, and deep learning-based 
         vehicle classification to provide comprehensive vehicle analysis.
         """)

@@ -933,7 +933,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
     
     summary_lines = []
-    summary_lines.append(f"📊 **Detected {len(boxes)} objects:**")
+    summary_lines.append(f" **Detected {len(boxes)} objects:**")
     summary_lines.append("")
     
     for i in range(len(boxes)):
@@ -946,7 +946,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
         
         confidence = f"{float(conf[i]):.2f}" if i < len(conf) else "N/A"
         
-        line = f"🔹 **{class_name}** (conf: {confidence})"
+        line = f" **{class_name}** (conf: {confidence})"
         
         # Add color and text info
         try:
@@ -1255,7 +1255,7 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
             h, w = annotated.shape[:2]
             
             # Create a banner at the top for license plate info
-            plate_label = f"🚗 License Plate: {plate_text} (confidence: {confidence:.2f})"
+            plate_label = f" License Plate: {plate_text} (confidence: {confidence:.2f})"
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.7
             thickness = 2

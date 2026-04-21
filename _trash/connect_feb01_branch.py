@@ -27,21 +27,21 @@ def connect_to_branch(username, repo_name="YOLO26", branch="feb.0.1"):
     print(f"Adding remote: {github_url}")
     
     if run_command(f"git remote add origin {github_url}"):
-        print("✓ Added GitHub remote")
+        print(" Added GitHub remote")
     
     # Fetch the branch
     print(f"Fetching branch: {branch}")
     if run_command(f"git fetch origin {branch}"):
-        print(f"✓ Fetched {branch}")
+        print(f" Fetched {branch}")
     
     # Create and checkout the branch locally
     print(f"Creating local branch: {branch}")
     if run_command(f"git checkout -b {branch} origin/{branch}"):
-        print(f"✓ Created and checked out {branch}")
+        print(f" Created and checked out {branch}")
     
     # Set upstream
     if run_command(f"git branch --set-upstream-to=origin/{branch} {branch}"):
-        print(f"✓ Set upstream to origin/{branch}")
+        print(f" Set upstream to origin/{branch}")
     
     # Update config manager
     config = ConfigManager()
@@ -49,7 +49,7 @@ def connect_to_branch(username, repo_name="YOLO26", branch="feb.0.1"):
     config.add_repository(repo_name, github_url, branch, username)
     config.set_current_account(username)
     
-    print(f"\n✓ Successfully connected to {username}/{repo_name} branch: {branch}")
+    print(f"\n Successfully connected to {username}/{repo_name} branch: {branch}")
     print("You can now push changes with: git push origin feb.0.1")
 
 if __name__ == "__main__":

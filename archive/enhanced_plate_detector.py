@@ -43,9 +43,9 @@ class EnhancedPlateDetector:
             try:
                 self.paddle_ocr = PaddleOCR(use_angle_cls=True, lang='en')
                 self.ocr_engines.append('paddleocr')
-                print("✅ PaddleOCR initialized")
+                print(" PaddleOCR initialized")
             except Exception as e:
-                print(f"❌ PaddleOCR failed: {e}")
+                print(f" PaddleOCR failed: {e}")
         
         # Initialize Tesseract
         if TESSERACT_AVAILABLE:
@@ -55,11 +55,11 @@ class EnhancedPlateDetector:
                 cv2.putText(test_img, "TEST", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
                 pytesseract.image_to_string(test_img)
                 self.ocr_engines.append('tesseract')
-                print("✅ Tesseract initialized")
+                print(" Tesseract initialized")
             except Exception as e:
-                print(f"❌ Tesseract failed: {e}")
+                print(f" Tesseract failed: {e}")
         
-        print(f"🔧 Available OCR engines: {self.ocr_engines}")
+        print(f" Available OCR engines: {self.ocr_engines}")
     
     def extract_text_from_image(self, image: np.ndarray) -> List[Dict]:
         """Extract text using all available OCR engines"""
@@ -77,7 +77,7 @@ class EnhancedPlateDetector:
                 results.extend(text_results)
                 
             except Exception as e:
-                print(f"❌ {engine} failed: {e}")
+                print(f" {engine} failed: {e}")
         
         return results
     
@@ -102,7 +102,7 @@ class EnhancedPlateDetector:
             return extracted_texts
             
         except Exception as e:
-            print(f"❌ PaddleOCR extraction failed: {e}")
+            print(f" PaddleOCR extraction failed: {e}")
             return []
     
     def _extract_with_tesseract(self, image: np.ndarray) -> List[Dict]:
@@ -116,7 +116,7 @@ class EnhancedPlateDetector:
             for lang in languages:
                 try:
                     # Configure Tesseract for better plate detection
-                    custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789日本'
+                    custom_config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
                     
                     text = pytesseract.image_to_string(image, lang=lang, config=custom_config)
                     confidence = pytesseract.image_to_data(image, lang=lang, config=custom_config, output_type=pytesseract.Output.DICT)
@@ -139,7 +139,7 @@ class EnhancedPlateDetector:
             return extracted_texts
             
         except Exception as e:
-            print(f"❌ Tesseract extraction failed: {e}")
+            print(f" Tesseract extraction failed: {e}")
             return []
     
     def is_license_plate(self, text: str) -> bool:
@@ -152,8 +152,8 @@ class EnhancedPlateDetector:
         # Japanese plate patterns
         japanese_patterns = [
             r'^[A-Z0-9]{2,6}$',  # Standard Japanese
-            r'^日本\s*[0-9]{1,4}\s*[A-Z0-9]{2,4}$',  # Japanese with characters
-            r'^[ひらがなカタカナ]{1,4}\s*[0-9]{1,4}\s*[A-Z0-9]{2,4}$',  # Hiragana/Katakana
+            r'^\s*[0-9]{1,4}\s*[A-Z0-9]{2,4}$',  # Japanese with characters
+            r'^[]{1,4}\s*[0-9]{1,4}\s*[A-Z0-9]{2,4}$',  # Hiragana/Katakana
         ]
         
         # International patterns
@@ -172,7 +172,7 @@ class EnhancedPlateDetector:
         # Additional check: contains both letters and numbers (common for plates)
         has_letters = bool(re.search(r'[A-Z]', text))
         has_numbers = bool(re.search(r'[0-9]', text))
-        has_japanese = bool(re.search(r'[日本ひらがなカタカナ]', text))
+        has_japanese = bool(re.search(r'[]', text))
         
         return (has_letters and has_numbers) or has_japanese
     
@@ -199,7 +199,7 @@ class EnhancedPlateDetector:
             return enhanced
             
         except Exception as e:
-            print(f"❌ Preprocessing failed: {e}")
+            print(f" Preprocessing failed: {e}")
             return image
     
     def detect_license_plates_in_frame(self, frame: np.ndarray, car_bboxes: List[List[int]]) -> List[Dict]:
@@ -290,8 +290,8 @@ class EnhancedPlateDetector:
 def process_video_with_enhanced_detection(video_path: str, output_path: str = None, show_realtime: bool = True):
     """Process video with enhanced license plate detection"""
     
-    print("🚗 Starting Enhanced Car & License Plate Detection")
-    print(f"📁 Input video: {video_path}")
+    print(" Starting Enhanced Car & License Plate Detection")
+    print(f" Input video: {video_path}")
     
     if not os.path.exists(video_path):
         return {'error': f'Video file not found: {video_path}'}
@@ -319,7 +319,7 @@ def process_video_with_enhanced_detection(video_path: str, output_path: str = No
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"📹 Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
+        print(f" Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
         
         # Setup output video
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -331,7 +331,7 @@ def process_video_with_enhanced_detection(video_path: str, output_path: str = No
         unique_plates = set()
         cars_detected = 0
         
-        print("🔄 Starting enhanced processing...")
+        print(" Starting enhanced processing...")
         
         while True:
             ret, frame = cap.read()
@@ -390,7 +390,7 @@ def process_video_with_enhanced_detection(video_path: str, output_path: str = No
                                 cv2.rectangle(annotated_frame, (px1, py1), (px2, py2), (0, 0, 255), 2)
                                 
                                 # Create plate label
-                                plate_label = f"📋 {plate_text} ({plate_confidence:.2f})"
+                                plate_label = f" {plate_text} ({plate_confidence:.2f})"
                                 cv2.putText(annotated_frame, plate_label, 
                                            (px1, py1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             
@@ -436,22 +436,22 @@ def process_video_with_enhanced_detection(video_path: str, output_path: str = No
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
-        print(f"✅ Enhanced processing completed!")
-        print(f"📁 Output video: {output_path}")
-        print(f"📁 Results JSON: {json_path}")
-        print(f"🚗 Cars detected: {cars_detected}")
-        print(f"📋 Plates found: {len(all_plates)}")
-        print(f"🎯 Unique plates: {len(unique_plates)}")
+        print(f" Enhanced processing completed!")
+        print(f" Output video: {output_path}")
+        print(f" Results JSON: {json_path}")
+        print(f" Cars detected: {cars_detected}")
+        print(f" Plates found: {len(all_plates)}")
+        print(f" Unique plates: {len(unique_plates)}")
         
         if unique_plates:
-            print("\n📋 Detected License Plates:")
+            print("\n Detected License Plates:")
             for i, plate in enumerate(unique_plates, 1):
                 print(f"   {i}. {plate}")
         
         return results
         
     except Exception as e:
-        print(f"❌ Enhanced processing failed: {e}")
+        print(f" Enhanced processing failed: {e}")
         import traceback
         traceback.print_exc()
         return {'error': str(e)}

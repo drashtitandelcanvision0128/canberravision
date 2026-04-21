@@ -25,8 +25,8 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
         Dictionary with detection results including license plates
     """
     
-    print("🚗 Starting PROPER License Plate Detection")
-    print(f"📁 Input video: {video_path}")
+    print(" Starting PROPER License Plate Detection")
+    print(f" Input video: {video_path}")
     
     if not os.path.exists(video_path):
         return {'error': f'Video file not found: {video_path}'}
@@ -39,19 +39,19 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
         # Import YOLO for car detection
         from ultralytics import YOLO
         model = YOLO("yolo26n.pt")
-        print("✅ YOLO model loaded")
+        print(" YOLO model loaded")
     except Exception as e:
-        print(f"❌ YOLO failed: {e}")
+        print(f" YOLO failed: {e}")
         return {'error': 'YOLO not available'}
     
     # Try to import OCR
     try:
         from optimized_paddleocr_gpu import extract_text_optimized
         PADDLE_AVAILABLE = True
-        print("✅ PaddleOCR available")
+        print(" PaddleOCR available")
     except:
         PADDLE_AVAILABLE = False
-        print("⚠️ PaddleOCR not available, using Tesseract fallback")
+        print(" PaddleOCR not available, using Tesseract fallback")
     
     try:
         import pytesseract
@@ -72,7 +72,7 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📹 Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
+    print(f" Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
     
     # Setup output video
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -84,7 +84,7 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
     all_plates = []
     unique_plates = set()
     
-    print("🔄 Processing...")
+    print(" Processing...")
     
     while True:
         ret, frame = cap.read()
@@ -152,7 +152,7 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
                                 text_x = car_bbox[0]
                                 text_y = car_bbox[3] + 30  # Below the car box
                                 
-                                plate_label = f"📋 {plate_text}"
+                                plate_label = f" {plate_text}"
                                 
                                 # Draw background for text
                                 (text_w, text_h), _ = cv2.getTextSize(plate_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
@@ -221,15 +221,15 @@ def process_video_with_plate_detection(video_path, output_path=None, show_realti
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     
-    print(f"\n✅ Processing completed!")
-    print(f"📁 Output video: {output_path}")
-    print(f"📁 Results JSON: {json_path}")
-    print(f"🚗 Cars detected: {len(all_cars)}")
-    print(f"📋 Total plates: {len(all_plates)}")
-    print(f"🔢 Unique plates: {len(unique_plates)}")
+    print(f"\n Processing completed!")
+    print(f" Output video: {output_path}")
+    print(f" Results JSON: {json_path}")
+    print(f" Cars detected: {len(all_cars)}")
+    print(f" Total plates: {len(all_plates)}")
+    print(f" Unique plates: {len(unique_plates)}")
     
     if unique_plates:
-        print("\n📋 DETECTED LICENSE PLATES:")
+        print("\n DETECTED LICENSE PLATES:")
         for i, plate in enumerate(sorted(unique_plates), 1):
             print(f"   {i}. {plate}")
     

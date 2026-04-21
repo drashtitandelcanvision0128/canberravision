@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-🚗 Enhanced License Plate Detector - Angle Independent Detection
+ Enhanced License Plate Detector - Angle Independent Detection
 ============================================================
 
 Advanced license plate detection that works at any angle and properly
 classifies license plates regardless of orientation.
 
 Features:
-- ✅ Angle-independent detection
-- ✅ Multi-color plate support (white, yellow, blue, red, green)
-- ✅ Robust text classification
-- ✅ Perspective correction
-- ✅ Multiple detection methods
-- ✅ High confidence scoring
+-  Angle-independent detection
+-  Multi-color plate support (white, yellow, blue, red, green)
+-  Robust text classification
+-  Perspective correction
+-  Multiple detection methods
+-  High confidence scoring
 """
 
 import gradio as gr
@@ -31,7 +31,7 @@ sys.path.append(str(project_root))
 class EnhancedPlateDetector:
     def __init__(self):
         self.ocr_available = self.check_ocr_availability()
-        print(f"🔍 OCR Available: {'✅' if self.ocr_available else '❌'}")
+        print(f" OCR Available: {'' if self.ocr_available else ''}")
         
         # License plate patterns for different regions
         self.plate_patterns = [
@@ -558,7 +558,7 @@ class EnhancedPlateDetector:
             color_name = plate.get('color', 'unknown')
             method = plate.get('method', 'unknown')
             
-            label = f"🚗 {text} ({confidence:.2f}) [{color_name}]"
+            label = f" {text} ({confidence:.2f}) [{color_name}]"
             
             # Draw label background
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
@@ -579,43 +579,43 @@ def create_enhanced_interface():
     
     def process_image(image):
         if image is None:
-            return None, "❌ Please upload an image"
+            return None, " Please upload an image"
         
         # Detect license plates
         result_image, plates = detector.detect_license_plates_enhanced(image)
         
         # Format results
         if len(plates) == 0:
-            result_text = "❌ No license plates detected\n\n💡 Tips:\n- Ensure the license plate is clearly visible\n- Try different angles and lighting\n- Support for white, yellow, blue, red, green plates"
+            result_text = " No license plates detected\n\n Tips:\n- Ensure the license plate is clearly visible\n- Try different angles and lighting\n- Support for white, yellow, blue, red, green plates"
         else:
-            result_text = f"🎯 Found {len(plates)} License Plate(s):\n\n"
+            result_text = f" Found {len(plates)} License Plate(s):\n\n"
             for i, plate in enumerate(plates):
-                result_text += f"🚗 Plate {i+1}: {plate['text']}\n"
-                result_text += f"   📊 Confidence: {plate['plate_confidence']:.2f}\n"
-                result_text += f"   🎨 Color: {plate['color']}\n"
-                result_text += f"   🔍 Method: {plate['method']}\n"
-                result_text += f"   📍 Position: ({plate['x1']}, {plate['y1']})\n\n"
+                result_text += f" Plate {i+1}: {plate['text']}\n"
+                result_text += f"    Confidence: {plate['plate_confidence']:.2f}\n"
+                result_text += f"    Color: {plate['color']}\n"
+                result_text += f"    Method: {plate['method']}\n"
+                result_text += f"    Position: ({plate['x1']}, {plate['y1']})\n\n"
         
         return result_image, result_text
     
     # Create Gradio interface
     with gr.Blocks(title="Enhanced License Plate Detector", theme=gr.themes.Soft()) as interface:
         gr.Markdown("""
-        # 🚗 Enhanced License Plate Detector - Angle Independent
+        #  Enhanced License Plate Detector - Angle Independent
         
         Advanced license plate detection that works at **any angle** and supports **multi-colored plates**.
         
         **Features:**
-        - ✅ **Angle Independent** - Works at any orientation
-        - 🎨 **Multi-Color Support** - White, Yellow, Blue, Red, Green plates
-        - 🔍 **Smart Classification** - Advanced text pattern recognition
-        - 📊 **Confidence Scoring** - Shows detection confidence
-        - 🌍 **International Patterns** - Supports multiple plate formats
+        -  **Angle Independent** - Works at any orientation
+        -  **Multi-Color Support** - White, Yellow, Blue, Red, Green plates
+        -  **Smart Classification** - Advanced text pattern recognition
+        -  **Confidence Scoring** - Shows detection confidence
+        -  **International Patterns** - Supports multiple plate formats
         """)
         
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 📤 Upload Image")
+                gr.Markdown("###  Upload Image")
                 image_input = gr.Image(
                     label="Upload Image with License Plate",
                     type="pil",
@@ -623,13 +623,13 @@ def create_enhanced_interface():
                 )
                 
                 process_btn = gr.Button(
-                    "🔍 Detect License Plates",
+                    " Detect License Plates",
                     variant="primary",
                     size="lg"
                 )
                 
                 gr.Markdown("""
-                ### 💡 Detection Tips:
+                ###  Detection Tips:
                 - Works at **any angle**
                 - Supports **all plate colors**
                 - Handles **different lighting**
@@ -638,7 +638,7 @@ def create_enhanced_interface():
                 """)
             
             with gr.Column(scale=1):
-                gr.Markdown("### 🎯 Detection Results")
+                gr.Markdown("###  Detection Results")
                 image_output = gr.Image(
                     label="Detected License Plates",
                     type="pil",
@@ -670,10 +670,10 @@ def create_enhanced_interface():
 
 def main():
     """Main entry point"""
-    print("🚗 Starting Enhanced License Plate Detector...")
-    print("✅ Angle-independent detection enabled")
-    print("✅ Multi-color plate support enabled")
-    print("✅ Smart text classification enabled")
+    print(" Starting Enhanced License Plate Detector...")
+    print(" Angle-independent detection enabled")
+    print(" Multi-color plate support enabled")
+    print(" Smart text classification enabled")
     
     try:
         # Create and launch interface
@@ -688,7 +688,7 @@ def main():
         )
         
     except Exception as e:
-        print(f"❌ Failed to start application: {e}")
+        print(f" Failed to start application: {e}")
         print("Please check your dependencies and try again.")
 
 if __name__ == "__main__":

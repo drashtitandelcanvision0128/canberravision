@@ -195,7 +195,7 @@ class ParkingDetector:
                 print(f"[MATCH-CHECK] Spot {spot_coords} vs {vehicle['class']} at {vehicle['bbox']}")
                 print(f"              Overlap: {overlap:.1%}, Center inside: {center_inside}, Touches: {touches}")
                 if is_match:
-                    print(f"              ✓ MATCH FOUND!")
+                    print(f"               MATCH FOUND!")
         
         is_occupied = max_overlap >= overlap_threshold or best_vehicle is not None
         

@@ -2994,7 +2994,7 @@ class PPEDetector:
 
                 print(f"\n{'='*60}")
 
-                print(f"[PPE] 🎯 AI SAFETY DETECTION SYSTEM STARTED")
+                print(f"[PPE]  AI SAFETY DETECTION SYSTEM STARTED")
 
                 print(f"[PPE] Frame: {frame.shape}")
 
@@ -3056,7 +3056,7 @@ class PPEDetector:
 
             if self.debug:
 
-                print(f"\n[PPE] 👥 PROCESSING {len(persons)} PERSONS...")
+                print(f"\n[PPE]  PROCESSING {len(persons)} PERSONS...")
 
                 print(f"{'-'*60}")
 
@@ -3630,23 +3630,23 @@ class PPEDetector:
 
                 emoji = "🟩"
 
-                details = f"Helmet: ✅ Present (conf: {person.helmet.confidence:.2f}), Vest: ✅ Present (conf: {person.vest.confidence:.2f})"
+                details = f"Helmet:  Present (conf: {person.helmet.confidence:.2f}), Vest:  Present (conf: {person.vest.confidence:.2f})"
 
             elif person.helmet.present:
 
                 output_label = "No Vest"
 
-                emoji = "�"
+                emoji = ""
 
-                details = f"Helmet: ✅ Present (conf: {person.helmet.confidence:.2f}), Vest: ❌ Not detected"
+                details = f"Helmet:  Present (conf: {person.helmet.confidence:.2f}), Vest:  Not detected"
 
             elif person.vest.present:
 
                 output_label = "No Helmet"
 
-                emoji = "�"
+                emoji = ""
 
-                details = f"Helmet: ❌ Not detected, Vest: ✅ Present (conf: {person.vest.confidence:.2f})"
+                details = f"Helmet:  Not detected, Vest:  Present (conf: {person.vest.confidence:.2f})"
 
             else:
 
@@ -3654,7 +3654,7 @@ class PPEDetector:
 
                 emoji = "🟥"
 
-                details = f"Helmet: ❌ Not detected, Vest: ❌ Not detected"
+                details = f"Helmet:  Not detected, Vest:  Not detected"
 
             
 
@@ -3676,7 +3676,7 @@ class PPEDetector:
 
         if result.error_message:
 
-            lines.append(f"\n⚠️ Warning: {result.error_message}")
+            lines.append(f"\n Warning: {result.error_message}")
 
 
 

@@ -24,7 +24,7 @@ try:
         initialize_gpu_environment
     )
     OPTIMIZED_PADDLEOCR_AVAILABLE = True
-    print("[INFO] 🚀 Optimized PaddleOCR GPU available for fast detection flow")
+    print("[INFO]  Optimized PaddleOCR GPU available for fast detection flow")
 except ImportError:
     OPTIMIZED_PADDLEOCR_AVAILABLE = False
     print("[WARNING] Optimized PaddleOCR GPU not available")
@@ -351,7 +351,7 @@ class FastDetectionFlow:
         """
         total_start = time.time()
         
-        print(f"[INFO] 🚀 Starting fast detection flow on {image.shape}")
+        print(f"[INFO]  Starting fast detection flow on {image.shape}")
         
         # Step 1: Fast object detection
         detections = self.detect_objects_fast(
@@ -420,7 +420,7 @@ class FastDetectionFlow:
             gpu_accelerated=self.use_gpu
         )
         
-        print(f"[INFO] ✅ Fast detection flow completed in {total_time:.3f}s")
+        print(f"[INFO]  Fast detection flow completed in {total_time:.3f}s")
         print(f"[INFO]   Detections: {len(detections)}, Objects with text: {text_summary['total_objects_with_text']}")
         print(f"[INFO]   License plates: {text_summary['license_plates_found']}, General text: {text_summary['general_text_found']}")
         

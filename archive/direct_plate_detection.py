@@ -12,30 +12,30 @@ def run_plate_detection(video_path):
     """Run detection using app.py directly"""
     
     print("=" * 70)
-    print("🚗 DIRECT License Plate Detection")
+    print(" DIRECT License Plate Detection")
     print("=" * 70)
     
     if not os.path.exists(video_path):
-        print(f"❌ Video not found: {video_path}")
+        print(f" Video not found: {video_path}")
         return
     
-    print(f"📁 Video: {video_path}")
+    print(f" Video: {video_path}")
     print()
     
     # Execute app.py functions directly
     try:
         # Import required modules from app.py
-        print("🔧 Loading modules...")
+        print(" Loading modules...")
         
         # This will trigger app.py to load
         import app
         
-        print("✅ Modules loaded")
+        print(" Modules loaded")
         print()
         
         # Check if process_video_optimized_fast exists
         if hasattr(app, 'process_video_optimized_fast'):
-            print("🚀 Starting detection with OCR enabled...")
+            print(" Starting detection with OCR enabled...")
             print("-" * 70)
             
             result = app.process_video_optimized_fast(
@@ -52,10 +52,10 @@ def run_plate_detection(video_path):
                 
                 print()
                 print("=" * 70)
-                print("✅ PROCESSING COMPLETE!")
+                print(" PROCESSING COMPLETE!")
                 print("=" * 70)
-                print(f"📁 Output video: {output_video}")
-                print(f"📊 Summary: {summary}")
+                print(f" Output video: {output_video}")
+                print(f" Summary: {summary}")
                 
                 # Parse and display plates
                 if json_data:
@@ -65,7 +65,7 @@ def run_plate_detection(video_path):
                         
                         if 'all_detected_text' in data:
                             texts = data['all_detected_text']
-                            print(f"\n📋 Found {len(texts)} text detections:")
+                            print(f"\n Found {len(texts)} text detections:")
                             
                             plates = []
                             for item in texts:
@@ -75,18 +75,18 @@ def run_plate_detection(video_path):
                                     print(f"   • {text}")
                             
                             if plates:
-                                print(f"\n🔢 Unique plates: {len(set(plates))}")
+                                print(f"\n Unique plates: {len(set(plates))}")
                             else:
-                                print("\n⚠️ No license plates detected in text")
+                                print("\n No license plates detected in text")
                     except Exception as e:
-                        print(f"⚠️ Could not parse JSON: {e}")
+                        print(f" Could not parse JSON: {e}")
             else:
-                print("❌ Processing failed - no result returned")
+                print(" Processing failed - no result returned")
         else:
-            print("❌ process_video_optimized_fast not found in app.py")
+            print(" process_video_optimized_fast not found in app.py")
             
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         import traceback
         traceback.print_exc()
 

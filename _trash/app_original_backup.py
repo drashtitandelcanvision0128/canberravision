@@ -1,4 +1,4 @@
-# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# Ultralytics  AGPL-3.0 License - https://ultralytics.com/license
 
 import asyncio
 import os
@@ -270,7 +270,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                             }
                         })
                         result["text_extraction"]["summary"]["license_plates_found"] += 1
-                        print(f"[DEBUG] ✅ Found VALID license plate: {cleaned_plate}")
+                        print(f"[DEBUG]  Found VALID license plate: {cleaned_plate}")
                         
                         # Also add as a detected object for annotation
                         # For license plates, we need to determine the car color by looking at surrounding area
@@ -300,7 +300,7 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
                         result["text_extraction"]["summary"]["total_objects"] += 1
                         result["text_extraction"]["summary"]["objects_with_text"] += 1
                     else:
-                        print(f"[DEBUG] ❌ REJECTED fake license plate: {cleaned_plate} (not found in image)")
+                        print(f"[DEBUG]  REJECTED fake license plate: {cleaned_plate} (not found in image)")
         
         # STEP 3: Detect other objects in the image (excluding license plate regions)
         print(f"[DEBUG] Step 3: Detecting other objects...")
@@ -848,7 +848,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         estimated_max_width = expected_chars * max_char_width
         
         if not (estimated_min_width <= w <= estimated_max_width * 2):
-            print(f"[DEBUG] ❌ Plate size doesn't match text length: {w}px vs {expected_chars} chars")
+            print(f"[DEBUG]  Plate size doesn't match text length: {w}px vs {expected_chars} chars")
             return False
         
         # Method 2: Visual character verification
@@ -876,7 +876,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         
         # Allow some tolerance (some characters might be merged or split)
         if not (visual_char_count >= expected_chars * 0.4 and visual_char_count <= expected_chars * 2.0):
-            print(f"[DEBUG] ❌ Visual character count doesn't match text")
+            print(f"[DEBUG]  Visual character count doesn't match text")
             # Don't immediately reject, continue with other validations
         
         # Method 3: Cross-validate with different OCR methods
@@ -937,7 +937,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         # Method 4: Plate structure validation
         # Check if the detected text follows realistic license plate patterns
         if not _is_realistic_license_plate_pattern(plate_text):
-            print(f"[DEBUG] ❌ Unreliable license plate pattern: {plate_text}")
+            print(f"[DEBUG]  Unreliable license plate pattern: {plate_text}")
             return False
         
         # Final decision based on all validations
@@ -965,9 +965,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         is_valid = validation_score >= 2
         
         if is_valid:
-            print(f"[DEBUG] ✅ License plate validation PASSED: {plate_text}")
+            print(f"[DEBUG]  License plate validation PASSED: {plate_text}")
         else:
-            print(f"[DEBUG] ❌ License plate validation FAILED: {plate_text}")
+            print(f"[DEBUG]  License plate validation FAILED: {plate_text}")
         
         return is_valid
         
@@ -995,14 +995,14 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         has_letter = any(c.isalpha() for c in plate_upper)
         
         if not (has_digit and has_letter):
-            print(f"[DEBUG] ❌ Plate missing digits or letters: {plate_text}")
+            print(f"[DEBUG]  Plate missing digits or letters: {plate_text}")
             return False
         
         # Rule 2: Reject patterns that look like OCR errors
         # Too many repeated characters might indicate OCR errors
         repeated_chars = plate_upper.count(plate_upper[0]) if plate_upper else 0
         if repeated_chars > len(plate_upper) * 0.6:
-            print(f"[DEBUG] ❌ Too many repeated characters: {plate_text}")
+            print(f"[DEBUG]  Too many repeated characters: {plate_text}")
             return False
         
         # Rule 3: Reject obviously unrealistic patterns
@@ -1018,12 +1018,12 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         import re
         for pattern in ocr_error_patterns:
             if re.match(pattern, plate_upper):
-                print(f"[DEBUG] ❌ Suspicious pattern detected: {plate_text}")
+                print(f"[DEBUG]  Suspicious pattern detected: {plate_text}")
                 return False
         
         # Rule 4: Length should be reasonable (6-12 characters for most plates)
         if not (6 <= len(plate_upper) <= 12):
-            print(f"[DEBUG] ❌ Unreasonable length: {len(plate_upper)} chars in {plate_text}")
+            print(f"[DEBUG]  Unreasonable length: {len(plate_upper)} chars in {plate_text}")
             return False
         
         # Rule 5: Should follow some basic license plate structure
@@ -1040,11 +1040,11 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
         if (re.match(indian_pattern1, plate_upper) or 
             re.match(indian_pattern2, plate_upper) or
             re.match(international_pattern, plate_upper)):
-            print(f"[DEBUG] ✅ Valid license plate pattern: {plate_text}")
+            print(f"[DEBUG]  Valid license plate pattern: {plate_text}")
             return True
         
         # If it doesn't match standard patterns but passes other checks, allow it
-        print(f"[DEBUG] ⚠️ Non-standard but acceptable pattern: {plate_text}")
+        print(f"[DEBUG]  Non-standard but acceptable pattern: {plate_text}")
         return True
         
     except Exception as e:
@@ -1368,7 +1368,7 @@ def format_text_extraction_results(json_result: dict) -> str:
     summary = extraction["summary"]
     
     lines = []
-    lines.append("📝 **Text Extraction Results:**")
+    lines.append(" **Text Extraction Results:**")
     lines.append(f"   Total Objects: {summary['total_objects']}")
     lines.append(f"   Objects with Text: {summary['objects_with_text']}")
     lines.append(f"   License Plates Found: {summary['license_plates_found']}")
@@ -1377,21 +1377,21 @@ def format_text_extraction_results(json_result: dict) -> str:
     
     # Show license plates
     if extraction["license_plates"]:
-        lines.append("🚗 **License Plates:**")
+        lines.append(" **License Plates:**")
         for plate in extraction["license_plates"]:
             lines.append(f"   • {plate['plate_text']} (confidence: {plate['confidence']:.2f})")
         lines.append("")
     
     # Show general text
     if extraction["general_text"]:
-        lines.append("📄 **General Text:**")
+        lines.append(" **General Text:**")
         for text_item in extraction["general_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")
     
     # Show full image text
     if "full_image_text" in extraction and extraction["full_image_text"]:
-        lines.append("🖼️ **Full Image Text:**")
+        lines.append(" **Full Image Text:**")
         for text_item in extraction["full_image_text"]:
             lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
         lines.append("")
@@ -1785,7 +1785,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
     
     summary_lines = []
-    summary_lines.append(f"📊 **Detected {len(boxes)} objects:**")
+    summary_lines.append(f" **Detected {len(boxes)} objects:**")
     summary_lines.append("")
     
     for i in range(len(boxes)):
@@ -1798,7 +1798,7 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
         
         confidence = f"{float(conf[i]):.2f}" if i < len(conf) else "N/A"
         
-        line = f"🔹 **{class_name}** (conf: {confidence})"
+        line = f" **{class_name}** (conf: {confidence})"
         
         # Add color and text info
         try:
@@ -2079,7 +2079,7 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
             h, w = annotated.shape[:2]
             
             # Create a banner at the top for license plate info
-            plate_label = f"🚗 License Plate: {plate_text} (confidence: {confidence:.2f})"
+            plate_label = f" License Plate: {plate_text} (confidence: {confidence:.2f})"
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 0.7
             thickness = 2
@@ -2235,7 +2235,7 @@ def predict_image(
         
         # Also add raw JSON for debugging
         json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
+        summary = f"{summary}\n\n **Raw JSON Data:**\n```json\n{json_output}\n```"
     
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
     return Image.fromarray(annotated_rgb), summary
@@ -3235,9 +3235,9 @@ with gr.Blocks(title="YOLO26 Object Detection") as demo:
     # Display device status
     device = _get_device()
     if device != "cpu":
-        gr.Markdown(f"### 🚀 GPU Acceleration Enabled - Processing on {torch.cuda.get_device_name(0)}")
+        gr.Markdown(f"###  GPU Acceleration Enabled - Processing on {torch.cuda.get_device_name(0)}")
     else:
-        gr.Markdown("### ⚠️ CPU Processing Mode")
+        gr.Markdown("###  CPU Processing Mode")
     
     gr.Markdown("# YOLO26 Object Detection")
 
@@ -3351,7 +3351,7 @@ with gr.Blocks(title="YOLO26 Object Detection") as demo:
                             duration = frames / fps if fps > 0 else 0
                             cap.release()
                             
-                            info = f"✅ Processed: {frames} frames | Size: {width}x{height} | FPS: {fps:.1f} | Duration: {duration:.1f}s"
+                            info = f" Processed: {frames} frames | Size: {width}x{height} | FPS: {fps:.1f} | Duration: {duration:.1f}s"
                             print(f"[INFO] {info}")
                             
                             
@@ -3374,26 +3374,26 @@ with gr.Blocks(title="YOLO26 Object Detection") as demo:
                                     transcoded = _transcode_to_browser_mp4(permanent_path, compatible_path)
                                     if transcoded:
                                         print(f"[DEBUG] Created browser-compatible version: {transcoded}")
-                                        return transcoded, transcoded, "🎉 Processing complete!", info
+                                        return transcoded, transcoded, " Processing complete!", info
 
                                     print("[WARNING] Could not create browser-compatible H.264 mp4; returning original output")
-                                    return permanent_path, permanent_path, "🎉 Processing complete!", info
+                                    return permanent_path, permanent_path, " Processing complete!", info
                                 else:
                                     print("[ERROR] Permanent video file is not accessible")
-                                    return result_path, result_path, "⚠️ Processing complete but display issues", "Video processed but may have display issues"
+                                    return result_path, result_path, " Processing complete but display issues", "Video processed but may have display issues"
                             except Exception as copy_error:
                                 print(f"[ERROR] Failed to copy video: {copy_error}")
-                                return result_path, result_path, "⚠️ Processing complete but copy failed", "Video processed but could not create accessible copy"
+                                return result_path, result_path, " Processing complete but copy failed", "Video processed but could not create accessible copy"
                         else:
                             print("[ERROR] Could not open processed video for verification")
-                            return result_path, result_path, "⚠️ Processing complete but verification failed", "Video processed but could not verify output"
+                            return result_path, result_path, " Processing complete but verification failed", "Video processed but could not verify output"
                     else:
-                        error_msg = f"❌ Processing failed - No output file created. Result path: {result_path}"
+                        error_msg = f" Processing failed - No output file created. Result path: {result_path}"
                         print(error_msg)
                         return None, None, "Processing failed", error_msg
                         
                 except Exception as e:
-                    error_msg = f"❌ Processing failed: {str(e)}"
+                    error_msg = f" Processing failed: {str(e)}"
                     print(f"[ERROR] {error_msg}")
                     import traceback
                     traceback.print_exc()

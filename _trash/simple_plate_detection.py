@@ -194,7 +194,7 @@ class SimpleLicensePlateDetector:
                     best_text = self.select_best_plate_text(texts)
                     if best_text:
                         extracted_texts.append(best_text)
-                        print(f"[DEBUG] ✅ Extracted: {best_text}")
+                        print(f"[DEBUG]  Extracted: {best_text}")
                 
             except Exception as e:
                 print(f"[ERROR] Text extraction from region {i+1} failed: {e}")
@@ -352,7 +352,7 @@ def simple_plate_integration(image_bgr: np.ndarray, existing_results: dict = Non
 
 
 if __name__ == "__main__":
-    print("🚗 Simple Universal License Plate Detection")
+    print(" Simple Universal License Plate Detection")
     print("=" * 50)
     print("Logic:")
     print("1. Koi bhi vehicle ho - car, motorcycle, bike")
@@ -373,15 +373,15 @@ if __name__ == "__main__":
         "MH20EE7602"
     ]
     
-    print("🧪 Testing plate validation:")
+    print(" Testing plate validation:")
     for plate in test_plates:
         is_valid = validate_plate_simple(plate)
-        status = "✅ Valid" if is_valid else "❌ Invalid"
+        status = " Valid" if is_valid else " Invalid"
         print(f"  {plate:<12} → {status}")
     
-    print("\n📖 Usage:")
+    print("\n Usage:")
     print("  plates = extract_license_plates_simple(image)")
     print("  is_valid = validate_plate_simple('ABC123')")
     print("  results = simple_plate_integration(image, existing_results)")
     
-    print("\n✅ Simple logic ready - sab countries mein kaam karega!")
+    print("\n Simple logic ready - sab countries mein kaam karega!")

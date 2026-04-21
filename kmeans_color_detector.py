@@ -295,7 +295,7 @@ class EnhancedColorDetector:
                 enhanced_confidence = confidence
             
             # Create enhanced object description
-            method_indicator = "🧠" if self.enable_resnet else "🎨"
+            method_indicator = "" if self.enable_resnet else ""
             description = f"{display_name} ({color_family} - {color_shade})"
             
             # Determine if it's a significant detection
@@ -383,23 +383,23 @@ class EnhancedColorDetector:
     def _get_display_name(self, class_name: str, category: str) -> str:
         """Get display name with emoji based on class and category"""
         emoji_map = {
-            'Person': '👤',
-            'Vehicle': '🚗',
-            'Animal': '🐾',
-            'Electronics': '📱',
-            'Furniture': '🪑',
-            'Food': '🍎',
-            'Drinkware': '☕',
-            'Tableware': '🍴',
-            'Clothing': '👔',
-            'Personal': '🎒',
-            'Sports': '⚽',
-            'Appliance': '🔌',
-            'Traffic': '🚦',
-            'Object': '📦'
+            'Person': '',
+            'Vehicle': '',
+            'Animal': '',
+            'Electronics': '',
+            'Furniture': '',
+            'Food': '',
+            'Drinkware': '',
+            'Tableware': '',
+            'Clothing': '',
+            'Personal': '',
+            'Sports': '',
+            'Appliance': '',
+            'Traffic': '',
+            'Object': ''
         }
         
-        emoji = emoji_map.get(category, '📌')
+        emoji = emoji_map.get(category, '')
         return f"{emoji} {class_name.title()}"
     
     def _analyze_color_distribution(self, colors: List[Dict]) -> Dict:
@@ -456,17 +456,17 @@ def categorize_object_enhanced(class_name: str, color_result: Dict, confidence: 
 
 
 if __name__ == "__main__":
-    print("🧠🎨 Enhanced K-means + ResNet-18 Color Detector Module")
+    print(" Enhanced K-means + ResNet-18 Color Detector Module")
     print("=" * 60)
     
-    print("🧪 Testing enhanced color detection...")
+    print(" Testing enhanced color detection...")
     
     # Create a test image
     test_image = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
     
     # Test enhanced color detection
     result = detect_colors_enhanced(test_image)
-    print(f"✅ Enhanced color detection test: {result['success']}")
+    print(f" Enhanced color detection test: {result['success']}")
     
     if result['success']:
         primary = result['primary_color']
@@ -475,12 +475,12 @@ if __name__ == "__main__":
         print(f"   ResNet-18 enhanced: {resnet_info.get('enhanced', False)}")
         print(f"   Processing time: {result['processing_info']['processing_time_ms']:.2f}ms")
     
-    print("\n📖 Usage:")
+    print("\n Usage:")
     print("   from kmeans_color_detector import detect_colors_enhanced, categorize_object_enhanced")
     print("   colors = detect_colors_enhanced(image)")
     print("   categorized = categorize_object_enhanced('car', colors, 0.9)")
     
-    print("\n✅ Enhanced K-means + ResNet-18 Color Detector ready!")
+    print("\n Enhanced K-means + ResNet-18 Color Detector ready!")
     print("   Features:")
     print("   - ResNet-18 feature extraction")
     print("   - K-means color clustering")

@@ -150,7 +150,7 @@ class OptimizedVideoProcessor:
             # Final stats
             total_time = time.time() - start_time
             final_fps = processed_count / total_time
-            print(f"[INFO] ✅ FAST processing complete!")
+            print(f"[INFO]  FAST processing complete!")
             print(f"[INFO] Total time: {total_time:.1f}s")
             print(f"[INFO] Processing speed: {final_fps:.1f} FPS")
             print(f"[INFO] Total detections: {total_detections}")
@@ -260,7 +260,7 @@ class OptimizedVideoProcessor:
         - More frame skipping
         - Minimal annotation
         """
-        print("[INFO] 🚀 ULTRA FAST MODE - Quick preview processing")
+        print("[INFO]  ULTRA FAST MODE - Quick preview processing")
         return self.process_video_fast(
             video_path=video_path,
             model=model,
@@ -274,13 +274,13 @@ class OptimizedVideoProcessor:
     def get_performance_tips(self):
         """Get performance optimization tips"""
         tips = [
-            "🚀 Use CUDA GPU for 5-10x speed improvement",
-            "📏 Reduce image size (320px for ultra-fast, 640px for balanced)",
-            "⏭️ Skip frames (process every 2nd or 3rd frame)",
-            "🎯 Increase confidence threshold (0.3-0.4 for fewer detections)",
-            "📦 Use batch processing (4-8 frames per batch on CUDA)",
-            "💾 Use MP4V codec for fastest encoding",
-            "🔧 Close other applications to free GPU memory"
+            " Use CUDA GPU for 5-10x speed improvement",
+            " Reduce image size (320px for ultra-fast, 640px for balanced)",
+            "⏭ Skip frames (process every 2nd or 3rd frame)",
+            " Increase confidence threshold (0.3-0.4 for fewer detections)",
+            " Use batch processing (4-8 frames per batch on CUDA)",
+            " Use MP4V codec for fastest encoding",
+            " Close other applications to free GPU memory"
         ]
         return tips
 
@@ -310,7 +310,7 @@ def process_video_optimized(video_path, model, mode="fast", **kwargs):
 
 
 if __name__ == "__main__":
-    print("⚡ Optimized Video Processor")
+    print(" Optimized Video Processor")
     print("=" * 40)
     
     # Show performance tips
@@ -318,6 +318,6 @@ if __name__ == "__main__":
     for tip in tips:
         print(tip)
     
-    print(f"\n🔧 Device: {optimized_processor.device}")
-    print(f"🧵 Workers: {optimized_processor.num_workers}")
-    print("\n✅ Ready for ultra-fast video processing!")
+    print(f"\n Device: {optimized_processor.device}")
+    print(f" Workers: {optimized_processor.num_workers}")
+    print("\n Ready for ultra-fast video processing!")

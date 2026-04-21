@@ -15,20 +15,20 @@ def process_video_detect_plates(video_path):
     Main function: Detect cars and license plates
     """
     print("=" * 60)
-    print("🚗 WORKING License Plate Detector")
+    print(" WORKING License Plate Detector")
     print("=" * 60)
     
     if not os.path.exists(video_path):
-        print(f"❌ Video not found: {video_path}")
+        print(f" Video not found: {video_path}")
         return None
     
     # Load YOLO
     try:
         from ultralytics import YOLO
         model = YOLO("yolo26n.pt")
-        print("✅ YOLO loaded")
+        print(" YOLO loaded")
     except Exception as e:
-        print(f"❌ YOLO error: {e}")
+        print(f" YOLO error: {e}")
         return None
     
     # Load Tesseract
@@ -36,15 +36,15 @@ def process_video_detect_plates(video_path):
         import pytesseract
         if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        print("✅ Tesseract ready")
+        print(" Tesseract ready")
     except Exception as e:
-        print(f"❌ Tesseract error: {e}")
+        print(f" Tesseract error: {e}")
         return None
     
     # Open video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("❌ Cannot open video")
+        print(" Cannot open video")
         return None
     
     # Video properties
@@ -53,7 +53,7 @@ def process_video_detect_plates(video_path):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📹 Video: {width}x{height} @ {fps:.1f}fps")
+    print(f" Video: {width}x{height} @ {fps:.1f}fps")
     print(f"   Total frames: {total_frames}")
     
     # Output video
@@ -67,7 +67,7 @@ def process_video_detect_plates(video_path):
     cars_total = 0
     plates_list = []
     
-    print("\n🔄 Processing...")
+    print("\n Processing...")
     print("-" * 60)
     
     while True:
@@ -146,7 +146,7 @@ def process_video_detect_plates(video_path):
                                            (cx1+5, cy2+th+10), 
                                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
                                 
-                                print(f"   📋 Frame {frame_count}: {plate_text}")
+                                print(f"    Frame {frame_count}: {plate_text}")
         
         # Frame info at top
         info = f"Frame: {frame_count} | Cars: {cars_total} | Plates: {len(plates_list)}"
@@ -184,16 +184,16 @@ def process_video_detect_plates(video_path):
     
     # Print summary
     print("\n" + "=" * 60)
-    print("✅ PROCESSING COMPLETE!")
+    print(" PROCESSING COMPLETE!")
     print("=" * 60)
-    print(f"📁 Output video: {output_path}")
-    print(f"📁 Results JSON: {json_path}")
-    print(f"🚗 Total cars: {cars_total}")
-    print(f"📋 Total plates: {len(plates_list)}")
-    print(f"🔢 Unique plates: {len(unique_plates)}")
+    print(f" Output video: {output_path}")
+    print(f" Results JSON: {json_path}")
+    print(f" Total cars: {cars_total}")
+    print(f" Total plates: {len(plates_list)}")
+    print(f" Unique plates: {len(unique_plates)}")
     
     if unique_plates:
-        print("\n📋 DETECTED LICENSE PLATES:")
+        print("\n DETECTED LICENSE PLATES:")
         for i, plate in enumerate(sorted(unique_plates), 1):
             print(f"   {i}. {plate}")
     

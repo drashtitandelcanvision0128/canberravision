@@ -49,24 +49,24 @@ def test_imports():
     
     try:
         import gradio as gr
-        logger.info(f"✅ Gradio {gr.__version__} imported successfully")
+        logger.info(f" Gradio {gr.__version__} imported successfully")
     except Exception as e:
-        logger.error(f"❌ Gradio import failed: {e}")
+        logger.error(f" Gradio import failed: {e}")
         return False
     
     try:
         import torch
-        logger.info(f"✅ PyTorch {torch.__version__} imported successfully")
+        logger.info(f" PyTorch {torch.__version__} imported successfully")
         logger.info(f"   CUDA available: {torch.cuda.is_available()}")
     except Exception as e:
-        logger.error(f"❌ PyTorch import failed: {e}")
+        logger.error(f" PyTorch import failed: {e}")
         return False
     
     try:
         import cv2
-        logger.info(f"✅ OpenCV {cv2.__version__} imported successfully")
+        logger.info(f" OpenCV {cv2.__version__} imported successfully")
     except Exception as e:
-        logger.error(f"❌ OpenCV import failed: {e}")
+        logger.error(f" OpenCV import failed: {e}")
         return False
     
     return True
@@ -84,12 +84,12 @@ def test_demo_creation():
         
         # Import demo
         from apps.app import demo
-        logger.info(f"✅ Demo imported: {type(demo)}")
+        logger.info(f" Demo imported: {type(demo)}")
         
         return True
         
     except Exception as e:
-        logger.error(f"❌ Demo creation failed: {e}")
+        logger.error(f" Demo creation failed: {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         return False
 
@@ -105,23 +105,23 @@ def main():
     
     # Test imports
     if not test_imports():
-        logger.error("❌ Import tests failed. Exiting.")
+        logger.error(" Import tests failed. Exiting.")
         sys.exit(1)
     
     # Test demo creation
     if not test_demo_creation():
-        logger.error("❌ Demo creation failed. Exiting.")
+        logger.error(" Demo creation failed. Exiting.")
         sys.exit(1)
     
     # Start the application
-    logger.info("🚀 Starting production application...")
+    logger.info(" Starting production application...")
     
     try:
         # Import and run the app
         from apps.app import demo
         
-        logger.info("✅ Application starting successfully")
-        logger.info("🌐 Server will be available at: http://0.0.0.0:7860")
+        logger.info(" Application starting successfully")
+        logger.info(" Server will be available at: http://0.0.0.0:7860")
         
         print("[DEBUG] Starting Gradio on 0.0.0.0:7860")
         
@@ -138,7 +138,7 @@ def main():
         )
         
     except Exception as e:
-        logger.error(f"❌ Application failed to start: {e}")
+        logger.error(f" Application failed to start: {e}")
         logger.error(f"Full traceback:\n{traceback.format_exc()}")
         sys.exit(1)
 

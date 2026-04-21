@@ -106,12 +106,12 @@ class YOLO26App:
         lines = []
         
         # Header
-        lines.append("🎯 **YOLO26 Detection Results**")
+        lines.append(" **YOLO26 Detection Results**")
         lines.append("")
         
         # Detection Summary
         detection_summary = results.get('detection_summary', {})
-        lines.append(f"📊 **Objects Detected:** {detection_summary.get('total_objects', 0)}")
+        lines.append(f" **Objects Detected:** {detection_summary.get('total_objects', 0)}")
         
         objects_by_class = detection_summary.get('objects_by_class', {})
         if objects_by_class:
@@ -124,7 +124,7 @@ class YOLO26App:
         # Text Summary
         text_summary = results.get('text_summary', {})
         if text_summary:
-            lines.append("📝 **Text Extraction:**")
+            lines.append(" **Text Extraction:**")
             lines.append(f"  • Total text instances: {text_summary.get('total_text_instances', 0)}")
             lines.append(f"  • License plates found: {text_summary.get('license_plates_found', 0)}")
             lines.append(f"  • General text found: {text_summary.get('general_text_found', 0)}")
@@ -141,7 +141,7 @@ class YOLO26App:
         # Color Summary
         color_summary = results.get('color_summary', {})
         if color_summary:
-            lines.append("🎨 **Color Analysis:**")
+            lines.append(" **Color Analysis:**")
             lines.append(f"  • Total colors found: {color_summary.get('total_colors_found', 0)}")
             
             dominant_color = color_summary.get('dominant_color')
@@ -157,7 +157,7 @@ class YOLO26App:
             lines.append("")
         
         # Processing Info
-        lines.append("⚡ **Processing Information:**")
+        lines.append(" **Processing Information:**")
         lines.append(f"  • Processing time: {results.get('processing_time', 0):.2f} seconds")
         
         # Paths
@@ -176,7 +176,7 @@ class YOLO26App:
             theme=gr.themes.Soft()
         ) as interface:
             
-            gr.Markdown(f"# 🚀 {self.config['title']}")
+            gr.Markdown(f"#  {self.config['title']}")
             gr.Markdown("Advanced Object Detection with OCR and Color Analysis")
             
             with gr.Row():
@@ -189,7 +189,7 @@ class YOLO26App:
                     )
                     
                     # Settings section
-                    with gr.Accordion("⚙️ Detection Settings", open=True):
+                    with gr.Accordion(" Detection Settings", open=True):
                         model_dropdown = gr.Dropdown(
                             choices=self.model_choices,
                             value=self.yolo_config['default_model'],
@@ -218,7 +218,7 @@ class YOLO26App:
                             label="Image Size"
                         )
                     
-                    with gr.Accordion("🔧 Advanced Settings", open=False):
+                    with gr.Accordion(" Advanced Settings", open=False):
                         enable_ocr_checkbox = gr.Checkbox(
                             label="Enable Text Extraction (OCR)",
                             value=True
@@ -241,7 +241,7 @@ class YOLO26App:
                     
                     # Process button
                     process_button = gr.Button(
-                        "🚀 Process Image",
+                        " Process Image",
                         variant="primary",
                         size="lg"
                     )
@@ -260,7 +260,7 @@ class YOLO26App:
                     )
             
             # Examples section
-            gr.Markdown("## 📸 Examples")
+            gr.Markdown("##  Examples")
             gr.Examples(
                 examples=[
                     # Add example images here if available
@@ -274,7 +274,7 @@ class YOLO26App:
             # Footer
             gr.Markdown("---")
             gr.Markdown(
-                "💡 **Tips:**"
+                " **Tips:**"
                 "\\n• Use higher confidence for cleaner results"
                 "\\n• Enable OCR for text detection and license plates"
                 "\\n• Enable color analysis for object color information"
@@ -330,7 +330,7 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
         logger.error(traceback.format_exc())
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         print("Please check the logs for more details.")
 
 

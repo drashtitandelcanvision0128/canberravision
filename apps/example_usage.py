@@ -8,18 +8,18 @@ from simple_car_plate_detector import process_video_for_cars_and_plates
 
 def example_1_basic_usage():
     """Example 1: Basic video processing"""
-    print("📖 Example 1: Basic Video Processing")
+    print(" Example 1: Basic Video Processing")
     print("=" * 40)
     
     # Find a video file
     video_files = [f for f in os.listdir('.') if f.lower().endswith('.mp4') and 'compatible' in f]
     
     if not video_files:
-        print("❌ No compatible video files found")
+        print(" No compatible video files found")
         return
     
     video_path = video_files[0]
-    print(f"🎬 Processing video: {video_path}")
+    print(f" Processing video: {video_path}")
     
     # Process the video
     results = process_video_for_cars_and_plates(
@@ -28,35 +28,35 @@ def example_1_basic_usage():
     )
     
     if 'error' in results:
-        print(f"❌ Error: {results['error']}")
+        print(f" Error: {results['error']}")
         return
     
     # Display results
-    print(f"✅ Processing completed!")
-    print(f"📁 Output video: {results['video_info']['output_path']}")
-    print(f"🚗 Cars detected: {results.get('cars_detected', 0)}")
-    print(f"📋 Plates found: {results.get('plates_found', 0)}")
-    print(f"🔢 Unique plates: {len(results.get('unique_plates', []))}")
+    print(f" Processing completed!")
+    print(f" Output video: {results['video_info']['output_path']}")
+    print(f" Cars detected: {results.get('cars_detected', 0)}")
+    print(f" Plates found: {results.get('plates_found', 0)}")
+    print(f" Unique plates: {len(results.get('unique_plates', []))}")
     
     # Show detected plates
     if results.get('unique_plates'):
-        print("\n📋 Detected License Plates:")
+        print("\n Detected License Plates:")
         for i, plate in enumerate(results['unique_plates'], 1):
             print(f"   {i}. {plate}")
 
 def example_2_batch_processing():
     """Example 2: Process multiple videos"""
-    print("\n📖 Example 2: Batch Processing")
+    print("\n Example 2: Batch Processing")
     print("=" * 40)
     
     # Find multiple video files
     video_files = [f for f in os.listdir('.') if f.lower().endswith('.mp4') and 'compatible' in f][:3]
     
     if not video_files:
-        print("❌ No video files found")
+        print(" No video files found")
         return
     
-    print(f"🎬 Processing {len(video_files)} videos...")
+    print(f" Processing {len(video_files)} videos...")
     
     all_results = []
     
@@ -70,9 +70,9 @@ def example_2_batch_processing():
         
         if 'error' not in results:
             all_results.append(results)
-            print(f"   ✅ Cars: {results.get('cars_detected', 0)}, Plates: {results.get('plates_found', 0)}")
+            print(f"    Cars: {results.get('cars_detected', 0)}, Plates: {results.get('plates_found', 0)}")
         else:
-            print(f"   ❌ Error: {results['error']}")
+            print(f"    Error: {results['error']}")
     
     # Summary
     if all_results:
@@ -83,7 +83,7 @@ def example_2_batch_processing():
         for result in all_results:
             all_unique_plates.update(result.get('unique_plates', []))
         
-        print(f"\n📊 Batch Processing Summary:")
+        print(f"\n Batch Processing Summary:")
         print(f"   Videos processed: {len(all_results)}")
         print(f"   Total cars detected: {total_cars}")
         print(f"   Total plates found: {total_plates}")
@@ -91,13 +91,13 @@ def example_2_batch_processing():
 
 def example_3_custom_settings():
     """Example 3: Custom processing settings"""
-    print("\n📖 Example 3: Custom Settings")
+    print("\n Example 3: Custom Settings")
     print("=" * 40)
     
     # This example shows how you would use custom settings
     # when the full infrastructure is available
     
-    print("🔧 Custom settings example (when full system is available):")
+    print(" Custom settings example (when full system is available):")
     print("""
     from car_plate_video_processor import CarPlateVideoProcessor
     
@@ -122,24 +122,24 @@ def example_3_custom_settings():
 
 def example_4_results_analysis():
     """Example 4: Analyze results"""
-    print("\n📖 Example 4: Results Analysis")
+    print("\n Example 4: Results Analysis")
     print("=" * 40)
     
     # Process one video to get results
     video_files = [f for f in os.listdir('.') if f.lower().endswith('.mp4') and 'compatible' in f]
     
     if not video_files:
-        print("❌ No video files found")
+        print(" No video files found")
         return
     
     video_path = video_files[0]
     results = process_video_for_cars_and_plates(video_path, show_realtime=False)
     
     if 'error' in results:
-        print(f"❌ Error: {results['error']}")
+        print(f" Error: {results['error']}")
         return
     
-    print("📊 Results Analysis:")
+    print(" Results Analysis:")
     print(f"   Video file: {video_path}")
     print(f"   Cars detected: {results.get('cars_detected', 0)}")
     print(f"   Plates found: {results.get('plates_found', 0)}")
@@ -148,7 +148,7 @@ def example_4_results_analysis():
     # Analyze plates
     unique_plates = results.get('unique_plates', [])
     if unique_plates:
-        print(f"\n🔢 License Plate Analysis:")
+        print(f"\n License Plate Analysis:")
         print(f"   Total unique plates: {len(unique_plates)}")
         
         # Categorize plates by length
@@ -159,13 +159,13 @@ def example_4_results_analysis():
         print(f"   Long plates (>6 chars): {len(long_plates)}")
         
         # Show sample plates
-        print(f"\n📋 Sample Plates:")
+        print(f"\n Sample Plates:")
         for i, plate in enumerate(unique_plates[:5], 1):
             print(f"   {i}. {plate}")
 
 def main():
     """Run all examples"""
-    print("🚗 Car & License Plate Detection - Usage Examples")
+    print(" Car & License Plate Detection - Usage Examples")
     print("=" * 60)
     
     examples = [
@@ -179,12 +179,12 @@ def main():
         try:
             func()
         except Exception as e:
-            print(f"❌ {name} failed: {e}")
+            print(f" {name} failed: {e}")
     
-    print("\n✅ Examples completed!")
-    print("\n📖 For more information, see CAR_PLATE_DETECTION_GUIDE.md")
-    print("🌐 For web interface, run: python gradio_car_plate_app.py")
-    print("🎮 For interactive demo, run: python demo_car_plate_detection.py")
+    print("\n Examples completed!")
+    print("\n For more information, see CAR_PLATE_DETECTION_GUIDE.md")
+    print(" For web interface, run: python gradio_car_plate_app.py")
+    print(" For interactive demo, run: python demo_car_plate_detection.py")
 
 if __name__ == "__main__":
     main()

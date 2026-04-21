@@ -71,7 +71,7 @@ def detect_and_crop_plates(frame, model):
         
         return plates
     except Exception as e:
-        print(f"⚠️ Detection error: {e}")
+        print(f" Detection error: {e}")
         return []
 
 
@@ -126,26 +126,26 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
         mode: ultra_fast, fast, or balanced
         save_crops: Whether to save cropped plate images
     """
-    print(f"🚀 Video Processing with License Plate Detection")
-    print(f"📹 Input: {video_path}")
-    print(f"🤖 Model: {model_name}")
-    print(f"⚙️ Mode: {mode}")
+    print(f" Video Processing with License Plate Detection")
+    print(f" Input: {video_path}")
+    print(f" Model: {model_name}")
+    print(f" Mode: {mode}")
     
     # Check video exists
     if not os.path.exists(video_path):
-        print(f"❌ Video not found: {video_path}")
+        print(f" Video not found: {video_path}")
         return None
     
     # Load model
     model_path = f"models/{model_name}.pt"
     if not os.path.exists(model_path):
-        print(f"❌ Model not found: {model_path}")
+        print(f" Model not found: {model_path}")
         return None
     
     print(f"⏳ Loading model...")
     model = YOLO(model_path)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"✅ Model loaded on {device}")
+    print(f" Model loaded on {device}")
     
     # Mode settings
     settings = {
@@ -158,7 +158,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
     # Open video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("❌ Cannot open video")
+        print(" Cannot open video")
         return None
     
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -166,7 +166,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📊 Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
+    print(f" Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
     
     # Setup output
     timestamp = int(time.time())
@@ -178,7 +178,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
     if save_crops:
         crops_dir = os.path.join(output_dir, f"plates_{timestamp}")
         os.makedirs(crops_dir, exist_ok=True)
-        print(f"📁 Crops will be saved to: {crops_dir}")
+        print(f" Crops will be saved to: {crops_dir}")
     
     # Video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -192,7 +192,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
     plates_with_text = 0
     unique_plates = set()
     
-    print(f"\n🎬 Starting processing...")
+    print(f"\n Starting processing...")
     
     while True:
         ret, frame = cap.read()
@@ -212,7 +212,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
             fps_proc = actual / elapsed
             pct = (processed / total_frames) * 100
             eta = (total_frames - processed) / (fps_proc * cfg['skip']) / 60
-            print(f"📈 {pct:.1f}% | {fps_proc:.1f} FPS | ETA: {eta:.1f} min | Plates: {plates_found}")
+            print(f" {pct:.1f}% | {fps_proc:.1f} FPS | ETA: {eta:.1f} min | Plates: {plates_found}")
         
         try:
             # Detect plates
@@ -256,7 +256,7 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
             out.write(annotated)
             
         except Exception as e:
-            print(f"⚠️ Error on frame {processed}: {e}")
+            print(f" Error on frame {processed}: {e}")
             out.write(frame)
     
     # Cleanup
@@ -268,21 +268,21 @@ def process_video(video_path, model_name="yolo26n", mode="fast", save_crops=True
     avg_fps = actual / total_time
     
     print(f"\n" + "="*50)
-    print(f"✅ Processing Complete!")
+    print(f" Processing Complete!")
     print(f"="*50)
-    print(f"⏱️  Total Time: {total_time:.1f}s ({total_time/60:.1f} min)")
-    print(f"🚀 Speed: {avg_fps:.1f} FPS")
-    print(f"📊 Frames: {actual}/{total_frames}")
-    print(f"🔍 Plates Detected: {plates_found}")
-    print(f"📝 Plates with Text: {plates_with_text}")
-    print(f"🎯 Unique Plates: {len(unique_plates)}")
+    print(f"  Total Time: {total_time:.1f}s ({total_time/60:.1f} min)")
+    print(f" Speed: {avg_fps:.1f} FPS")
+    print(f" Frames: {actual}/{total_frames}")
+    print(f" Plates Detected: {plates_found}")
+    print(f" Plates with Text: {plates_with_text}")
+    print(f" Unique Plates: {len(unique_plates)}")
     
     if unique_plates:
-        print(f"\n🚗 Detected License Plates:")
+        print(f"\n Detected License Plates:")
         for plate in sorted(unique_plates):
             print(f"   • {plate}")
     
-    print(f"\n💾 Output Files:")
+    print(f"\n Output Files:")
     print(f"   Video: {output_path}")
     if save_crops:
         print(f"   Crops: {crops_dir}")
@@ -313,9 +313,9 @@ def main():
     )
     
     if output:
-        print(f"\n🎉 Success! Video saved to: {output}")
+        print(f"\n Success! Video saved to: {output}")
     else:
-        print(f"\n❌ Processing failed")
+        print(f"\n Processing failed")
         sys.exit(1)
 
 

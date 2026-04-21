@@ -17,12 +17,12 @@ def detect_with_tesseract(video_path, output_path=None):
     """
     
     print("=" * 70)
-    print("🚗 TESSERACT License Plate Detection")
+    print(" TESSERACT License Plate Detection")
     print("=" * 70)
-    print(f"📁 Video: {video_path}")
+    print(f" Video: {video_path}")
     
     if not os.path.exists(video_path):
-        print("❌ Video not found")
+        print(" Video not found")
         return None
     
     # Setup Tesseract
@@ -30,24 +30,24 @@ def detect_with_tesseract(video_path, output_path=None):
         import pytesseract
         if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-        print("✅ Tesseract OCR ready")
+        print(" Tesseract OCR ready")
     except Exception as e:
-        print(f"❌ Tesseract error: {e}")
+        print(f" Tesseract error: {e}")
         return None
     
     # Load YOLO
     try:
         from ultralytics import YOLO
         model = YOLO("yolo26n.pt")
-        print("✅ YOLO model loaded")
+        print(" YOLO model loaded")
     except Exception as e:
-        print(f"❌ YOLO error: {e}")
+        print(f" YOLO error: {e}")
         return None
     
     # Open video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("❌ Cannot open video")
+        print(" Cannot open video")
         return None
     
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -55,7 +55,7 @@ def detect_with_tesseract(video_path, output_path=None):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📹 {width}x{height} @ {fps:.1f}fps, {total_frames} frames")
+    print(f" {width}x{height} @ {fps:.1f}fps, {total_frames} frames")
     
     # Output video
     if output_path is None:
@@ -71,7 +71,7 @@ def detect_with_tesseract(video_path, output_path=None):
     plates_list = []
     unique_plates = set()
     
-    print("\n🔄 Processing...")
+    print("\n Processing...")
     print("-" * 70)
     
     while True:
@@ -149,7 +149,7 @@ def detect_with_tesseract(video_path, output_path=None):
                                          (plate_x2, plate_y2), 
                                          (255, 0, 0), 2)  # Blue plate box
                             
-                            print(f"   📋 Frame {frame_count}: {plate_text}")
+                            print(f"    Frame {frame_count}: {plate_text}")
         
         # Frame info
         info = f"Frame: {frame_count} | Cars: {cars_total} | Plates: {len(unique_plates)}"
@@ -183,16 +183,16 @@ def detect_with_tesseract(video_path, output_path=None):
         json.dump(results_data, f, indent=2, ensure_ascii=False)
     
     print("\n" + "=" * 70)
-    print("✅ PROCESSING COMPLETE!")
+    print(" PROCESSING COMPLETE!")
     print("=" * 70)
-    print(f"📁 Video: {output_path}")
-    print(f"📁 JSON: {json_path}")
-    print(f"🚗 Cars: {cars_total}")
-    print(f"📋 Plates: {len(plates_list)}")
-    print(f"🔢 Unique: {len(unique_plates)}")
+    print(f" Video: {output_path}")
+    print(f" JSON: {json_path}")
+    print(f" Cars: {cars_total}")
+    print(f" Plates: {len(plates_list)}")
+    print(f" Unique: {len(unique_plates)}")
     
     if unique_plates:
-        print("\n📋 DETECTED PLATES:")
+        print("\n DETECTED PLATES:")
         for i, p in enumerate(sorted(unique_plates), 1):
             print(f"   {i}. {p}")
     

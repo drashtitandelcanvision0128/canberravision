@@ -20,7 +20,7 @@ demo = gr.Blocks(
 )
 
 with demo:
-    gr.Markdown("# 🚀 YOLO26 AI Vision - Minimal Test")
+    gr.Markdown("#  YOLO26 AI Vision - Minimal Test")
     gr.Markdown("## If you see this, the basic Gradio interface is working!")
     
     with gr.Tab("Test"):
@@ -54,9 +54,9 @@ try:
         server_port=int(os.environ.get("GRADIO_SERVER_PORT", "7860")),
         prevent_thread_lock=False,
     )
-    print("[MINIMAL_APP] ✅ Server started successfully!")
+    print("[MINIMAL_APP]  Server started successfully!")
 except Exception as e:
-    print(f"[MINIMAL_APP] ❌ Failed to start server: {e}")
+    print(f"[MINIMAL_APP]  Failed to start server: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)

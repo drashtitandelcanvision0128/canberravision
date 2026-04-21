@@ -1,5 +1,4 @@
-gradio==4.32.2
-gradio-client==0.15.1
+gradio==5.25.0
 pydantic==2.10.6
 ultralytics
 pathlib
@@ -14,7 +13,7 @@ protobuf==3.20.2
 opencv-python
 timm
 # Enhanced detection dependencies
-numpy>=2.0.0
+numpy<2.0.0
 pillow
 scipy
 # K-means color detection dependencies
@@ -31,3 +30,6 @@ setuptools==68.0.0
 # LightOnOCR integration (GPU ready when CUDA is available)
 # Additional GPU dependencies can be added when CUDA is properly configured
 # Optional enhanced modules - these are warnings only, core functionality works without them
+# Fast ALPR for license plate recognition
+fast-alpr
+onnxruntime

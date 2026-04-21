@@ -309,14 +309,14 @@ def format_international_plate_for_display(plate_info: Dict) -> str:
     text = plate_info['text']
     country = plate_info['countries'][0]
     
-    formatted = f"🚗 Plate: {text}\n"
-    formatted += f"🌍 Country: {country['country']} ({country['confidence']:.1%} confidence)\n"
-    formatted += f"📝 Format: {country['description']}\n"
-    formatted += f"💡 Examples: {', '.join(country['examples'])}"
+    formatted = f" Plate: {text}\n"
+    formatted += f" Country: {country['country']} ({country['confidence']:.1%} confidence)\n"
+    formatted += f" Format: {country['description']}\n"
+    formatted += f" Examples: {', '.join(country['examples'])}"
     
     if len(plate_info['countries']) > 1:
         other_countries = [c['country'] for c in plate_info['countries'][1:3]]
-        formatted += f"\n🔄 Also possible: {', '.join(other_countries)}"
+        formatted += f"\n Also possible: {', '.join(other_countries)}"
     
     return formatted
 
@@ -330,8 +330,8 @@ if __name__ == "__main__":
     integration = InternationalYOLO26Integration()
     
     if INTERNATIONAL_AVAILABLE:
-        print(f"✅ International system loaded with {len(get_supported_countries())} countries")
-        print(f"📋 Supported countries: {', '.join(get_supported_countries()[:10])}...")
+        print(f" International system loaded with {len(get_supported_countries())} countries")
+        print(f" Supported countries: {', '.join(get_supported_countries()[:10])}...")
         
         # Test validation
         test_plates = [
@@ -339,26 +339,26 @@ if __name__ == "__main__":
             "AB12CDE",    # UK
             "B-AB123",    # Germany
             "1234ABC",    # Australia
-            "京A12345",   # China
+            "A12345",   # China
         ]
         
-        print("\n🧪 Testing plate validation:")
+        print("\n Testing plate validation:")
         for plate in test_plates:
             result = validate_license_plate_international(plate)
             if result['valid']:
                 country = result['most_likely_country']
-                print(f"  ✅ {plate} → {country['country']} ({country['confidence']:.1%})")
+                print(f"   {plate} → {country['country']} ({country['confidence']:.1%})")
             else:
-                print(f"  ❌ {plate} → No match")
+                print(f"   {plate} → No match")
     else:
-        print("❌ International system not available")
+        print(" International system not available")
     
     if ENHANCED_DETECTION_AVAILABLE:
-        print("✅ Enhanced detection for challenging images available")
+        print(" Enhanced detection for challenging images available")
     else:
-        print("❌ Enhanced detection not available")
+        print(" Enhanced detection not available")
     
-    print("\n📖 Usage:")
+    print("\n Usage:")
     print("1. Add to existing results: add_international_support_to_results(image, results)")
     print("2. Validate plate: validate_license_plate_international('ABC123')")
     print("3. Get country info: get_country_information('usa')")

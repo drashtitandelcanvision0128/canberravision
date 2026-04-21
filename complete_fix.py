@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔧 Complete Fix for MockBoxes Error & Display Issues
+ Complete Fix for MockBoxes Error & Display Issues
 ==================================================
 
 This script will fix:
@@ -20,10 +20,10 @@ def fix_all_issues():
     app_file = Path(__file__).parent / "apps" / "app.py"
     
     if not app_file.exists():
-        print(f"❌ File not found: {app_file}")
+        print(f" File not found: {app_file}")
         return False
     
-    print(f"🔧 Fixing all issues in: {app_file}")
+    print(f" Fixing all issues in: {app_file}")
     
     try:
         # Read the file
@@ -71,13 +71,13 @@ def fix_all_issues():
         
         new_text_display = '''# Separate license plates from general text
                             if text_type == 'license_plate':
-                                prefix = "🚗"
+                                prefix = ""
                                 color = (0, 255, 0)  # Green for license plates
                                 # Show license plates at top
                                 y_offset = 30 + plate_count * 25
                                 plate_count += 1
                             else:
-                                prefix = "📝"
+                                prefix = ""
                                 color = (255, 255, 0)  # Yellow for general text
                                 # Show general text at bottom
                                 y_offset = frame.shape[0] - 100 - general_count * 25
@@ -91,15 +91,15 @@ def fix_all_issues():
         with open(app_file, 'w', encoding='utf-8') as f:
             f.write(content)
         
-        print("✅ All issues fixed successfully!")
-        print("🚀 MockBoxes error fixed")
-        print("🎨 Display layout improved")
-        print("📝 Text separation added")
-        print("🔄 Overlapping prevented")
+        print(" All issues fixed successfully!")
+        print(" MockBoxes error fixed")
+        print(" Display layout improved")
+        print(" Text separation added")
+        print(" Overlapping prevented")
         return True
         
     except Exception as e:
-        print(f"❌ Error fixing file: {e}")
+        print(f" Error fixing file: {e}")
         return False
 
 def create_clean_detector():
@@ -107,7 +107,7 @@ def create_clean_detector():
     
     clean_detector_code = '''#!/usr/bin/env python3
 """
-🚗 Clean License Plate Detector - No Errors, Clean Display
+ Clean License Plate Detector - No Errors, Clean Display
 =========================================================
 
 Simple, clean license plate detector with proper display layout.
@@ -217,7 +217,7 @@ class CleanPlateDetector:
             cv2.rectangle(result, (x1, y1), (x2, y2), (0, 255, 0), 3)
             
             # Clean label at top of image
-            text = f"🚗 {plate['text']}"
+            text = f" {plate['text']}"
             label_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
             
             # Background for label at top
@@ -238,21 +238,21 @@ def create_interface():
         result_image, plates = detector.detect_plates(image)
         
         if plates:
-            text = f"🎉 Found {len(plates)} License Plate(s):\\n\\n"
+            text = f" Found {len(plates)} License Plate(s):\\n\\n"
             for i, plate in enumerate(plates):
-                text += f"🚗 Plate {i+1}: {plate['text']}\\n"
+                text += f" Plate {i+1}: {plate['text']}\\n"
         else:
-            text = "❌ No license plates detected\\n\\n💡 Try uploading a clearer image of a license plate"
+            text = " No license plates detected\\n\\n Try uploading a clearer image of a license plate"
         
         return result_image, text
     
     with gr.Blocks(title="Clean Plate Detector") as interface:
-        gr.markdown("# 🚗 Clean License Plate Detector\\n\\nSimple, clean detection with proper display layout")
+        gr.markdown("#  Clean License Plate Detector\\n\\nSimple, clean detection with proper display layout")
         
         with gr.Row():
             with gr.Column():
                 image_input = gr.Image(label="Upload Image", type="pil", height=400)
-                btn = gr.Button("🔍 Detect Plates", variant="primary", size="lg")
+                btn = gr.Button(" Detect Plates", variant="primary", size="lg")
             
             with gr.Column():
                 image_output = gr.Image(label="Results", type="pil", height=400)
@@ -273,29 +273,29 @@ if __name__ == "__main__":
     try:
         with open(clean_file, 'w', encoding='utf-8') as f:
             f.write(clean_detector_code)
-        print(f"✅ Created clean detector: {clean_file}")
+        print(f" Created clean detector: {clean_file}")
         return True
     except Exception as e:
-        print(f"❌ Error creating clean detector: {e}")
+        print(f" Error creating clean detector: {e}")
         return False
 
 if __name__ == "__main__":
-    print("🔧 Starting Complete Fix...")
+    print(" Starting Complete Fix...")
     print("=" * 50)
     
     # Fix main app
     if fix_all_issues():
-        print("✅ Main app fixed!")
+        print(" Main app fixed!")
     else:
-        print("❌ Main app fix failed")
+        print(" Main app fix failed")
     
     # Create clean detector
     if create_clean_detector():
-        print("✅ Clean detector created!")
+        print(" Clean detector created!")
     else:
-        print("❌ Clean detector creation failed")
+        print(" Clean detector creation failed")
     
-    print("\\n🚀 Options:")
+    print("\\n Options:")
     print("1. Fixed main app: python apps/app.py")
     print("2. Clean detector: python apps/clean_plate_detector.py")
     print("3. Simple detector: python apps/simple_working_plate_detector.py")

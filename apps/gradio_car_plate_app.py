@@ -24,7 +24,7 @@ def initialize_processor():
 def process_video_interface(video_file, model_name, confidence_threshold, show_realtime):
     """Process video for Gradio interface"""
     if video_file is None:
-        return None, "❌ Please upload a video file", None
+        return None, " Please upload a video file", None
     
     try:
         # Initialize processor
@@ -47,7 +47,7 @@ def process_video_interface(video_file, model_name, confidence_threshold, show_r
         )
         
         if 'error' in results:
-            return None, f"❌ Processing failed: {results['error']}", None
+            return None, f" Processing failed: {results['error']}", None
         
         # Create summary text
         summary = create_summary_text(results)
@@ -60,7 +60,7 @@ def process_video_interface(video_file, model_name, confidence_threshold, show_r
             return None, summary, results
             
     except Exception as e:
-        error_msg = f"❌ Processing failed: {str(e)}"
+        error_msg = f" Processing failed: {str(e)}"
         print(error_msg)
         return None, error_msg, None
 
@@ -68,22 +68,22 @@ def create_summary_text(results):
     """Create formatted summary text"""
     try:
         summary = f"""
-## 🚗 Car & License Plate Detection Results
+##  Car & License Plate Detection Results
 
-### 📊 Processing Summary
+###  Processing Summary
 - **Processing Time**: {results['video_info']['processing_time']:.1f} seconds
 - **Total Frames**: {results['video_info']['total_frames']}
 - **Processing Speed**: {results['video_info']['fps_processed']:.1f} FPS
 - **Frames with Detections**: {results['detection_summary']['frames_with_detections']}
 
-### 🚗 Vehicle Detection
+###  Vehicle Detection
 - **Total Cars Detected**: {results['detection_summary']['total_cars_detected']}
 
-### 📋 License Plate Results
+###  License Plate Results
 - **Total Plates Found**: {results['detection_summary']['total_plates_found']}
 - **Unique Plates**: {results['detection_summary']['unique_plates_count']}
 
-### 🔢 Detected License Plates
+###  Detected License Plates
 """
         
         if results['detection_summary']['unique_plates']:
@@ -93,13 +93,13 @@ def create_summary_text(results):
             summary += "No license plates detected.\n"
         
         if results['most_common_plates']:
-            summary += "\n### 🏆 Most Common Plates\n"
+            summary += "\n###  Most Common Plates\n"
             for i, (plate, count) in enumerate(results['most_common_plates'][:5], 1):
                 summary += f"{i}. `{plate}` (seen {count} times)\n"
         
         # Add sample frame info
         if results['saved_frames']:
-            summary += f"\n### 📁 Sample Frames\n"
+            summary += f"\n###  Sample Frames\n"
             summary += f"Saved {len(results['saved_frames'])} frames with detections to `detected_frames/` folder.\n"
         
         return summary
@@ -156,28 +156,28 @@ def create_interface():
     
     with gr.Blocks(title="Car & License Plate Detection", theme=gr.themes.Soft(), css=css) as interface:
         gr.Markdown("""
-        # 🚗 Car & License Plate Video Detection System
+        #  Car & License Plate Video Detection System
         
         Upload a video to detect cars and extract license plate numbers in real-time.
         
         **Features:**
-        - 🚗 Real-time car detection
-        - 📋 License plate recognition  
-        - 🌍 International plate support
-        - 🔥 GPU acceleration
-        - 📊 Detailed results export
+        -  Real-time car detection
+        -  License plate recognition  
+        -  International plate support
+        -  GPU acceleration
+        -  Detailed results export
         """)
         
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("## 📤 Upload Video")
+                gr.Markdown("##  Upload Video")
                 video_input = gr.Video(
                     label="Upload Video File",
                     sources=["upload"],
                     type="filepath"
                 )
                 
-                gr.Markdown("## ⚙️ Settings")
+                gr.Markdown("##  Settings")
                 model_dropdown = gr.Dropdown(
                     choices=["yolo26n.pt", "yolo26s.pt", "yolo26m.pt", "yolov8s.pt"],
                     value="yolo26n.pt",
@@ -198,28 +198,28 @@ def create_interface():
                 )
                 
                 process_btn = gr.Button(
-                    "🚀 Process Video",
+                    " Process Video",
                     variant="primary",
                     size="lg"
                 )
                 
             with gr.Column(scale=2):
-                gr.Markdown("## 📊 Results")
+                gr.Markdown("##  Results")
                 
-                with gr.Tab("📹 Output Video"):
+                with gr.Tab(" Output Video"):
                     output_video = gr.Video(
                         label="Processed Video",
                         autoplay=False,
                         show_label=True
                     )
                 
-                with gr.Tab("📋 Detection Summary"):
+                with gr.Tab(" Detection Summary"):
                     summary_output = gr.Markdown(
                         label="Results Summary",
                         value="Upload a video and click 'Process Video' to see results."
                     )
                 
-                with gr.Tab("🖼️ Sample Frames"):
+                with gr.Tab(" Sample Frames"):
                     gallery_output = gr.Gallery(
                         label="Frames with Detections",
                         columns=3,
@@ -227,13 +227,13 @@ def create_interface():
                         show_label=True
                     )
                 
-                with gr.Tab("📁 Download Results"):
+                with gr.Tab(" Download Results"):
                     json_download = gr.File(
                         label="Download JSON Results",
                         visible=False
                     )
                     download_btn = gr.Button(
-                        "📥 Generate Results JSON",
+                        " Generate Results JSON",
                         variant="secondary"
                     )
         
@@ -259,7 +259,7 @@ def create_interface():
         )
         
         # Examples
-        gr.Markdown("## 💡 Usage Examples")
+        gr.Markdown("##  Usage Examples")
         gr.Examples(
             examples=[
                 # Add example videos if available
@@ -269,7 +269,7 @@ def create_interface():
         )
         
         # Instructions
-        with gr.Accordion("📖 Instructions", open=False):
+        with gr.Accordion(" Instructions", open=False):
             gr.Markdown("""
             ### How to Use:
             
@@ -299,14 +299,14 @@ def create_interface():
 
 def main():
     """Launch the Gradio interface"""
-    print("🌐 Starting Car & License Plate Detection Web Interface...")
+    print(" Starting Car & License Plate Detection Web Interface...")
     
     # Initialize processor
     try:
         initialize_processor()
-        print("✅ Processor initialized successfully")
+        print(" Processor initialized successfully")
     except Exception as e:
-        print(f"⚠️ Processor initialization warning: {e}")
+        print(f" Processor initialization warning: {e}")
     
     # Create and launch interface
     interface = create_interface()

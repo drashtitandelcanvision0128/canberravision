@@ -11,10 +11,10 @@ Input (Image / Video / Webcam)
 Frame Extractor
         ↓
 Unified Detection Engine
-   ├── PPE Detection
-   ├── Vehicle Detection
-   ├── Number Plate (ANPR)
-   ├── Parking Detection
+    PPE Detection
+    Vehicle Detection
+    Number Plate (ANPR)
+    Parking Detection
         ↓
 Result Formatter (JSON)
         ↓
@@ -508,7 +508,7 @@ class UnifiedDetectionSystem:
                (p.vehicle_type in ['car', 'truck', 'bus'] and not p.seatbelt)
         ]
         if violations:
-            print(f"  ⚠️  VIOLATIONS: {len(violations)}")
+            print(f"    VIOLATIONS: {len(violations)}")
     
     def _save_frame(self, frame: np.ndarray, result, frame_number: int):
         """Save current frame with detections"""

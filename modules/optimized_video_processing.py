@@ -46,7 +46,7 @@ def predict_video_optimized(
         batch_size: Number of frames to process at once (CUDA only)
     """
     try:
-        print(f"[INFO] 🚀 Starting OPTIMIZED video processing in {mode} mode")
+        print(f"[INFO]  Starting OPTIMIZED video processing in {mode} mode")
         
         # Extract video path
         video_path = _extract_video_path(video_path)
@@ -72,16 +72,16 @@ def predict_video_optimized(
             imgsz = min(imgsz, 320)  # Smaller image size
             skip_frames = max(skip_frames, 2)  # Skip more frames
             batch_size = 8 if device != "cpu" else 1
-            print("[INFO] ⚡ Ultra-fast mode activated")
+            print("[INFO]  Ultra-fast mode activated")
         elif mode == "balanced":
             imgsz = 640  # Standard size
             skip_frames = 1  # Process all frames
             batch_size = 4 if device != "cpu" else 1
-            print("[INFO] ⚖️ Balanced mode activated")
+            print("[INFO]  Balanced mode activated")
         else:  # fast mode
             imgsz = min(imgsz, 640)
             batch_size = 4 if device != "cpu" else 1
-            print("[INFO] 🚀 Fast mode activated")
+            print("[INFO]  Fast mode activated")
 
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -198,7 +198,7 @@ def predict_video_optimized(
         final_fps = actual_frames / total_time if total_time > 0 else 0
         speedup = skip_frames  # Approximate speedup from frame skipping
         
-        print(f"[INFO] ✅ Optimized processing complete!")
+        print(f"[INFO]  Optimized processing complete!")
         print(f"[INFO] Total time: {total_time:.1f}s")
         print(f"[INFO] Processing speed: {final_fps:.1f} FPS")
         print(f"[INFO] Frames processed: {actual_frames}/{processed_frames}")
@@ -310,7 +310,7 @@ def benchmark_video_processing(video_path, model_name="yolo26n"):
     """
     Benchmark different processing modes to find the optimal setting
     """
-    print(f"[INFO] 🏁 Benchmarking video processing modes...")
+    print(f"[INFO]  Benchmarking video processing modes...")
     
     from .utils import get_model, _get_device
     
@@ -357,7 +357,7 @@ def benchmark_video_processing(video_path, model_name="yolo26n"):
             print(f"[ERROR] {mode} mode failed")
             results[mode] = {"error": "Processing failed"}
     
-    print(f"\n[INFO] 🏆 Benchmark Results:")
+    print(f"\n[INFO]  Benchmark Results:")
     for mode, result in results.items():
         if "error" not in result:
             print(f"  {mode}: {result['time']:.1f}s")
@@ -368,16 +368,16 @@ def benchmark_video_processing(video_path, model_name="yolo26n"):
 
 
 if __name__ == "__main__":
-    print("⚡ Optimized Video Processing Module")
+    print(" Optimized Video Processing Module")
     print("=" * 50)
     
     # Show optimization settings
     settings = get_optimization_settings()
     for mode, config in settings.items():
-        print(f"\n🔧 {mode.upper()} Mode:")
+        print(f"\n {mode.upper()} Mode:")
         print(f"   Description: {config['description']}")
         print(f"   Image size: {config['imgsz']}px")
         print(f"   Skip frames: {config['skip_frames']}")
         print(f"   Best for: {', '.join(config['use_cases'])}")
     
-    print(f"\n✅ Ready for optimized video processing!")
+    print(f"\n Ready for optimized video processing!")

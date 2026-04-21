@@ -37,7 +37,7 @@ def get_system_info():
 
 def install_paddleocr_gpu():
     """Install GPU-enabled PaddleOCR"""
-    print("🚀 Installing GPU-enabled PaddleOCR...")
+    print(" Installing GPU-enabled PaddleOCR...")
     
     try:
         # Install paddlepaddle-gpu
@@ -52,16 +52,16 @@ def install_paddleocr_gpu():
             "paddleocr>=3.4.0"
         ])
         
-        print("✅ GPU-enabled PaddleOCR installed successfully!")
+        print(" GPU-enabled PaddleOCR installed successfully!")
         return True
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install GPU PaddleOCR: {e}")
+        print(f" Failed to install GPU PaddleOCR: {e}")
         return False
 
 def install_paddleocr_cpu():
     """Install CPU-only PaddleOCR as fallback"""
-    print("💻 Installing CPU-only PaddleOCR...")
+    print(" Installing CPU-only PaddleOCR...")
     
     try:
         # Uninstall GPU version if exists
@@ -81,16 +81,16 @@ def install_paddleocr_cpu():
             "paddleocr>=3.4.0"
         ])
         
-        print("✅ CPU-only PaddleOCR installed successfully!")
+        print(" CPU-only PaddleOCR installed successfully!")
         return True
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install CPU PaddleOCR: {e}")
+        print(f" Failed to install CPU PaddleOCR: {e}")
         return False
 
 def test_paddleocr():
     """Test PaddleOCR installation"""
-    print("🧪 Testing PaddleOCR installation...")
+    print(" Testing PaddleOCR installation...")
     
     try:
         from paddleocr import PaddleOCR
@@ -108,24 +108,24 @@ def test_paddleocr():
         result = ocr.ocr(test_image, cls=True)
         
         if result and len(result) > 0 and result[0]:
-            print("✅ PaddleOCR test successful!")
+            print(" PaddleOCR test successful!")
             return True
         else:
-            print("⚠️ PaddleOCR installed but test returned empty results")
+            print(" PaddleOCR installed but test returned empty results")
             return False
             
     except Exception as e:
-        print(f"❌ PaddleOCR test failed: {e}")
+        print(f" PaddleOCR test failed: {e}")
         return False
 
 def main():
     """Main setup function"""
-    print("🔧 YOLO26 PaddleOCR GPU Setup")
+    print(" YOLO26 PaddleOCR GPU Setup")
     print("=" * 50)
     
     # Get system information
     info = get_system_info()
-    print(f"📋 System Information:")
+    print(f" System Information:")
     print(f"   Platform: {info['platform']}")
     print(f"   Python: {info['python_version'].split()[0]}")
     print(f"   CUDA Available: {'Yes' if info['cuda_available'] else 'No'}")
@@ -139,36 +139,36 @@ def main():
     
     # Choose installation method
     if info['cuda_available']:
-        print("🎯 CUDA GPU detected - Installing GPU-enabled PaddleOCR")
+        print(" CUDA GPU detected - Installing GPU-enabled PaddleOCR")
         success = install_paddleocr_gpu()
         
         if not success:
-            print("⚠️ GPU installation failed, trying CPU fallback...")
+            print(" GPU installation failed, trying CPU fallback...")
             success = install_paddleocr_cpu()
     else:
-        print("💻 No CUDA GPU detected - Installing CPU-only PaddleOCR")
+        print(" No CUDA GPU detected - Installing CPU-only PaddleOCR")
         success = install_paddleocr_cpu()
     
     if success:
-        print("\n🧪 Testing installation...")
+        print("\n Testing installation...")
         test_success = test_paddleocr()
         
         if test_success:
-            print("\n🎉 Setup completed successfully!")
-            print("\n📖 Next steps:")
+            print("\n Setup completed successfully!")
+            print("\n Next steps:")
             print("   1. Run: python app.py")
             print("   2. Open your browser to the provided URL")
             print("   3. Upload an image to test object detection + text extraction")
             
             if info['cuda_available']:
-                print("   4. 🚀 GPU acceleration is active for maximum speed!")
+                print("   4.  GPU acceleration is active for maximum speed!")
             else:
-                print("   4. 💻 Consider installing CUDA for GPU acceleration")
+                print("   4.  Consider installing CUDA for GPU acceleration")
         else:
-            print("\n⚠️ Installation completed but test failed")
+            print("\n Installation completed but test failed")
             print("   Please check the error messages above")
     else:
-        print("\n❌ Setup failed!")
+        print("\n Setup failed!")
         print("   Please check the error messages and try manually installing:")
         print("   pip install paddlepaddle-gpu==2.6.2 paddleocr>=3.4.0")
 

@@ -13,26 +13,26 @@ def process_video_file(video_path):
     """Process a specific video file"""
     
     print("=" * 70)
-    print("🚗 PROCESSING VIDEO:", video_path)
+    print(" PROCESSING VIDEO:", video_path)
     print("=" * 70)
     
     if not os.path.exists(video_path):
-        print(f"❌ Video not found: {video_path}")
+        print(f" Video not found: {video_path}")
         return None
     
     try:
         # Import app.py with all its dependencies (torch, etc.)
-        print("🔧 Loading detection modules...")
+        print(" Loading detection modules...")
         import app
-        print("✅ Modules loaded successfully")
+        print(" Modules loaded successfully")
         print()
         
         # Check if the function exists
         if not hasattr(app, 'process_video_optimized_fast'):
-            print("❌ Detection function not found")
+            print(" Detection function not found")
             return None
         
-        print("🚀 Starting detection with settings:")
+        print(" Starting detection with settings:")
         print("   • Model: yolo26n")
         print("   • Mode: fast")
         print("   • OCR: ENABLED")
@@ -51,17 +51,17 @@ def process_video_file(video_path):
         )
         
         if not result or len(result) < 3:
-            print("❌ Processing failed - no result")
+            print(" Processing failed - no result")
             return None
         
         output_video, summary, json_data = result
         
         print()
         print("=" * 70)
-        print("✅ PROCESSING COMPLETE!")
+        print(" PROCESSING COMPLETE!")
         print("=" * 70)
-        print(f"📁 Output video: {output_video}")
-        print(f"📊 Summary: {summary}")
+        print(f" Output video: {output_video}")
+        print(f" Summary: {summary}")
         
         # Extract and display plates
         if json_data:
@@ -71,7 +71,7 @@ def process_video_file(video_path):
                 
                 # Get all detected text
                 all_text = data.get('all_detected_text', [])
-                print(f"\n📋 Total text detections: {len(all_text)}")
+                print(f"\n Total text detections: {len(all_text)}")
                 
                 # Filter for license plates
                 plates = []
@@ -87,18 +87,18 @@ def process_video_file(video_path):
                 unique_plates = list(set(plates))
                 
                 if unique_plates:
-                    print(f"\n🔢 FOUND {len(unique_plates)} UNIQUE LICENSE PLATES:")
+                    print(f"\n FOUND {len(unique_plates)} UNIQUE LICENSE PLATES:")
                     print("-" * 70)
                     for i, plate in enumerate(sorted(unique_plates), 1):
                         print(f"   {i}. {plate}")
                     print("-" * 70)
                 else:
-                    print("\n⚠️ No license plates detected")
+                    print("\n No license plates detected")
                     print("   (Try with better quality video or different angle)")
                 
                 # Show sample frames with text
                 if all_text:
-                    print(f"\n📝 Sample detections by frame:")
+                    print(f"\n Sample detections by frame:")
                     frames_with_text = {}
                     for item in all_text[:20]:  # First 20
                         frame = item.get('frame_number', 0)
@@ -112,12 +112,12 @@ def process_video_file(video_path):
                         print(f"   Frame {frame}: {', '.join(texts[:3])}")
                 
             except Exception as e:
-                print(f"⚠️ Error parsing results: {e}")
+                print(f" Error parsing results: {e}")
         
         return result
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         import traceback
         traceback.print_exc()
         return None

@@ -366,7 +366,7 @@ class CarPlateVideoProcessor:
                 if plate:
                     plate['angle'] = angle
                     plates.append(plate)
-                    print(f"[DEBUG] ✅ Found plate at angle {angle}: '{plate['text']}'")
+                    print(f"[DEBUG]  Found plate at angle {angle}: '{plate['text']}'")
                     return plates
             
             # Third attempt: Try perspective correction if plate appears skewed
@@ -445,7 +445,7 @@ class CarPlateVideoProcessor:
                             text = tess_clean
                             confidence = 0.85
                             device = 'Tesseract'
-                            print(f"[DEBUG] ✅ Tesseract found plate: '{text}' (config: {config})")
+                            print(f"[DEBUG]  Tesseract found plate: '{text}' (config: {config})")
                             break
                 
                 if text:
@@ -464,7 +464,7 @@ class CarPlateVideoProcessor:
                         if country:
                             plate_info['country'] = country
                     
-                    print(f"[DEBUG] ✅ License plate detected: '{text}' (method: {method}, angle: {angle_hint})")
+                    print(f"[DEBUG]  License plate detected: '{text}' (method: {method}, angle: {angle_hint})")
                     return plate_info
                     
             except Exception as e:
@@ -502,10 +502,10 @@ class CarPlateVideoProcessor:
                             if country:
                                 plate_info['country'] = country
                         
-                        print(f"[DEBUG] ✅ License plate detected: '{paddle_text}' (method: {method}, angle: {angle_hint})")
+                        print(f"[DEBUG]  License plate detected: '{paddle_text}' (method: {method}, angle: {angle_hint})")
                         return plate_info
                     else:
-                        print(f"[DEBUG] ❌ PaddleOCR text rejected: '{paddle_text}' - not a valid plate format")
+                        print(f"[DEBUG]  PaddleOCR text rejected: '{paddle_text}' - not a valid plate format")
                         
         except Exception as e:
             print(f"[DEBUG] OCR attempt failed: {e}")
@@ -529,7 +529,7 @@ class CarPlateVideoProcessor:
         
         # Relaxed length check (2-12 chars)
         if len(clean_text) < 2 or len(clean_text) > 12:
-            print(f"[DEBUG] ❌ Text length {len(clean_text)} not in range [2, 12]")
+            print(f"[DEBUG]  Text length {len(clean_text)} not in range [2, 12]")
             return False
         
         # Must have at least 1 letter OR 1 number (very relaxed)
@@ -540,15 +540,15 @@ class CarPlateVideoProcessor:
         
         # Accept if has at least one letter AND one number
         if has_letters and has_numbers:
-            print(f"[DEBUG] ✅ Accepted as plate: '{clean_text}'")
+            print(f"[DEBUG]  Accepted as plate: '{clean_text}'")
             return True
         
         # Also accept pure alphanumeric that looks like a plate (e.g., "ABC123")
         if clean_text.isalnum() and len(clean_text) >= 4:
-            print(f"[DEBUG] ✅ Accepted alphanumeric as plate: '{clean_text}'")
+            print(f"[DEBUG]  Accepted alphanumeric as plate: '{clean_text}'")
             return True
         
-        print(f"[DEBUG] ❌ Rejected: '{clean_text}'")
+        print(f"[DEBUG]  Rejected: '{clean_text}'")
         return False
     
     def _rotate_image(self, image: np.ndarray, angle: float) -> np.ndarray:
@@ -991,18 +991,18 @@ def process_video_for_cars_and_plates(video_path: str, model_path: str = "yolo26
     return processor.process_video(video_path, output_path, show_realtime)
 
 if __name__ == "__main__":
-    print("🚗 Car & License Plate Video Processor")
+    print(" Car & License Plate Video Processor")
     print("=" * 50)
     
     # Example usage
     video_path = "input_video.mp4"  # Replace with actual video path
     
-    print("📖 Usage:")
+    print(" Usage:")
     print("   from car_plate_video_processor import process_video_for_cars_and_plates")
     print("   results = process_video_for_cars_and_plates('video.mp4')")
     print("   print(f'Found {len(results[\"unique_plates\"])} unique plates')")
     
-    print("\n✅ Processor ready!")
+    print("\n Processor ready!")
     print("   Features:")
     print("   - Real-time car detection")
     print("   - License plate recognition")

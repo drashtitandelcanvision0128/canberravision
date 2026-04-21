@@ -180,7 +180,7 @@ def predict_image(
                         color_shade = primary_color.get('shade', 'Unknown')
                         
                         # Draw color information
-                        color_label = f"🎨 {color_shade}"
+                        color_label = f" {color_shade}"
                         cv2.putText(annotated_bgr, color_label,
                                    (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
         except Exception as e:
@@ -210,7 +210,7 @@ def predict_image(
         
         # Also add raw JSON for debugging
         json_output = json.dumps(json_text_results, indent=2, ensure_ascii=False)
-        summary = f"{summary}\n\n📋 **Raw JSON Data:**\n```json\n{json_output}\n```"
+        summary = f"{summary}\n\n **Raw JSON Data:**\n```json\n{json_output}\n```"
     
     # Convert back to PIL and save to outputs folder
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
@@ -235,10 +235,10 @@ def _generate_kmeans_color_summary(kmeans_results: Dict) -> str:
     """Generate summary for K-means color analysis results"""
     try:
         if not kmeans_results.get('success'):
-            return "🎨 **K-means Color Analysis:** Failed - " + kmeans_results.get('error', 'Unknown error')
+            return " **K-means Color Analysis:** Failed - " + kmeans_results.get('error', 'Unknown error')
         
         summary_lines = []
-        summary_lines.append("🎨 **Advanced K-means Color Analysis Complete!**")
+        summary_lines.append(" **Advanced K-means Color Analysis Complete!**")
         
         # Scene analysis
         scene_analysis = kmeans_results.get('scene_analysis', {})
@@ -246,20 +246,20 @@ def _generate_kmeans_color_summary(kmeans_results: Dict) -> str:
             global_colors = scene_analysis.get('global_colors', {})
             if global_colors.get('dominant_colors'):
                 primary_color = global_colors['dominant_colors'][0]
-                summary_lines.append(f"🌈 **Primary Scene Color:** {primary_color.get('family', 'Unknown')} - {primary_color.get('shade', 'Unknown')}")
-                summary_lines.append(f"🎯 **Color Confidence:** {primary_color.get('confidence', 0):.2f}")
+                summary_lines.append(f" **Primary Scene Color:** {primary_color.get('family', 'Unknown')} - {primary_color.get('shade', 'Unknown')}")
+                summary_lines.append(f" **Color Confidence:** {primary_color.get('confidence', 0):.2f}")
             
             if scene_analysis.get('dominant_theme'):
-                summary_lines.append(f"🌟 **Scene Theme:** {scene_analysis['dominant_theme']}")
+                summary_lines.append(f" **Scene Theme:** {scene_analysis['dominant_theme']}")
             
             harmony = scene_analysis.get('scene_harmony', {})
             if harmony.get('harmony_type'):
-                summary_lines.append(f"🎭 **Color Harmony:** {harmony['harmony_type']} (Score: {harmony.get('harmony_score', 0):.2f})")
+                summary_lines.append(f" **Color Harmony:** {harmony['harmony_type']} (Score: {harmony.get('harmony_score', 0):.2f})")
         
         # Object colors
         object_colors = kmeans_results.get('object_colors', [])
         if object_colors:
-            summary_lines.append(f"📊 **Objects Analyzed:** {len(object_colors)}")
+            summary_lines.append(f" **Objects Analyzed:** {len(object_colors)}")
             
             # Count color families
             color_families = {}
@@ -273,12 +273,12 @@ def _generate_kmeans_color_summary(kmeans_results: Dict) -> str:
                     color_families[family] += 1
             
             if color_families:
-                summary_lines.append("**🎨 Color Distribution:**")
+                summary_lines.append("** Color Distribution:**")
                 for family, count in sorted(color_families.items(), key=lambda x: x[1], reverse=True):
                     summary_lines.append(f"  • {family}: {count} objects")
         
         summary_lines.append("")
-        summary_lines.append("**🔬 Technical Details:**")
+        summary_lines.append("** Technical Details:**")
         summary_lines.append("  • Algorithm: K-means Clustering (8 clusters)")
         summary_lines.append("  • Color Families: 6 (Red, Blue, Green, Yellow, Purple, Neutral)")
         summary_lines.append("  • Color Shades: 56 total shades")
@@ -288,4 +288,4 @@ def _generate_kmeans_color_summary(kmeans_results: Dict) -> str:
         
     except Exception as e:
         print(f"[ERROR] Failed to generate K-means color summary: {e}")
-        return f"🎨 **K-means Color Analysis:** Summary generation failed - {str(e)}"
+        return f" **K-means Color Analysis:** Summary generation failed - {str(e)}"

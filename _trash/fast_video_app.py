@@ -51,9 +51,9 @@ MODEL_CHOICES = [
 
 # Processing modes
 PROCESSING_MODES = [
-    ("ultra_fast", "⚡ Ultra Fast (Quick Preview)"),
-    ("fast", "🚀 Fast (Recommended)"),
-    ("balanced", "⚖️ Balanced (High Quality)"),
+    ("ultra_fast", " Ultra Fast (Quick Preview)"),
+    ("fast", " Fast (Recommended)"),
+    ("balanced", " Balanced (High Quality)"),
 ]
 
 def process_video_optimized_wrapper(video, conf, iou, model, labels, conf_show, imgsz, mode, skip_frames, batch_size):
@@ -91,17 +91,17 @@ def process_video_optimized_wrapper(video, conf, iou, model, labels, conf_show, 
                 duration = frames / fps if fps > 0 else 0
                 cap.release()
                 
-                info = f"✅ Processed in {mode} mode | {frames} frames | {width}x{height} | {fps:.1f} FPS | {duration:.1f}s"
+                info = f" Processed in {mode} mode | {frames} frames | {width}x{height} | {fps:.1f} FPS | {duration:.1f}s"
                 print(f"[INFO] {info}")
                 
-                return result_path, result_path, "🎉 Processing complete!", info
+                return result_path, result_path, " Processing complete!", info
             else:
-                return result_path, result_path, "⚠️ Processing complete", "Video processed but verification failed"
+                return result_path, result_path, " Processing complete", "Video processed but verification failed"
         else:
-            return None, None, "❌ Processing failed", "No output file created"
+            return None, None, " Processing failed", "No output file created"
             
     except Exception as e:
-        error_msg = f"❌ Processing failed: {str(e)}"
+        error_msg = f" Processing failed: {str(e)}"
         print(f"[ERROR] {error_msg}")
         return None, None, f"Error: {str(e)}", error_msg
 
@@ -113,7 +113,7 @@ def run_benchmark(video, model):
     try:
         results = benchmark_video_processing(video, model)
         
-        output = "## 🏁 Benchmark Results\n\n"
+        output = "##  Benchmark Results\n\n"
         
         for mode, result in results.items():
             if "error" not in result:
@@ -122,15 +122,15 @@ def run_benchmark(video, model):
                 output += f"- Output size: {result['file_size'] / (1024*1024):.1f} MB\n\n"
             else:
                 output += f"### {mode.upper()}\n"
-                output += f"- ❌ Failed to process\n\n"
+                output += f"-  Failed to process\n\n"
         
         # Find fastest mode
         successful_modes = {k: v for k, v in results.items() if "error" not in v}
         if successful_modes:
             fastest_mode = min(successful_modes.keys(), key=lambda k: successful_modes[k]['time'])
-            output += f"🏆 **Fastest mode: {fastest_mode.upper()}** ({successful_modes[fastest_mode]['time']:.1f}s)\n\n"
+            output += f" **Fastest mode: {fastest_mode.upper()}** ({successful_modes[fastest_mode]['time']:.1f}s)\n\n"
         
-        output += "### 💡 Recommendations:\n"
+        output += "###  Recommendations:\n"
         output += "- Use **ultra_fast** for quick previews\n"
         output += "- Use **fast** for normal processing\n"
         output += "- Use **balanced** for high-quality results\n"
@@ -138,17 +138,17 @@ def run_benchmark(video, model):
         return output
         
     except Exception as e:
-        return f"❌ Benchmark failed: {str(e)}"
+        return f" Benchmark failed: {str(e)}"
 
 # Create the Gradio app
 with gr.Blocks(title="YOLO26 Fast Video Processing") as demo:
     # Display device status
     device = _get_device()
     if device != "cpu":
-        gr.Markdown(f"### 🚀 GPU Acceleration Enabled - {torch.cuda.get_device_name(0)}")
+        gr.Markdown(f"###  GPU Acceleration Enabled - {torch.cuda.get_device_name(0)}")
         gr.Markdown("**CUDA optimized for ultra-fast video processing**")
     else:
-        gr.Markdown("### ⚠️ CPU Processing Mode - Consider using a CUDA GPU for better performance")
+        gr.Markdown("###  CPU Processing Mode - Consider using a CUDA GPU for better performance")
     
     gr.Markdown("# YOLO26 Fast Video Processing")
     gr.Markdown("Optimized video processing with CUDA acceleration and performance modes")
@@ -183,7 +183,7 @@ with gr.Blocks(title="YOLO26 Fast Video Processing") as demo:
                     vid_labels = gr.Checkbox(value=True, label="Show Labels")
                     vid_conf_show = gr.Checkbox(value=True, label="Show Confidence")
                     
-                    vid_btn = gr.Button("🚀 Process Video Fast", variant="primary")
+                    vid_btn = gr.Button(" Process Video Fast", variant="primary")
                     
                     # Status
                     vid_progress = gr.Textbox(label="Status", interactive=False, visible=True)
@@ -212,7 +212,7 @@ with gr.Blocks(title="YOLO26 Fast Video Processing") as demo:
                 with gr.Column():
                     bench_input = gr.Video(label="Upload Video for Benchmark")
                     bench_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-                    bench_btn = gr.Button("🏁 Run Benchmark", variant="primary")
+                    bench_btn = gr.Button(" Run Benchmark", variant="primary")
                     
                 with gr.Column():
                     bench_output = gr.Markdown(label="Benchmark Results", value="Upload a video and click 'Run Benchmark'")
@@ -252,17 +252,17 @@ with gr.Blocks(title="YOLO26 Fast Video Processing") as demo:
         # Performance Tips
         with gr.TabItem("Performance Tips"):
             gr.Markdown("""
-            ## 🚀 Performance Optimization Tips
+            ##  Performance Optimization Tips
             
             ### CUDA GPU Acceleration
-            - ✅ Your system has CUDA GPU: **NVIDIA GeForce RTX 4050 Laptop GPU**
-            - ✅ 6.4 GB GPU memory available
+            -  Your system has CUDA GPU: **NVIDIA GeForce RTX 4050 Laptop GPU**
+            -  6.4 GB GPU memory available
             - Processing is **5-10x faster** with CUDA
             
             ### Processing Modes
-            - **⚡ Ultra Fast**: Quick previews, lower quality
-            - **🚀 Fast**: Recommended for most videos
-            - **⚖️ Balanced**: High quality, slower processing
+            - ** Ultra Fast**: Quick previews, lower quality
+            - ** Fast**: Recommended for most videos
+            - ** Balanced**: High quality, slower processing
             
             ### Optimization Settings
             - **Image Size**: 320px for speed, 640px for quality
@@ -291,10 +291,10 @@ if __name__ == "__main__":
     outputs_dir = os.path.join(os.getcwd(), "outputs")
     os.makedirs(outputs_dir, exist_ok=True)
     
-    print("🚀 Starting Fast Video Processing App...")
-    print(f"🔧 Device: {_get_device()}")
+    print(" Starting Fast Video Processing App...")
+    print(f" Device: {_get_device()}")
     if torch.cuda.is_available():
-        print(f"💾 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        print(f" GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
     
     demo.launch(
         ssr_mode=False,

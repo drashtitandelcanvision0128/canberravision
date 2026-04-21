@@ -10,7 +10,7 @@ from car_plate_video_processor import CarPlateVideoProcessor, process_video_for_
 def demo_single_video():
     """Demonstrate processing a single video"""
     
-    print("🚗 Car & License Plate Detection Demo")
+    print(" Car & License Plate Detection Demo")
     print("=" * 40)
     
     # Check for video file
@@ -22,14 +22,14 @@ def demo_single_video():
             video_path = video_files[0]
             print(f"Using found video: {video_path}")
         else:
-            print("❌ No video files found. Please provide a video path.")
+            print(" No video files found. Please provide a video path.")
             return
     
     if not os.path.exists(video_path):
-        print(f"❌ Video file not found: {video_path}")
+        print(f" Video file not found: {video_path}")
         return
     
-    print(f"\n🎬 Processing video: {video_path}")
+    print(f"\n Processing video: {video_path}")
     
     # Process the video
     try:
@@ -41,36 +41,36 @@ def demo_single_video():
         )
         
         if 'error' in results:
-            print(f"❌ Processing failed: {results['error']}")
+            print(f" Processing failed: {results['error']}")
             return
         
         # Display results
-        print("\n✅ Processing completed!")
-        print(f"📁 Output video: {results['video_info']['output_path']}")
-        print(f"⏱️  Processing time: {results['video_info']['processing_time']:.1f} seconds")
-        print(f"🚗 Cars detected: {results['detection_summary']['total_cars_detected']}")
-        print(f"📋 Plates found: {results['detection_summary']['total_plates_found']}")
-        print(f"🔢 Unique plates: {results['detection_summary']['unique_plates_count']}")
+        print("\n Processing completed!")
+        print(f" Output video: {results['video_info']['output_path']}")
+        print(f"  Processing time: {results['video_info']['processing_time']:.1f} seconds")
+        print(f" Cars detected: {results['detection_summary']['total_cars_detected']}")
+        print(f" Plates found: {results['detection_summary']['total_plates_found']}")
+        print(f" Unique plates: {results['detection_summary']['unique_plates_count']}")
         
         # Show unique plates
         if results['detection_summary']['unique_plates']:
-            print("\n📋 Detected License Plates:")
+            print("\n Detected License Plates:")
             for i, plate in enumerate(results['detection_summary']['unique_plates'], 1):
                 print(f"   {i}. {plate}")
         
         # Show most common plates
         if results['most_common_plates']:
-            print("\n🏆 Most Common Plates:")
+            print("\n Most Common Plates:")
             for i, (plate, count) in enumerate(results['most_common_plates'][:5], 1):
                 print(f"   {i}. {plate} (seen {count} times)")
         
         # Ask if user wants to play the output video
-        play = input("\n▶️  Play output video? (y/n): ").strip().lower()
+        play = input("\n  Play output video? (y/n): ").strip().lower()
         if play == 'y':
             play_video(results['video_info']['output_path'])
         
     except Exception as e:
-        print(f"❌ Demo failed: {e}")
+        print(f" Demo failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -79,10 +79,10 @@ def play_video(video_path):
     try:
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            print(f"❌ Cannot open video: {video_path}")
+            print(f" Cannot open video: {video_path}")
             return
         
-        print(f"▶️  Playing: {video_path}")
+        print(f"  Playing: {video_path}")
         print("   Press 'q' to quit")
         
         while True:
@@ -97,14 +97,14 @@ def play_video(video_path):
         
         cap.release()
         cv2.destroyAllWindows()
-        print("⏹️  Video playback ended")
+        print("⏹  Video playback ended")
         
     except Exception as e:
-        print(f"❌ Playback failed: {e}")
+        print(f" Playback failed: {e}")
 
 def demo_webcam_detection():
     """Demonstrate real-time webcam detection"""
-    print("\n📷 Real-time Webcam Detection Demo")
+    print("\n Real-time Webcam Detection Demo")
     print("=" * 40)
     
     try:
@@ -114,10 +114,10 @@ def demo_webcam_detection():
         # Open webcam
         cap = cv2.VideoCapture(0)  # Use default webcam
         if not cap.isOpened():
-            print("❌ Cannot open webcam")
+            print(" Cannot open webcam")
             return
         
-        print("📷 Webcam started. Press 'q' to quit.")
+        print(" Webcam started. Press 'q' to quit.")
         
         frame_count = 0
         while True:
@@ -141,22 +141,22 @@ def demo_webcam_detection():
         
         cap.release()
         cv2.destroyAllWindows()
-        print("⏹️  Webcam detection ended")
+        print("⏹  Webcam detection ended")
         
     except Exception as e:
-        print(f"❌ Webcam demo failed: {e}")
+        print(f" Webcam demo failed: {e}")
 
 def show_usage_examples():
     """Show usage examples"""
-    print("\n📖 Usage Examples:")
+    print("\n Usage Examples:")
     print("=" * 30)
     
-    print("\n1️⃣ Process a video file:")
+    print("\n1⃣ Process a video file:")
     print("   from car_plate_video_processor import process_video_for_cars_and_plates")
     print("   results = process_video_for_cars_and_plates('video.mp4')")
     print("   print(f'Found {len(results[\"unique_plates\"])} unique plates')")
     
-    print("\n2️⃣ Advanced usage with custom settings:")
+    print("\n2⃣ Advanced usage with custom settings:")
     print("   processor = CarPlateVideoProcessor(model_path='yolo26s.pt', use_gpu=True)")
     print("   results = processor.process_video(")
     print("       video_path='input.mp4',")
@@ -165,7 +165,7 @@ def show_usage_examples():
     print("       save_frames=True")
     print("   )")
     
-    print("\n3️⃣ Access specific results:")
+    print("\n3⃣ Access specific results:")
     print("   # All detected plates")
     print("   plates = results['all_plates']")
     print("   ")
@@ -175,17 +175,17 @@ def show_usage_examples():
     print("   # Most common plates")
     print("   common_plates = results['most_common_plates']")
     
-    print("\n4️⃣ Real-time webcam detection:")
+    print("\n4⃣ Real-time webcam detection:")
     print("   processor = CarPlateVideoProcessor()")
     print("   # Then use webcam processing loop...")
 
 def main():
     """Main demo menu"""
-    print("🚗 Car & License Plate Detection System")
+    print(" Car & License Plate Detection System")
     print("=" * 50)
     
     while True:
-        print("\n📋 Demo Menu:")
+        print("\n Demo Menu:")
         print("1. Process Video File")
         print("2. Real-time Webcam Detection")
         print("3. Show Usage Examples")
@@ -200,10 +200,10 @@ def main():
         elif choice == '3':
             show_usage_examples()
         elif choice == '4':
-            print("👋 Goodbye!")
+            print(" Goodbye!")
             break
         else:
-            print("❌ Invalid choice. Please try again.")
+            print(" Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()

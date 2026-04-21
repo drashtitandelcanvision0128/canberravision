@@ -20,7 +20,7 @@ demo = gr.Blocks(
 )
 
 with demo:
-    gr.Markdown("# 🚀 YOLO26 AI Vision - Test Page")
+    gr.Markdown("#  YOLO26 AI Vision - Test Page")
     gr.Markdown("If you see this, the Gradio interface is working!")
     
     with gr.Tab("Test"):
@@ -43,9 +43,9 @@ try:
         "prevent_thread_lock": False,
     }
     print(f"[TEST] Launch config: {launch_config}")
-    print("[TEST] ✅ Demo is ready to launch!")
+    print("[TEST]  Demo is ready to launch!")
 except Exception as e:
-    print(f"[TEST] ❌ Launch config error: {e}")
+    print(f"[TEST]  Launch config error: {e}")
     sys.exit(1)
 
-print("[TEST] ✅ All tests passed! The demo should work in production.")
+print("[TEST]  All tests passed! The demo should work in production.")

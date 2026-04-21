@@ -10,10 +10,10 @@ import numpy as np
 video_files = [f for f in os.listdir('.') if 'compatible' in f.lower() and f.endswith('.mp4')]
 
 if not video_files:
-    print("❌ No compatible videos found")
+    print(" No compatible videos found")
 else:
     video_path = video_files[0]
-    print(f"🎬 Testing with: {video_path}")
+    print(f" Testing with: {video_path}")
     
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -28,12 +28,12 @@ else:
             # Save frame
             frame_file = f"test_frame_{i}.jpg"
             cv2.imwrite(frame_file, frame)
-            print(f"📷 Saved: {frame_file}")
+            print(f" Saved: {frame_file}")
         
         cap.release()
         
         # Now try OCR on saved frames
-        print("\n🔍 Testing OCR on frames...")
+        print("\n Testing OCR on frames...")
         
         try:
             import pytesseract
@@ -57,6 +57,6 @@ else:
                     os.remove(frame_file)
         
         except Exception as e:
-            print(f"❌ OCR failed: {e}")
+            print(f" OCR failed: {e}")
     else:
-        print("❌ Cannot open video")
+        print(" Cannot open video")

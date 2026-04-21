@@ -424,7 +424,7 @@ def get_fallback_status() -> Dict:
 
 
 if __name__ == "__main__":
-    print("🛡️ Fallback Color Detection System")
+    print(" Fallback Color Detection System")
     print("=" * 50)
     
     # Show fallback status
@@ -434,27 +434,27 @@ if __name__ == "__main__":
     print(f"K-means Available: {status['kmeans_available']}")
     print(f"Recommendation: {status['recommended_usage']}")
     
-    print("\n📊 Available Fallback Levels:")
+    print("\n Available Fallback Levels:")
     for i, level in enumerate(status['levels_available'], 1):
         if level:
-            print(f"   Level {i}: ✅ {level}")
+            print(f"   Level {i}:  {level}")
         else:
-            print(f"   Level {i}: ❌ Not Available")
+            print(f"   Level {i}:  Not Available")
     
     # Test fallback system
-    print("\n🧪 Testing fallback system...")
+    print("\n Testing fallback system...")
     test_image = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
     result = detect_colors_fallback(test_image)
     
     if result['success']:
-        print(f"✅ Fallback system working (Level {result['fallback_level']})")
+        print(f" Fallback system working (Level {result['fallback_level']})")
         print(f"   Method: {result['fallback_method']}")
         print(f"   Primary color: {result['primary_color']['family']} - {result['primary_color']['shade']}")
         print(f"   Processing time: {result['processing_time_ms']:.2f}ms")
     else:
-        print("❌ Fallback system failed")
+        print(" Fallback system failed")
     
-    print("\n🛡️ Fallback Color Detection System Ready!")
+    print("\n Fallback Color Detection System Ready!")
     print("   - Always works regardless of dependencies")
     print("   - Automatic level selection")
     print("   - Graceful degradation")

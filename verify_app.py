@@ -21,10 +21,10 @@ try:
     print(f"  Theme: {demo.theme}")
     print(f"  CSS: {'Custom CSS applied' if demo.css else 'No CSS'}")
     
-    print("[TEST] ✅ All tests passed! The application should start correctly.")
+    print("[TEST]  All tests passed! The application should start correctly.")
     
 except Exception as e:
-    print(f"[TEST] ❌ Error: {e}")
+    print(f"[TEST]  Error: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)

@@ -87,7 +87,7 @@ def add_simple_plate_detection(image_bgr, existing_result):
                 }
                 existing_result['text_extraction']['license_plates'].append(plate_info)
                 existing_result['text_extraction']['summary']['license_plates_found'] += 1
-                print(f"[DEBUG] ✅ Simple plate added: {plate_text}")
+                print(f"[DEBUG]  Simple plate added: {plate_text}")
         
         # Simple detection info add karo
         existing_result['simple_plate_detection'] = {
@@ -124,7 +124,7 @@ def example_simple_usage():
     """
     Simple usage examples
     """
-    print("🚗 Simple License Plate Detection Examples")
+    print(" Simple License Plate Detection Examples")
     print("=" * 50)
     
     # Example 1: Direct plate extraction
@@ -166,23 +166,23 @@ def explain_simple_logic():
     Simple logic explanation
     """
     print("""
-🎯 SIMPLE UNIVERSAL LICENSE PLATE DETECTION LOGIC
+ SIMPLE UNIVERSAL LICENSE PLATE DETECTION LOGIC
 ================================================
 
-📝 PROBLEM:
+ PROBLEM:
 - Koi bhi vehicle ho (car, motorcycle, bike)
 - Uske aage jo number plate hai
 - Bas ussi ka text chahiye
 - Sabhi countries mein same logic
 
-💡 SIMPLE SOLUTION:
-1️⃣ REGION DETECTION:
+ SIMPLE SOLUTION:
+1⃣ REGION DETECTION:
    - Edge detection se rectangle shapes dhundo
    - White/light color regions dhundo (most plates are white)
    - Aspect ratio check (2:1 to 6:1)
    - Contrast check (text ke liye achha contrast)
 
-2️⃣ TEXT EXTRACTION:
+2⃣ TEXT EXTRACTION:
    - Multiple OCR attempts:
      • Direct OCR
      • Grayscale OCR  
@@ -190,30 +190,30 @@ def explain_simple_logic():
      • Binary threshold OCR
    - Best result select karo
 
-3️⃣ TEXT VALIDATION:
+3⃣ TEXT VALIDATION:
    - Length: 5-15 characters
    - Characters: Letters + Numbers only
    - Basic pattern matching
 
-🔧 IMPLEMENTATION:
+ IMPLEMENTATION:
 - Single function: extract_license_plates_simple(image)
 - Returns: List of plate texts
 - Works: All countries, all vehicles
 - No complex logic needed
 
-🚀 ADVANTAGES:
-✅ Very simple to understand
-✅ Works on all license plates globally
-✅ No country-specific rules needed
-✅ Fast processing
-✅ Easy to debug and modify
+ ADVANTAGES:
+ Very simple to understand
+ Works on all license plates globally
+ No country-specific rules needed
+ Fast processing
+ Easy to debug and modify
 
-📊 ACCURACY:
+ ACCURACY:
 - 80-90% for clear plates
 - Works on challenging images
 - Fallback for complex systems
 
-🎯 USAGE:
+ USAGE:
 ```python
 # Most simple usage
 plates = extract_license_plates_simple(image)
@@ -227,7 +227,7 @@ for plate in plates:
 results = add_simple_plate_detection(image, existing_results)
 ```
 
-Bas itna hi! Simple aur effective! 🚗✨
+Bas itna hi! Simple aur effective! 
     """)
 
 if __name__ == "__main__":
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     example_simple_usage()
     
     print("\n" + "="*60)
-    print("✅ Simple integration guide ready!")
-    print("📖 Follow the steps above to add to your app.py")
-    print("🚗 Now your system will detect plates from ANY country!")
+    print(" Simple integration guide ready!")
+    print(" Follow the steps above to add to your app.py")
+    print(" Now your system will detect plates from ANY country!")
     print("="*60)

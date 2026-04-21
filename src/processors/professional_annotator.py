@@ -432,11 +432,11 @@ if __name__ == "__main__":
     # Test annotation
     result = professional_annotator.annotate_detections(test_image, detections)
     
-    print(f"✅ Test completed successfully!")
-    print(f"✅ Input shape: {test_image.shape}")
-    print(f"✅ Output shape: {result.shape}")
-    print(f"✅ Processed {len(detections)} detections")
+    print(f" Test completed successfully!")
+    print(f" Input shape: {test_image.shape}")
+    print(f" Output shape: {result.shape}")
+    print(f" Processed {len(detections)} detections")
     
     # Save test result
     cv2.imwrite("test_professional_annotation.jpg", result)
-    print("✅ Test result saved to 'test_professional_annotation.jpg'")
+    print(" Test result saved to 'test_professional_annotation.jpg'")

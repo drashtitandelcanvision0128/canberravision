@@ -201,9 +201,9 @@ def process_video(video_path, output_path=None):
     with open(json_path, 'w') as f:
         json.dump(all_results, f, indent=2)
     
-    print(f"\n✓ Done! Processed {frame_count} frames")
-    print(f"✓ Video saved: {output_path}")
-    print(f"✓ Results saved: {json_path}")
+    print(f"\n Done! Processed {frame_count} frames")
+    print(f" Video saved: {output_path}")
+    print(f" Results saved: {json_path}")
     
     return output_path
 

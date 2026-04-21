@@ -518,12 +518,12 @@ def main():
     
     # Add alert callback
     def on_alert(alert: ParkingAlert):
-        print(f"🚨 ALERT: {alert.severity} - {alert.message}")
+        print(f" ALERT: {alert.severity} - {alert.message}")
         
     # Add update callback
     def on_update(results: Dict[str, ZoneResult]):
         for zone_id, zone_result in results.items():
-            print(f"📊 Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)")
+            print(f" Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)")
             
     dashboard.add_alert_callback(on_alert)
     dashboard.add_update_callback(on_update)
@@ -531,7 +531,7 @@ def main():
     try:
         # Start monitoring
         if dashboard.start_monitoring(camera_configs):
-            print("✅ Monitoring started. Press Ctrl+C to stop...")
+            print(" Monitoring started. Press Ctrl+C to stop...")
             
             # Keep running
             while True:
@@ -539,17 +539,17 @@ def main():
                 
                 # Print system status every 30 seconds
                 status = dashboard.get_system_status()
-                print(f"\n📈 System Status: {status.overall_occupancy_rate:.1f}% occupancy, "
+                print(f"\n System Status: {status.overall_occupancy_rate:.1f}% occupancy, "
                       f"{status.active_zones}/{status.total_zones} zones active, "
                       f"{status.alerts_count} active alerts")
                       
     except KeyboardInterrupt:
-        print("\n🛑 Stopping monitoring...")
+        print("\n Stopping monitoring...")
         dashboard.stop_monitoring()
-        print("✅ Monitoring stopped")
+        print(" Monitoring stopped")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         dashboard.stop_monitoring()
 
 if __name__ == "__main__":

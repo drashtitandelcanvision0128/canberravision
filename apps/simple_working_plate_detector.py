@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-🚗 Simple Working License Plate Detector
+ Simple Working License Plate Detector
 ======================================
 
 A simple, reliable license plate detector that ACTUALLY WORKS!
 No complex dependencies, no errors - just results.
 
 Features:
-- ✅ Simple and reliable
-- ✅ Works with any plate format
-- ✅ No complex dependencies
-- ✅ Fast processing
-- ✅ Guaranteed to detect plates
+-  Simple and reliable
+-  Works with any plate format
+-  No complex dependencies
+-  Fast processing
+-  Guaranteed to detect plates
 """
 
 import gradio as gr
@@ -30,7 +30,7 @@ sys.path.append(str(project_root))
 class SimpleWorkingPlateDetector:
     def __init__(self):
         self.ocr_available = self.check_ocr()
-        print(f"🔍 OCR Available: {'✅' if self.ocr_available else '❌'}")
+        print(f" OCR Available: {'' if self.ocr_available else ''}")
     
     def check_ocr(self):
         """Check if Tesseract is available"""
@@ -328,7 +328,7 @@ class SimpleWorkingPlateDetector:
             text = plate.get('text', 'LICENSE_PLATE')
             method = plate.get('method', 'detected')
             
-            label = f"🚗 {text}"
+            label = f" {text}"
             
             # Draw label background
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
@@ -349,56 +349,56 @@ def create_simple_interface():
     
     def process_image(image):
         if image is None:
-            return None, "❌ Please upload an image"
+            return None, " Please upload an image"
         
-        print("🔍 Starting simple license plate detection...")
+        print(" Starting simple license plate detection...")
         
         # Detect license plates
         result_image, plates = detector.detect_plates_simple(image)
         
-        print(f"📊 Found {len(plates)} license plate(s)")
+        print(f" Found {len(plates)} license plate(s)")
         
         # Format results
         if len(plates) == 0:
-            result_text = """❌ No license plates detected
+            result_text = """ No license plates detected
 
-💡 Try these tips:
+ Try these tips:
 - Make sure the license plate is clearly visible
 - Ensure good lighting on the plate
 - Try different angles if possible
 - Plate should be at least 50x20 pixels
 
-🔧 This detector uses simple methods that work with most images."""
+ This detector uses simple methods that work with most images."""
         else:
-            result_text = f"🎉 SUCCESS! Found {len(plates)} License Plate(s):\n\n"
+            result_text = f" SUCCESS! Found {len(plates)} License Plate(s):\n\n"
             
             for i, plate in enumerate(plates):
-                result_text += f"🚗 Plate {i+1}: {plate['text']}\n"
-                result_text += f"   🔍 Method: {plate['method']}\n"
-                result_text += f"   📍 Position: ({plate['x1']}, {plate['y1']})\n\n"
+                result_text += f" Plate {i+1}: {plate['text']}\n"
+                result_text += f"    Method: {plate['method']}\n"
+                result_text += f"    Position: ({plate['x1']}, {plate['y1']})\n\n"
             
-            result_text += "✅ License plate detection successful!"
+            result_text += " License plate detection successful!"
         
         return result_image, result_text
     
     # Create Gradio interface
     with gr.Blocks(title="Simple Working Plate Detector", theme=gr.themes.Soft()) as interface:
         gr.Markdown("""
-        # 🚗 Simple Working License Plate Detector
+        #  Simple Working License Plate Detector
         
         **Simple, reliable detection that ACTUALLY WORKS!**
         
         **Features:**
-        - ✅ **Simple Methods** - No complex algorithms that fail
-        - 🎯 **Pattern Recognition** - Recognizes IM4U 555, MH14DX9937, etc.
-        - 🔧 **No Dependencies** - Works with basic OpenCV
-        - 📊 **High Success Rate** - Designed to work reliably
-        - 🚀 **Fast Processing** - Quick and efficient
+        -  **Simple Methods** - No complex algorithms that fail
+        -  **Pattern Recognition** - Recognizes IM4U 555, MH14DX9937, etc.
+        -  **No Dependencies** - Works with basic OpenCV
+        -  **High Success Rate** - Designed to work reliably
+        -  **Fast Processing** - Quick and efficient
         """)
         
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 📤 Upload Image")
+                gr.Markdown("###  Upload Image")
                 image_input = gr.Image(
                     label="Upload Image with License Plate",
                     type="pil",
@@ -406,13 +406,13 @@ def create_simple_interface():
                 )
                 
                 process_btn = gr.Button(
-                    "🔍 DETECT LICENSE PLATES",
+                    " DETECT LICENSE PLATES",
                     variant="primary",
                     size="lg"
                 )
                 
                 gr.Markdown("""
-                ### 💡 Why This Works:
+                ###  Why This Works:
                 - **Simple rectangle detection**
                 - **Text region finding**
                 - **Edge detection**
@@ -421,7 +421,7 @@ def create_simple_interface():
                 """)
             
             with gr.Column(scale=1):
-                gr.Markdown("### 🎯 Detection Results")
+                gr.Markdown("###  Detection Results")
                 image_output = gr.Image(
                     label="Detected License Plates",
                     type="pil",
@@ -453,10 +453,10 @@ def create_simple_interface():
 
 def main():
     """Main entry point"""
-    print("🚗 Starting Simple Working License Plate Detector...")
-    print("✅ Simple and reliable detection")
-    print("✅ No complex dependencies")
-    print("✅ Designed to work!")
+    print(" Starting Simple Working License Plate Detector...")
+    print(" Simple and reliable detection")
+    print(" No complex dependencies")
+    print(" Designed to work!")
     
     try:
         # Create and launch interface
@@ -471,7 +471,7 @@ def main():
         )
         
     except Exception as e:
-        print(f"❌ Failed to start application: {e}")
+        print(f" Failed to start application: {e}")
         print("Please check your dependencies and try again.")
 
 if __name__ == "__main__":

@@ -258,18 +258,18 @@ class PPEProcessor:
         
         # Generate comprehensive info text with both helmet and seatbelt information
         info_lines = [
-            f"📹 PPE Detection - Live",
-            f"👥 Persons: {result.total_persons}",
-            f"🪖 Helmets: {result.helmet_detected}",
-            f"🚗 Seatbelts: {result.seatbelt_detected}",
-            f"✅ Compliant: {sum(1 for p in result.persons if p.status == 'compliant')}",
-            f"❌ Violations: {sum(1 for p in result.persons if p.status == 'violation')}",
-            f"⏱️ Processing: {result.processing_time*1000:.1f}ms",
+            f" PPE Detection - Live",
+            f" Persons: {result.total_persons}",
+            f" Helmets: {result.helmet_detected}",
+            f" Seatbelts: {result.seatbelt_detected}",
+            f" Compliant: {sum(1 for p in result.persons if p.status == 'compliant')}",
+            f" Violations: {sum(1 for p in result.persons if p.status == 'violation')}",
+            f" Processing: {result.processing_time*1000:.1f}ms",
         ]
         
         # Add detailed person information with both helmet and seatbelt status
         for person in result.persons:
-            status = "✅" if person.status == 'compliant' else "❌"
+            status = "" if person.status == 'compliant' else ""
             helmet_status = "H" if person.helmet.present else "-"
             belt_status = "S" if person.seatbelt.present else "-"
             vehicle = person.vehicle_type.upper()[:3] if person.vehicle_type != "unknown" else "???"

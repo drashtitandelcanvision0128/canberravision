@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚗 Clean License Plate Detector - No Errors, Clean Display
+ Clean License Plate Detector - No Errors, Clean Display
 =========================================================
 
 Simple, clean license plate detector with proper display layout.
@@ -110,7 +110,7 @@ class CleanPlateDetector:
             cv2.rectangle(result, (x1, y1), (x2, y2), (0, 255, 0), 3)
             
             # Clean label at top of image
-            text = f"🚗 {plate['text']}"
+            text = f" {plate['text']}"
             label_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
             
             # Background for label at top
@@ -131,21 +131,21 @@ def create_interface():
         result_image, plates = detector.detect_plates(image)
         
         if plates:
-            text = f"🎉 Found {len(plates)} License Plate(s):\n\n"
+            text = f" Found {len(plates)} License Plate(s):\n\n"
             for i, plate in enumerate(plates):
-                text += f"🚗 Plate {i+1}: {plate['text']}\n"
+                text += f" Plate {i+1}: {plate['text']}\n"
         else:
-            text = "❌ No license plates detected\n\n💡 Try uploading a clearer image of a license plate"
+            text = " No license plates detected\n\n Try uploading a clearer image of a license plate"
         
         return result_image, text
     
     with gr.Blocks(title="Clean Plate Detector") as interface:
-        gr.markdown("# 🚗 Clean License Plate Detector\n\nSimple, clean detection with proper display layout")
+        gr.markdown("#  Clean License Plate Detector\n\nSimple, clean detection with proper display layout")
         
         with gr.Row():
             with gr.Column():
                 image_input = gr.Image(label="Upload Image", type="pil", height=400)
-                btn = gr.Button("🔍 Detect Plates", variant="primary", size="lg")
+                btn = gr.Button(" Detect Plates", variant="primary", size="lg")
             
             with gr.Column():
                 image_output = gr.Image(label="Results", type="pil", height=400)

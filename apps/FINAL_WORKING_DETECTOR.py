@@ -14,8 +14,8 @@ def detect_cars_and_plates(video_path, output_path=None):
     """
     Detect cars and license plates - Guaranteed to work
     """
-    print("🚗 Guaranteed License Plate Detection")
-    print(f"📁 Video: {video_path}")
+    print(" Guaranteed License Plate Detection")
+    print(f" Video: {video_path}")
     
     # Check video
     if not os.path.exists(video_path):
@@ -30,7 +30,7 @@ def detect_cars_and_plates(video_path, output_path=None):
     try:
         from ultralytics import YOLO
         yolo = YOLO("yolo26n.pt")
-        print("✅ YOLO loaded")
+        print(" YOLO loaded")
     except Exception as e:
         return {'error': f'YOLO failed: {e}'}
     
@@ -40,10 +40,10 @@ def detect_cars_and_plates(video_path, output_path=None):
         if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         tesseract_ready = True
-        print("✅ Tesseract ready")
+        print(" Tesseract ready")
     except:
         tesseract_ready = False
-        print("❌ Tesseract not available")
+        print(" Tesseract not available")
     
     # Open video
     cap = cv2.VideoCapture(video_path)
@@ -55,7 +55,7 @@ def detect_cars_and_plates(video_path, output_path=None):
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📹 {w}x{h} @ {fps:.1f}fps, {total} frames")
+    print(f" {w}x{h} @ {fps:.1f}fps, {total} frames")
     
     # Video writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -67,7 +67,7 @@ def detect_cars_and_plates(video_path, output_path=None):
     plates_found = []
     unique_plates = set()
     
-    print("🔄 Processing video...")
+    print(" Processing video...")
     
     while True:
         ret, frame = cap.read()
@@ -134,7 +134,7 @@ def detect_cars_and_plates(video_path, output_path=None):
                                                (text_x+5, text_y), 
                                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
                                     
-                                    print(f"   📋 Frame {frame_count}: {plate_text}")
+                                    print(f"    Frame {frame_count}: {plate_text}")
         
         # Frame info
         info = f"Frame: {frame_count} | Cars: {cars_found} | Plates: {len(unique_plates)}"
@@ -166,14 +166,14 @@ def detect_cars_and_plates(video_path, output_path=None):
     with open(json_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
     
-    print(f"\n✅ DONE!")
-    print(f"📁 Video: {output_path}")
-    print(f"📁 JSON: {json_file}")
-    print(f"🚗 Cars: {cars_found}")
-    print(f"📋 Unique Plates: {len(unique_plates)}")
+    print(f"\n DONE!")
+    print(f" Video: {output_path}")
+    print(f" JSON: {json_file}")
+    print(f" Cars: {cars_found}")
+    print(f" Unique Plates: {len(unique_plates)}")
     
     if unique_plates:
-        print("\n📋 PLATES DETECTED:")
+        print("\n PLATES DETECTED:")
         for i, p in enumerate(sorted(unique_plates), 1):
             print(f"   {i}. {p}")
     

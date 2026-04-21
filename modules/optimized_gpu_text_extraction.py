@@ -46,7 +46,7 @@ def initialize_gpu_environment():
                     'device_memory': torch.cuda.get_device_properties(0).total_memory / 1e9,
                     'current_device': torch.cuda.current_device()
                 }
-                print(f"[INFO] 🚀 CUDA GPU Detected: {_device_info['device_name']}")
+                print(f"[INFO]  CUDA GPU Detected: {_device_info['device_name']}")
                 print(f"[INFO] GPU Memory: {_device_info['device_memory']:.1f} GB")
                 
                 # Set GPU optimization flags
@@ -58,7 +58,7 @@ def initialize_gpu_environment():
                 
             else:
                 _device_info = {'pytorch_cuda': False}
-                print("[INFO] ⚠️ CUDA not available, using CPU mode")
+                print("[INFO]  CUDA not available, using CPU mode")
         else:
             _gpu_available = False
             print("[WARNING] PyTorch not available for GPU acceleration")

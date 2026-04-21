@@ -16,21 +16,21 @@ def run_command(command, description):
     
     try:
         result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
-        print("✅ SUCCESS!")
+        print(" SUCCESS!")
         if result.stdout:
             print("Output:", result.stdout)
         return True
     except subprocess.CalledProcessError as e:
-        print("❌ FAILED!")
+        print(" FAILED!")
         print("Error:", e.stderr)
         return False
 
 def main():
-    print("🚀 Setting up PaddleOCR with GPU support for RTX 4050")
+    print(" Setting up PaddleOCR with GPU support for RTX 4050")
     
     # Check if we're in a virtual environment
     if sys.prefix == sys.base_prefix:
-        print("⚠️  WARNING: Not in a virtual environment!")
+        print("  WARNING: Not in a virtual environment!")
         print("Please run: python -m venv alpr_env && alpr_env\\Scripts\\activate")
         return False
     
@@ -56,18 +56,18 @@ def main():
     print(f"{'='*50}")
     
     if success_count == len(steps):
-        print("\n🎉 All installations completed successfully!")
+        print("\n All installations completed successfully!")
         print("\nNow let's verify the installation...")
         verify_command = "python -c \"import torch; import paddle; print('PyTorch GPU:', torch.cuda.is_available()); print('Paddle GPU:', paddle.is_compiled_with_cuda())\""
         run_command(verify_command, "Verify GPU support")
         
-        print("\n🧪 Testing PaddleOCR initialization...")
-        test_command = "python -c \"from paddleocr import PaddleOCR; ocr = PaddleOCR(use_gpu=True, version='PP-OCRv5', lang='en'); print('✅ PP-OCRv5 is ready for RTX 4050')\""
+        print("\n Testing PaddleOCR initialization...")
+        test_command = "python -c \"from paddleocr import PaddleOCR; ocr = PaddleOCR(use_gpu=True, version='PP-OCRv5', lang='en'); print(' PP-OCRv5 is ready for RTX 4050')\""
         run_command(test_command, "Test PaddleOCR initialization")
         
         return True
     else:
-        print("\n❌ Some installations failed. Please check the errors above.")
+        print("\n Some installations failed. Please check the errors above.")
         return False
 
 if __name__ == "__main__":

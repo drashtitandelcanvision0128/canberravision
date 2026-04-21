@@ -17,16 +17,16 @@ try:
     # Set Tesseract path for Windows
     if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
         pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-    print("✅ Tesseract initialized")
+    print(" Tesseract initialized")
 except ImportError:
     TESSERACT_AVAILABLE = False
-    print("❌ Tesseract not available")
+    print(" Tesseract not available")
 
 def quick_plate_detection(video_path, output_path=None, show_realtime=True):
     """Quick and effective license plate detection"""
     
-    print("🚗 Quick License Plate Detection")
-    print(f"📁 Input: {video_path}")
+    print(" Quick License Plate Detection")
+    print(f" Input: {video_path}")
     
     if not os.path.exists(video_path):
         return {'error': 'Video not found'}
@@ -39,9 +39,9 @@ def quick_plate_detection(video_path, output_path=None, show_realtime=True):
         # Try to import YOLO
         from ultralytics import YOLO
         model = YOLO("yolo26n.pt")
-        print("✅ YOLO model loaded")
+        print(" YOLO model loaded")
     except ImportError:
-        print("❌ YOLO not available, using fallback")
+        print(" YOLO not available, using fallback")
         return fallback_detection(video_path, output_path, show_realtime)
     
     # Open video
@@ -55,7 +55,7 @@ def quick_plate_detection(video_path, output_path=None, show_realtime=True):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     
-    print(f"📹 Video: {width}x{height} @ {fps:.1f} FPS")
+    print(f" Video: {width}x{height} @ {fps:.1f} FPS")
     
     # Setup output
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -67,7 +67,7 @@ def quick_plate_detection(video_path, output_path=None, show_realtime=True):
     unique_plates = set()
     cars_detected = 0
     
-    print("🔄 Starting detection...")
+    print(" Starting detection...")
     
     while True:
         ret, frame = cap.read()
@@ -116,7 +116,7 @@ def quick_plate_detection(video_path, output_path=None, show_realtime=True):
                                     unique_plates.add(plate_text)
                                     
                                     # Display plate text next to car
-                                    plate_label = f"📋 {plate_text}"
+                                    plate_label = f" {plate_text}"
                                     cv2.putText(annotated_frame, plate_label, 
                                                (int(x1), int(y2) + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
         
@@ -160,13 +160,13 @@ def quick_plate_detection(video_path, output_path=None, show_realtime=True):
         }
     }
     
-    print(f"✅ Processing completed!")
-    print(f"📁 Output: {output_path}")
-    print(f"🚗 Cars: {cars_detected}")
-    print(f"📋 Plates: {len(unique_plates)}")
+    print(f" Processing completed!")
+    print(f" Output: {output_path}")
+    print(f" Cars: {cars_detected}")
+    print(f" Plates: {len(unique_plates)}")
     
     if unique_plates:
-        print("\n📋 Detected Plates:")
+        print("\n Detected Plates:")
         for i, plate in enumerate(unique_plates, 1):
             print(f"   {i}. {plate}")
     
@@ -291,7 +291,7 @@ def is_valid_plate(text):
     
     # Japanese and international patterns
     patterns = [
-        r'^日本\s*\d{1,4}\s*[A-Z0-9]{2,6}$',  # Japanese format
+        r'^\s*\d{1,4}\s*[A-Z0-9]{2,6}$',  # Japanese format
         r'^[A-Z0-9]{3,8}$',                    # Simple alphanumeric
         r'^[A-Z]{2,3}\s*\d{2,4}\s*[A-Z]{0,3}$',  # International
         r'^\d{2,4}\s*[A-Z]{2,3}\s*\d{0,2}$',    # Reverse format
@@ -305,13 +305,13 @@ def is_valid_plate(text):
     # Check for mixed alphanumeric (common in plates)
     has_letters = bool(re.search(r'[A-Z]', text))
     has_numbers = bool(re.search(r'[0-9]', text))
-    has_japanese = bool(re.search(r'[日本]', text))
+    has_japanese = bool(re.search(r'[]', text))
     
     return (has_letters and has_numbers) or has_japanese
 
 def fallback_detection(video_path, output_path, show_realtime):
     """Fallback detection without YOLO"""
-    print("🔄 Using fallback detection (no car detection)")
+    print(" Using fallback detection (no car detection)")
     
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -376,12 +376,12 @@ if __name__ == "__main__":
     video_files = [f for f in os.listdir('.') if f.lower().endswith('.mp4')]
     
     if video_files:
-        print(f"🎬 Testing with: {video_files[0]}")
+        print(f" Testing with: {video_files[0]}")
         results = quick_plate_detection(video_files[0], show_realtime=False)
         
-        print(f"\n📊 Results:")
+        print(f"\n Results:")
         print(f"Cars detected: {results.get('cars_detected', 0)}")
         print(f"Plates found: {results.get('plates_found', 0)}")
         print(f"Unique plates: {results.get('unique_plates', [])}")
     else:
-        print("❌ No video files found")
+        print(" No video files found")

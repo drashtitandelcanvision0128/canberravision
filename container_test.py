@@ -28,10 +28,10 @@ print(f"[SYS] Current Directory: {os.getcwd()}")
 try:
     print("\n[IMPORT] Testing basic imports...")
     import gradio as gr
-    print(f"  ✅ Gradio {gr.__version__} imported")
+    print(f"   Gradio {gr.__version__} imported")
     
     import torch
-    print(f"  ✅ PyTorch {torch.__version__} imported")
+    print(f"   PyTorch {torch.__version__} imported")
     
     print("\n[DEMO] Testing demo creation...")
     
@@ -40,14 +40,14 @@ try:
     
     # Try to import the demo
     from apps.app import demo
-    print(f"  ✅ Demo imported: {type(demo)}")
-    print(f"  ✅ Demo title: {demo.title}")
+    print(f"   Demo imported: {type(demo)}")
+    print(f"   Demo title: {demo.title}")
     
     # Test if demo has the required methods
     if hasattr(demo, 'launch'):
-        print(f"  ✅ Demo has launch method")
+        print(f"   Demo has launch method")
     else:
-        print(f"  ❌ Demo missing launch method")
+        print(f"   Demo missing launch method")
         
     # Test launch configuration (without actually launching)
     print("\n[LAUNCH] Testing launch configuration...")
@@ -66,19 +66,19 @@ try:
         "server_port": server_port,
         "prevent_thread_lock": False,
     }
-    print(f"  ✅ Launch configuration ready")
+    print(f"   Launch configuration ready")
     
     print("\n" + "=" * 60)
-    print("✅ ALL TESTS PASSED - Application should work!")
+    print(" ALL TESTS PASSED - Application should work!")
     print("=" * 60)
     
 except ImportError as e:
-    print(f"\n❌ IMPORT ERROR: {e}")
+    print(f"\n IMPORT ERROR: {e}")
     print("This suggests a missing dependency in the container!")
     sys.exit(1)
     
 except Exception as e:
-    print(f"\n❌ ERROR: {e}")
+    print(f"\n ERROR: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)

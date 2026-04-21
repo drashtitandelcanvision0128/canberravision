@@ -20,34 +20,34 @@ def test_deployment():
     os.environ['GRADIO_SERVER_NAME'] = '0.0.0.0'
     os.environ['GRADIO_SERVER_PORT'] = '7860'
     
-    print("✅ Environment variables set")
+    print(" Environment variables set")
     print(f"   APP_ENV: {os.environ.get('APP_ENV')}")
     print(f"   Server: {os.environ.get('GRADIO_SERVER_NAME')}:{os.environ.get('GRADIO_SERVER_PORT')}")
     
     # Test imports
     try:
         import gradio as gr
-        print(f"✅ Gradio {gr.__version__} imported")
+        print(f" Gradio {gr.__version__} imported")
     except Exception as e:
-        print(f"❌ Gradio import failed: {e}")
+        print(f" Gradio import failed: {e}")
         return False
     
     try:
         from apps.app import demo
-        print("✅ Demo imported successfully")
+        print(" Demo imported successfully")
     except Exception as e:
-        print(f"❌ Demo import failed: {e}")
+        print(f" Demo import failed: {e}")
         return False
     
     # Test API info
     try:
         api_info = demo.get_api_info()
-        print(f"✅ API info generated: {len(api_info)} endpoints")
+        print(f" API info generated: {len(api_info)} endpoints")
     except Exception as e:
-        print(f"❌ API info failed: {e}")
+        print(f" API info failed: {e}")
         return False
     
-    print("\n🚀 All tests passed! Deployment should work correctly.")
+    print("\n All tests passed! Deployment should work correctly.")
     print("\nNext steps:")
     print("1. Push changes to Git")
     print("2. Redeploy on Coolify")

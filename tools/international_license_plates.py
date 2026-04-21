@@ -185,28 +185,28 @@ class InternationalLicensePlateRecognizer:
                 country='Japan',
                 patterns=[
                     r'^[A-Z]{3,4}[ -]?[0-9]{4}$',
-                    r'^[ひらがな]{1,2}[ -]?[0-9]{4}[ -]?[A-Z]{1,2}$',
+                    r'^[]{1,2}[ -]?[0-9]{4}[ -]?[A-Z]{1,2}$',
                     r'^[A-Z]{2}[0-9]{4}$',
                 ],
-                examples=['品川 123 あ', 'ABC-1234', 'AB1234'],
+                examples=[' 123 ', 'ABC-1234', 'AB1234'],
                 description='Japanese Prefectural Plates'
             ),
             'south_korea': CountryPlateFormat(
                 country='South Korea',
                 patterns=[
-                    r'^[0-9]{2}[ -]?[가-힣]{1,2}[ -]?[0-9]{4}$',
-                    r'^[0-9]{3}[ -]?[가-힣]{1,2}[ -]?[0-9]{4}$',
+                    r'^[0-9]{2}[ -]?[-]{1,2}[ -]?[0-9]{4}$',
+                    r'^[0-9]{3}[ -]?[-]{1,2}[ -]?[0-9]{4}$',
                 ],
-                examples=['12가1234', '123서4567'],
+                examples=['121234', '1234567'],
                 description='Korean Regional Plates'
             ),
             'china': CountryPlateFormat(
                 country='China',
                 patterns=[
                     r'^[A-Z]{1}[0-9A-Z]{1}[ -]?[0-9A-Z]{5}$',
-                    r'^[京沪津渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][0-9A-Z]{5}$',
+                    r'^[][A-Z][0-9A-Z]{5}$',
                 ],
-                examples=['京A12345', '沪B123CD', '粤S12345'],
+                examples=['A12345', 'B123CD', 'S12345'],
                 description='Chinese Provincial Plates'
             ),
             'singapore': CountryPlateFormat(
@@ -601,8 +601,8 @@ if __name__ == "__main__":
         "AB12CDE",    # UK
         "B-AB123",    # Germany
         "1234ABC",    # Australia
-        "京A12345",   # China
-        "12가1234",   # South Korea
+        "A12345",   # China
+        "121234",   # South Korea
     ]
     
     print("\nTest Results:")

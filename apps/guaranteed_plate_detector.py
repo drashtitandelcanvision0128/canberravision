@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-🚗 Guaranteed License Plate Detector - Works Every Time!
+ Guaranteed License Plate Detector - Works Every Time!
 ====================================================
 
 Simple, robust license plate detection that WILL detect license plates.
 Focus on practical detection rather than complex algorithms.
 
 Features:
-- ✅ Guaranteed plate detection
-- ✅ Works with any plate format
-- ✅ Multiple detection strategies
-- ✅ Simple and reliable
-- ✅ Color-independent
+-  Guaranteed plate detection
+-  Works with any plate format
+-  Multiple detection strategies
+-  Simple and reliable
+-  Color-independent
 """
 
 import gradio as gr
@@ -30,7 +30,7 @@ sys.path.append(str(project_root))
 class GuaranteedPlateDetector:
     def __init__(self):
         self.ocr_available = self.check_ocr_availability()
-        print(f"🔍 OCR Available: {'✅' if self.ocr_available else '❌'}")
+        print(f" OCR Available: {'' if self.ocr_available else ''}")
         
         # Very lenient license plate patterns - catch everything!
         self.plate_patterns = [
@@ -482,7 +482,7 @@ class GuaranteedPlateDetector:
             confidence = plate.get('plate_confidence', 0)
             method = plate.get('method', 'detected')
             
-            label = f"🚗 {text} ({confidence:.2f})"
+            label = f" {text} ({confidence:.2f})"
             
             # Draw label background
             label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
@@ -503,50 +503,50 @@ def create_guaranteed_interface():
     
     def process_image(image):
         if image is None:
-            return None, "❌ Please upload an image"
+            return None, " Please upload an image"
         
-        print("🔍 Starting guaranteed license plate detection...")
+        print(" Starting guaranteed license plate detection...")
         
         # Detect license plates
         result_image, plates = detector.detect_license_plates_guaranteed(image)
         
-        print(f"📊 Found {len(plates)} license plate candidates")
+        print(f" Found {len(plates)} license plate candidates")
         
         # Format results
         if len(plates) == 0:
-            result_text = "❌ No license plates detected\n\n🔧 Trying alternative detection methods...\n\n💡 If you're still seeing this, the plate might be:\n- Too small or blurry\n- Covered or partially visible\n- At an extreme angle\n- In very poor lighting"
+            result_text = " No license plates detected\n\n Trying alternative detection methods...\n\n If you're still seeing this, the plate might be:\n- Too small or blurry\n- Covered or partially visible\n- At an extreme angle\n- In very poor lighting"
         else:
-            result_text = f"🎯 LICENSE PLATES DETECTED! 🎉\n\n"
+            result_text = f" LICENSE PLATES DETECTED! \n\n"
             result_text += f"Found {len(plates)} license plate(s):\n\n"
             
             for i, plate in enumerate(plates):
-                result_text += f"🚗 Plate {i+1}: {plate['text']}\n"
-                result_text += f"   📊 Confidence: {plate['plate_confidence']:.2f}\n"
-                result_text += f"   🔍 Method: {plate['method']}\n"
-                result_text += f"   📍 Position: ({plate['x1']}, {plate['y1']})\n\n"
+                result_text += f" Plate {i+1}: {plate['text']}\n"
+                result_text += f"    Confidence: {plate['plate_confidence']:.2f}\n"
+                result_text += f"    Method: {plate['method']}\n"
+                result_text += f"    Position: ({plate['x1']}, {plate['y1']})\n\n"
             
-            result_text += "✅ SUCCESS! License plate(s) detected and classified!"
+            result_text += " SUCCESS! License plate(s) detected and classified!"
         
         return result_image, result_text
     
     # Create Gradio interface
     with gr.Blocks(title="Guaranteed License Plate Detector", theme=gr.themes.Soft()) as interface:
         gr.Markdown("""
-        # 🚗 Guaranteed License Plate Detector
+        #  Guaranteed License Plate Detector
         
         **This WILL detect license plates** - Simple, reliable detection that works!
         
         **Features:**
-        - ✅ **Guaranteed Detection** - Multiple detection methods
-        - 🎯 **Pattern Recognition** - Recognizes "IM4U 555", "MH14DX9937", etc.
-        - 🎨 **Color Independent** - Works with any plate color
-        - 🔍 **Aggressive Mode** - Tries harder if initial detection fails
-        - 📊 **High Success Rate** - Designed to succeed where others fail
+        -  **Guaranteed Detection** - Multiple detection methods
+        -  **Pattern Recognition** - Recognizes "IM4U 555", "MH14DX9937", etc.
+        -  **Color Independent** - Works with any plate color
+        -  **Aggressive Mode** - Tries harder if initial detection fails
+        -  **High Success Rate** - Designed to succeed where others fail
         """)
         
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 📤 Upload Image")
+                gr.Markdown("###  Upload Image")
                 image_input = gr.Image(
                     label="Upload Image with License Plate",
                     type="pil",
@@ -554,13 +554,13 @@ def create_guaranteed_interface():
                 )
                 
                 process_btn = gr.Button(
-                    "🔍 DETECT LICENSE PLATES",
+                    " DETECT LICENSE PLATES",
                     variant="primary",
                     size="lg"
                 )
                 
                 gr.Markdown("""
-                ### 💡 Why This Works:
+                ###  Why This Works:
                 - **Multiple detection methods**
                 - **Very lenient pattern matching**
                 - **Aggressive search mode**
@@ -569,7 +569,7 @@ def create_guaranteed_interface():
                 """)
             
             with gr.Column(scale=1):
-                gr.Markdown("### 🎯 Detection Results")
+                gr.Markdown("###  Detection Results")
                 image_output = gr.Image(
                     label="Detected License Plates",
                     type="pil",
@@ -601,10 +601,10 @@ def create_guaranteed_interface():
 
 def main():
     """Main entry point"""
-    print("🚗 Starting Guaranteed License Plate Detector...")
-    print("✅ This WILL detect license plates!")
-    print("✅ Multiple detection methods enabled")
-    print("✅ Aggressive search mode ready")
+    print(" Starting Guaranteed License Plate Detector...")
+    print(" This WILL detect license plates!")
+    print(" Multiple detection methods enabled")
+    print(" Aggressive search mode ready")
     
     try:
         # Create and launch interface
@@ -619,7 +619,7 @@ def main():
         )
         
     except Exception as e:
-        print(f"❌ Failed to start application: {e}")
+        print(f" Failed to start application: {e}")
         print("Please check your dependencies and try again.")
 
 if __name__ == "__main__":

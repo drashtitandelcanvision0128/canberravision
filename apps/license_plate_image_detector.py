@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🚗 License Plate Image Detection & Recognition System
+ License Plate Image Detection & Recognition System
 ==================================================
 
 Specialized application for detecting and reading license plates from uploaded images.
@@ -47,23 +47,23 @@ class LicensePlateImageDetector:
         try:
             # Try to initialize main detector
             self.detector = CarDetector()
-            print("✅ Main detector initialized")
+            print(" Main detector initialized")
         except:
-            print("⚠️ Main detector failed, using fallback")
+            print(" Main detector failed, using fallback")
         
         try:
             # Initialize OCR
             self.ocr_extractor = TextExtractor()
-            print("✅ OCR extractor initialized")
+            print(" OCR extractor initialized")
         except:
-            print("⚠️ OCR extractor failed, using fallback")
+            print(" OCR extractor failed, using fallback")
         
         try:
             # Initialize license plate detector
             self.plate_detector = LicensePlateDetector()
-            print("✅ License plate detector initialized")
+            print(" License plate detector initialized")
         except:
-            print("⚠️ License plate detector failed, using fallback")
+            print(" License plate detector failed, using fallback")
     
     def detect_license_plates_in_image(self, image):
         """
@@ -119,7 +119,7 @@ class LicensePlateImageDetector:
             
         except Exception as e:
             print(f"Error in detection: {e}")
-            return image, "❌ Detection failed: " + str(e)
+            return image, " Detection failed: " + str(e)
     
     def fallback_plate_detection(self, gray_image):
         """
@@ -339,7 +339,7 @@ def create_license_plate_interface():
     
     def process_image(image):
         if image is None:
-            return None, "❌ Please upload an image"
+            return None, " Please upload an image"
         
         # Detect license plates
         processed_image, plate_info = detector.detect_license_plates_in_image(image)
@@ -347,14 +347,14 @@ def create_license_plate_interface():
         # Format results
         if plate_info and isinstance(plate_info, list):
             if len(plate_info) == 0:
-                result_text = "❌ No license plates detected"
+                result_text = " No license plates detected"
             else:
-                result_text = "🎯 License Plates Detected:\n\n"
+                result_text = " License Plates Detected:\n\n"
                 for plate in plate_info:
-                    result_text += f"🚗 Plate {plate['plate_number']}: {plate['text']}\n"
-                    result_text += f"   📊 Confidence: {plate['confidence']:.2f}\n"
-                    result_text += f"   🎨 Color: {plate['color_detected']}\n"
-                    result_text += f"   🔍 Method: {plate['method']}\n\n"
+                    result_text += f" Plate {plate['plate_number']}: {plate['text']}\n"
+                    result_text += f"    Confidence: {plate['confidence']:.2f}\n"
+                    result_text += f"    Color: {plate['color_detected']}\n"
+                    result_text += f"    Method: {plate['method']}\n\n"
         else:
             result_text = str(plate_info)
         
@@ -363,18 +363,18 @@ def create_license_plate_interface():
     # Create Gradio interface
     with gr.Blocks(title="License Plate Detection", theme=gr.themes.Soft()) as interface:
         gr.Markdown("""
-        # 🚗 License Plate Image Detection & Recognition
+        #  License Plate Image Detection & Recognition
         
         Upload an image containing a license plate, and the system will:
-        - 🔍 Detect the license plate automatically
-        - 🎨 Recognize different plate colors (white, yellow, blue, red, etc.)
-        - 📝 Extract the text from the license plate
-        - 📊 Show confidence scores and detection method
+        -  Detect the license plate automatically
+        -  Recognize different plate colors (white, yellow, blue, red, etc.)
+        -  Extract the text from the license plate
+        -  Show confidence scores and detection method
         """)
         
         with gr.Row():
             with gr.Column(scale=1):
-                gr.Markdown("### 📤 Upload Image")
+                gr.Markdown("###  Upload Image")
                 image_input = gr.Image(
                     label="Upload License Plate Image",
                     type="pil",
@@ -382,14 +382,14 @@ def create_license_plate_interface():
                 )
                 
                 process_btn = gr.Button(
-                    "🔍 Detect License Plate",
+                    " Detect License Plate",
                     variant="primary",
                     size="lg"
                 )
                 
                 # Sample images info
                 gr.Markdown("""
-                ### 💡 Tips:
+                ###  Tips:
                 - Upload clear images of license plates
                 - Supported colors: White, Yellow, Blue, Red, Green
                 - Works with various lighting conditions
@@ -397,7 +397,7 @@ def create_license_plate_interface():
                 """)
             
             with gr.Column(scale=1):
-                gr.Markdown("### 🎯 Detection Results")
+                gr.Markdown("###  Detection Results")
                 image_output = gr.Image(
                     label="Processed Image with Detections",
                     type="pil",
@@ -412,7 +412,7 @@ def create_license_plate_interface():
                 )
         
         # Examples
-        gr.Markdown("### 📸 Example Usage")
+        gr.Markdown("###  Example Usage")
         gr.Examples(
             examples=[
                 # Add example paths if you have sample images
@@ -441,7 +441,7 @@ def create_license_plate_interface():
 
 def main():
     """Main entry point"""
-    print("🚗 Starting License Plate Image Detection System...")
+    print(" Starting License Plate Image Detection System...")
     
     try:
         # Create and launch interface
@@ -456,7 +456,7 @@ def main():
         )
         
     except Exception as e:
-        print(f"❌ Failed to start application: {e}")
+        print(f" Failed to start application: {e}")
         print("Please check your dependencies and try again.")
 
 if __name__ == "__main__":

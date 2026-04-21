@@ -184,7 +184,7 @@ def create_modular_gradio_interface():
             )
             
             if 'error' in result:
-                return None, f"❌ Error: {result['error']}"
+                return None, f" Error: {result['error']}"
             
             # Create annotated image
             annotated_image = result.get('output_files', {}).get('detection_image')
@@ -195,7 +195,7 @@ def create_modular_gradio_interface():
             return annotated_image, display_text
             
         except Exception as e:
-            return None, f"❌ Processing failed: {str(e)}"
+            return None, f" Processing failed: {str(e)}"
     
     def process_video_gradio(video, save_output):
         """Gradio video processing function"""
@@ -214,7 +214,7 @@ def create_modular_gradio_interface():
             )
             
             if 'error' in result:
-                return None, f"❌ Error: {result['error']}"
+                return None, f" Error: {result['error']}"
             
             # Get output video path
             output_video = result.get('output_files', {}).get('saved_video')
@@ -225,7 +225,7 @@ def create_modular_gradio_interface():
             return output_video, display_text
             
         except Exception as e:
-            return None, f"❌ Processing failed: {str(e)}"
+            return None, f" Processing failed: {str(e)}"
     
     def process_webcam_gradio(camera_index, duration):
         """Gradio webcam processing function"""
@@ -236,7 +236,7 @@ def create_modular_gradio_interface():
             )
             
             if 'error' in result:
-                return None, f"❌ Error: {result['error']}"
+                return None, f" Error: {result['error']}"
             
             # Format results
             display_text = format_webcam_results_for_display(result)
@@ -249,7 +249,7 @@ def create_modular_gradio_interface():
             return sample_frame, display_text
             
         except Exception as e:
-            return None, f"❌ Processing failed: {str(e)}"
+            return None, f" Processing failed: {str(e)}"
     
     return {
         'image_fn': process_image_gradio,
@@ -265,14 +265,14 @@ def format_results_for_display(result):
     """Format image processing results for display"""
     try:
         if 'error' in result:
-            return f"❌ Error: {result['error']}"
+            return f" Error: {result['error']}"
         
-        display_text = "🚗 YOLO26 Detection Results\n"
+        display_text = " YOLO26 Detection Results\n"
         display_text += "=" * 30 + "\n\n"
         
         # Image info
         image_info = result.get('image_info', {})
-        display_text += f"📷 Image Info:\n"
+        display_text += f" Image Info:\n"
         display_text += f"   Size: {image_info.get('shape', 'Unknown')}\n"
         display_text += f"   Processed: {image_info.get('timestamp', 'Unknown')}\n\n"
         
@@ -281,7 +281,7 @@ def format_results_for_display(result):
         
         # License plates
         plates = detections.get('license_plates', [])
-        display_text += f"🔢 License Plates ({len(plates)} found):\n"
+        display_text += f" License Plates ({len(plates)} found):\n"
         for i, plate in enumerate(plates[:5]):  # Show first 5
             display_text += f"   {i+1}. {plate.get('plate_text', 'Unknown')} "
             display_text += f"({plate.get('confidence', 0):.2f})\n"
@@ -291,7 +291,7 @@ def format_results_for_display(result):
         
         # Objects
         objects = detections.get('objects', [])
-        display_text += f"\n🚗 Objects ({len(objects)} found):\n"
+        display_text += f"\n Objects ({len(objects)} found):\n"
         object_counts = {}
         for obj in objects:
             class_name = obj.get('class_name', 'Unknown')
@@ -304,7 +304,7 @@ def format_results_for_display(result):
         if 'international_plates' in result:
             intl_plates = result['international_plates'].get('plates', [])
             if intl_plates:
-                display_text += f"\n🌍 International Recognition:\n"
+                display_text += f"\n International Recognition:\n"
                 for plate in intl_plates[:3]:  # Show first 3
                     countries = plate.get('countries', [])
                     if countries:
@@ -314,7 +314,7 @@ def format_results_for_display(result):
         
         # Processing info
         proc_info = result.get('processing_info', {})
-        display_text += f"\n⚙️ Processing Info:\n"
+        display_text += f"\n Processing Info:\n"
         display_text += f"   Time: {proc_info.get('processing_time', 0):.2f}s\n"
         display_text += f"   Methods: {', '.join(proc_info.get('method_used', []))}\n"
         
@@ -322,33 +322,33 @@ def format_results_for_display(result):
         output_files = result.get('output_files', {})
         saved_frames = output_files.get('saved_frames', [])
         if saved_frames:
-            display_text += f"\n💾 Saved Files:\n"
+            display_text += f"\n Saved Files:\n"
             display_text += f"   Frames: {len(saved_frames)} snapshots saved\n"
         
         return display_text
         
     except Exception as e:
-        return f"❌ Error formatting results: {str(e)}"
+        return f" Error formatting results: {str(e)}"
 
 def format_video_results_for_display(result):
     """Format video processing results for display"""
     try:
         if 'error' in result:
-            return f"❌ Error: {result['error']}"
+            return f" Error: {result['error']}"
         
-        display_text = "📹 YOLO26 Video Processing Results\n"
+        display_text = " YOLO26 Video Processing Results\n"
         display_text += "=" * 35 + "\n\n"
         
         # Video info
         video_info = result.get('video_info', {})
-        display_text += f"📹 Video Info:\n"
+        display_text += f" Video Info:\n"
         display_text += f"   Resolution: {video_info.get('width', 0)}x{video_info.get('height', 0)}\n"
         display_text += f"   Duration: {video_info.get('duration', 0):.1f}s\n"
         display_text += f"   Total Frames: {video_info.get('frame_count', 0)}\n\n"
         
         # Processing summary
         proc_info = result.get('processing_info', {})
-        display_text += f"⚙️ Processing Summary:\n"
+        display_text += f" Processing Summary:\n"
         display_text += f"   Frames Processed: {proc_info.get('processed_frames', 0)}\n"
         display_text += f"   Frames with Detections: {proc_info.get('frames_with_detections', 0)}\n"
         display_text += f"   Processing Time: {proc_info.get('processing_time', 0):.1f}s\n"
@@ -357,7 +357,7 @@ def format_video_results_for_display(result):
         # License plates summary
         plate_summary = result.get('detections', {}).get('summary', {})
         unique_plates = plate_summary.get('unique_plates', [])
-        display_text += f"🔢 License Plates Summary:\n"
+        display_text += f" License Plates Summary:\n"
         display_text += f"   Total Detections: {plate_summary.get('total_license_plates', 0)}\n"
         display_text += f"   Unique Plates: {len(unique_plates)}\n"
         
@@ -368,50 +368,50 @@ def format_video_results_for_display(result):
         
         # Output files
         output_files = result.get('output_files', {})
-        display_text += f"\n💾 Output Files:\n"
+        display_text += f"\n Output Files:\n"
         
         saved_video = output_files.get('saved_video')
         if saved_video:
-            display_text += f"   📹 Processed Video: {saved_video}\n"
+            display_text += f"    Processed Video: {saved_video}\n"
         
         saved_frames = output_files.get('saved_frames', [])
         if saved_frames:
-            display_text += f"   🖼️  Detection Frames: {len(saved_frames)} saved\n"
+            display_text += f"     Detection Frames: {len(saved_frames)} saved\n"
         
         # Output info
         output_info = result.get('output_info', {})
         if output_info:
-            display_text += f"\n📊 Output Directory Info:\n"
+            display_text += f"\n Output Directory Info:\n"
             display_text += f"   Total Files: {output_info.get('total_files', 0)}\n"
             display_text += f"   Total Size: {output_info.get('total_size_mb', 0):.1f} MB\n"
         
         return display_text
         
     except Exception as e:
-        return f"❌ Error formatting video results: {str(e)}"
+        return f" Error formatting video results: {str(e)}"
 
 def format_webcam_results_for_display(result):
     """Format webcam processing results for display"""
     try:
         if 'error' in result:
-            return f"❌ Error: {result['error']}"
+            return f" Error: {result['error']}"
         
-        display_text = "📷 YOLO26 Webcam Processing Results\n"
+        display_text = " YOLO26 Webcam Processing Results\n"
         display_text += "=" * 35 + "\n\n"
         
         # Session info
-        display_text += f"📷 Session Info:\n"
+        display_text += f" Session Info:\n"
         display_text += f"   Frames Processed: {result.get('frames_processed', 0)}\n"
         
         # Processing stats
         stats = result.get('processing_stats', {})
-        display_text += f"\n⚙️ Performance Stats:\n"
+        display_text += f"\n Performance Stats:\n"
         display_text += f"   Current FPS: {stats.get('current_fps', 0):.1f}\n"
         display_text += f"   Runtime: {stats.get('runtime_seconds', 0):.1f}s\n"
         display_text += f"   Avg Processing Time: {stats.get('avg_processing_time_ms', 0):.1f}ms\n"
         
         # Detection results
-        display_text += f"\n🔢 Detection Results:\n"
+        display_text += f"\n Detection Results:\n"
         display_text += f"   Unique Plates Found: {stats.get('unique_plates_count', 0)}\n"
         
         unique_plates = stats.get('unique_plates_found', [])
@@ -423,7 +423,7 @@ def format_webcam_results_for_display(result):
         # Camera info
         start_result = result.get('start_result', {})
         if start_result:
-            display_text += f"\n📹 Camera Info:\n"
+            display_text += f"\n Camera Info:\n"
             display_text += f"   Camera Index: {start_result.get('camera_index', 'Unknown')}\n"
             display_text += f"   Resolution: {start_result.get('resolution', 'Unknown')}\n"
             display_text += f"   FPS: {start_result.get('fps', 'Unknown')}\n"
@@ -431,7 +431,7 @@ def format_webcam_results_for_display(result):
         return display_text
         
     except Exception as e:
-        return f"❌ Error formatting webcam results: {str(e)}"
+        return f" Error formatting webcam results: {str(e)}"
 
 # ================================================================
 # CLEANUP AND MAINTENANCE
@@ -471,29 +471,29 @@ def setup_modular_system():
 # ================================================================
 
 if __name__ == "__main__":
-    print("🔧 Modular App Integration Guide")
+    print(" Modular App Integration Guide")
     print("=" * 40)
     
-    print("📋 Integration Steps:")
+    print(" Integration Steps:")
     print("1. Add imports to your app.py")
     print("2. Replace processing functions with modular versions")
     print("3. Update Gradio interface functions")
     print("4. Call setup_modular_system() when app starts")
     
-    print("\n🎯 Benefits:")
-    print("✅ Clean, modular code structure")
-    print("✅ Separate files for each media type")
-    print("✅ Easy maintenance and debugging")
-    print("✅ Reusable components")
-    print("✅ Better error handling")
-    print("✅ Performance optimization")
+    print("\n Benefits:")
+    print(" Clean, modular code structure")
+    print(" Separate files for each media type")
+    print(" Easy maintenance and debugging")
+    print(" Reusable components")
+    print(" Better error handling")
+    print(" Performance optimization")
     
-    print("\n📁 File Structure:")
+    print("\n File Structure:")
     print("app.py                 # Main application (clean)")
-    print("├── image_processor.py  # Image processing logic")
-    print("├── video_processor.py  # Video processing logic")
-    print("├── webcam_processor.py # Webcam processing logic")
-    print("└── video_output_handler.py # Output management")
+    print(" image_processor.py  # Image processing logic")
+    print(" video_processor.py  # Video processing logic")
+    print(" webcam_processor.py # Webcam processing logic")
+    print(" video_output_handler.py # Output management")
     
-    print("\n✅ Modular integration ready!")
-    print("🚀 Your app.py will be much cleaner and organized!")
+    print("\n Modular integration ready!")
+    print(" Your app.py will be much cleaner and organized!")

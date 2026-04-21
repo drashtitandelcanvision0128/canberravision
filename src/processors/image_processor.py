@@ -165,7 +165,7 @@ class ImageProcessor(BaseImageProcessor):
                 for plate in license_plates:
                     plate_text = plate.get('text', '')
                     if plate_text:
-                        label_parts.append(f"🚗 {plate_text}")
+                        label_parts.append(f" {plate_text}")
                         break  # Only show first plate
             
             # Add confidence
@@ -200,7 +200,7 @@ class ImageProcessor(BaseImageProcessor):
             for plate in license_plates[:3]:  # Show top 3 plates
                 plate_text = plate.get('text', '')
                 plate_conf = plate.get('confidence', 0.0)
-                plate_label = f"🚗 {plate_text} ({plate_conf:.2f})"
+                plate_label = f" {plate_text} ({plate_conf:.2f})"
                 
                 cv2.putText(annotated, plate_label, (10, y_offset),
                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
@@ -217,10 +217,10 @@ class ImageProcessor(BaseImageProcessor):
                 # Color code by method
                 if 'gpu' in method.lower():
                     color = (255, 0, 255)  # Magenta for GPU
-                    prefix = "🔥"
+                    prefix = ""
                 else:
                     color = (0, 255, 255)  # Cyan for CPU
-                    prefix = "💻"
+                    prefix = ""
                 
                 text_label = f"{prefix} {text} ({confidence:.2f})"
                 

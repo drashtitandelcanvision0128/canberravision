@@ -24,7 +24,7 @@ demo = gr.Blocks(
 )
 
 with demo:
-    gr.Markdown("# 🚀 YOLO26 AI Vision - TEST PAGE")
+    gr.Markdown("#  YOLO26 AI Vision - TEST PAGE")
     gr.Markdown("## If you can see this page, the configuration is working!")
     
     with gr.Row():
@@ -61,9 +61,9 @@ try:
         server_port=7860,
         prevent_thread_lock=False,
     )
-    print("✅ Server started successfully!")
-    print("🌐 Access at: http://localhost:7860")
+    print(" Server started successfully!")
+    print(" Access at: http://localhost:7860")
 except Exception as e:
-    print(f"❌ Failed to start: {e}")
+    print(f" Failed to start: {e}")
     import traceback
     traceback.print_exc()

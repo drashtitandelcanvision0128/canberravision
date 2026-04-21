@@ -21,12 +21,12 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
     No imports from apps.app to avoid Button errors
     """
     try:
-        print(f"🚀 Starting ULTRA-FAST video processing: {mode} mode")
+        print(f" Starting ULTRA-FAST video processing: {mode} mode")
         start_time = time.time()
         
         # Validate video
         if not os.path.exists(video_path):
-            print(f"❌ Video file not found: {video_path}")
+            print(f" Video file not found: {video_path}")
             return None, "Error: Video file not found"
         
         # Import YOLO directly
@@ -35,32 +35,32 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
         # Load model directly
         model_path = f"models/{model_name}.pt"
         if not os.path.exists(model_path):
-            print(f"❌ Model not found: {model_path}")
+            print(f" Model not found: {model_path}")
             return None, f"Error: Model not found: {model_path}"
         
-        print(f"🤖 Loading model: {model_path}")
+        print(f" Loading model: {model_path}")
         model = YOLO(model_path)
         
         # Device
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"💻 Device: {device}")
+        print(f" Device: {device}")
         
         # Optimize settings
         if mode == "ultra_fast":
             conf_threshold = 0.4
             imgsz = 256
             skip_frames = 3
-            print("⚡ ULTRA-FAST MODE - Maximum speed")
+            print(" ULTRA-FAST MODE - Maximum speed")
         elif mode == "fast":
             conf_threshold = 0.35
             imgsz = 320
             skip_frames = 2
-            print("🚀 FAST MODE - Balanced")
+            print(" FAST MODE - Balanced")
         else:
             conf_threshold = 0.3
             imgsz = 416
             skip_frames = 1
-            print("⚖️ BALANCED MODE - Better quality")
+            print(" BALANCED MODE - Better quality")
         
         # Open video
         cap = cv2.VideoCapture(video_path)
@@ -73,7 +73,7 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"📹 Video: {width}x{height} @ {fps} FPS, {total_frames} frames")
+        print(f" Video: {width}x{height} @ {fps} FPS, {total_frames} frames")
         
         # Output
         timestamp = int(time.time())
@@ -94,7 +94,7 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
         actual_processed = 0
         total_detections = 0
         
-        print("🎬 Processing...")
+        print(" Processing...")
         
         while True:
             ret, frame = cap.read()
@@ -114,7 +114,7 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
                 fps_proc = actual_processed / elapsed
                 progress = (processed_count / total_frames) * 100
                 eta = (total_frames - processed_count) / (fps_proc * skip_frames) / 60
-                print(f"📊 {progress:.1f}% - {fps_proc:.1f} FPS - ETA: {eta:.1f} min")
+                print(f" {progress:.1f}% - {fps_proc:.1f} FPS - ETA: {eta:.1f} min")
             
             try:
                 # Predict
@@ -142,7 +142,7 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
                 out.write(annotated)
                 
             except Exception as e:
-                print(f"⚠️ Frame error: {e}")
+                print(f" Frame error: {e}")
                 out.write(frame)
         
         # Cleanup
@@ -154,34 +154,34 @@ def process_video_simple(video_path, model_name="yolo26n", mode="ultra_fast"):
         final_fps = actual_processed / total_time
         speedup = skip_frames
         
-        print(f"\n✅ Complete!")
-        print(f"⏱️ Time: {total_time:.1f}s")
-        print(f"🚀 Speed: {final_fps:.1f} FPS")
-        print(f"📈 Speedup: ~{speedup}x")
-        print(f"📁 Output: {output_path}")
+        print(f"\n Complete!")
+        print(f" Time: {total_time:.1f}s")
+        print(f" Speed: {final_fps:.1f} FPS")
+        print(f" Speedup: ~{speedup}x")
+        print(f" Output: {output_path}")
         
         # Summary
-        summary = f"""🎥 **Video Processing Complete!**
+        summary = f""" **Video Processing Complete!**
 
-📊 **Statistics:**
+ **Statistics:**
 • Mode: {mode.upper()}
 • Time: {total_time:.1f}s
 • Speed: {final_fps:.1f} FPS
 • Speedup: ~{speedup}x
 • Frames: {actual_processed}/{total_frames}
 
-🔍 **Detections:**
+ **Detections:**
 • Total: {total_detections}
 • Per Frame: {total_detections/max(1, actual_processed):.1f}
 
-💾 **Output:**
+ **Output:**
 • {output_path}"""
         
         return output_path, summary
         
     except Exception as e:
         import traceback
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         traceback.print_exc()
         return None, f"Error: {str(e)}"
 
@@ -205,6 +205,6 @@ if __name__ == "__main__":
     output, summary = process_video_simple(args.video, args.model, args.mode)
     
     if output:
-        print(f"\n✅ Success! Output: {output}")
+        print(f"\n Success! Output: {output}")
     else:
-        print(f"\n❌ Failed: {summary}")
+        print(f"\n Failed: {summary}")

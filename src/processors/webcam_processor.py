@@ -381,7 +381,7 @@ class WebcamProcessor:
             import torch
             if torch.cuda.is_available():
                 using_gpu = True
-                print(f"[INFO] 🚀 MAXIMUM MODE (GPU): {torch.cuda.get_device_name(0)}")
+                print(f"[INFO]  MAXIMUM MODE (GPU): {torch.cuda.get_device_name(0)}")
                 torch.cuda.empty_cache()
             else:
                 print("[WARNING] CUDA not available - running webcam in CPU fallback mode")
@@ -2081,15 +2081,15 @@ class WebcamProcessor:
                     
                     # Method indicators
                     if fallback_level == 1:
-                        method_indicator = "🧠"  # ResNet-18 + K-means
+                        method_indicator = ""  # ResNet-18 + K-means
                     elif fallback_level == 2:
-                        method_indicator = "🎯"  # Basic K-means
+                        method_indicator = ""  # Basic K-means
                     elif fallback_level == 3:
-                        method_indicator = "🎨"  # HSV Detection
+                        method_indicator = ""  # HSV Detection
                     elif fallback_level == 4:
-                        method_indicator = "🔧"  # Basic Classification
+                        method_indicator = ""  # Basic Classification
                     else:
-                        method_indicator = "❓"  # Unknown
+                        method_indicator = ""  # Unknown
                     
                     box_color = obj.get('color', (255, 255, 255))
                     
@@ -2182,7 +2182,7 @@ class WebcamProcessor:
             time_str = timestamp.split('T')[1][:8]
             mode = result.get('processing_mode', 'fast')
             gpu_enabled = result.get('frame_info', {}).get('gpu_enabled', False)
-            gpu_status = "🚀 GPU" if gpu_enabled else "💻 CPU"
+            gpu_status = " GPU" if gpu_enabled else " CPU"
             
             cv2.putText(annotated, f"YOLO26 ULTRA FAST - {time_str}", 
                        (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
@@ -2670,11 +2670,11 @@ def get_webcam_stats() -> Dict:
 
 
 if __name__ == "__main__":
-    print("📷 Webcam Processor Module")
+    print(" Webcam Processor Module")
     print("=" * 30)
     
     # Test camera listing
-    print("🔍 Scanning for cameras...")
+    print(" Scanning for cameras...")
     cameras = webcam_processor.list_available_cameras()
     
     available_cameras = [c for c in cameras if c.get('available', False)]
@@ -2683,7 +2683,7 @@ if __name__ == "__main__":
     for camera in available_cameras:
         print(f"  - {camera['name']}: {camera['resolution']} @ {camera['fps']}fps")
     
-    print("\n📖 Usage:")
+    print("\n Usage:")
     print("   from webcam_processor import start_webcam, stop_webcam, get_webcam_frame")
     print("   start_webcam(0)")
     print("   while True:")
@@ -2694,7 +2694,7 @@ if __name__ == "__main__":
     print("               break")
     print("   stop_webcam()")
     
-    print("\n✅ Webcam processor ready!")
+    print("\n Webcam processor ready!")
     print("   Features:")
     print("   - Multi-threaded processing")
     print("   - Real-time performance optimization")

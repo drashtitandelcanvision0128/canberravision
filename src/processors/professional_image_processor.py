@@ -367,7 +367,7 @@ def _generate_professional_summary(detections: List[Dict], enable_ocr: bool) -> 
         Formatted summary string
     """
     if not detections:
-        return "🎯 **No objects detected**"
+        return " **No objects detected**"
     
     # Count objects by class
     class_counts = {}
@@ -386,37 +386,37 @@ def _generate_professional_summary(detections: List[Dict], enable_ocr: bool) -> 
     
     # Build summary
     summary_lines = [
-        f"🎯 **Detection Complete**",
-        f"📊 **Total Objects:** {len(detections)}",
+        f" **Detection Complete**",
+        f" **Total Objects:** {len(detections)}",
         ""
     ]
     
     # Add object counts
     if class_counts:
-        summary_lines.append("🏷️ **Objects Found:**")
+        summary_lines.append(" **Objects Found:**")
         for class_name, count in sorted(class_counts.items()):
             summary_lines.append(f"  • {class_name}: {count}")
         summary_lines.append("")
     
     # Add colors
     if colors_found:
-        summary_lines.append("🎨 **Colors Detected:**")
+        summary_lines.append(" **Colors Detected:**")
         for color in sorted(colors_found):
             summary_lines.append(f"  • {color}")
         summary_lines.append("")
     
     # Add license plates
     if license_plates_found and enable_ocr:
-        summary_lines.append("🚗 **License Plates:**")
+        summary_lines.append(" **License Plates:**")
         for plate_info in license_plates_found:
             summary_lines.append(f"  • {plate_info}")
         summary_lines.append("")
     
     # Add professional footer
     summary_lines.extend([
-        "✨ **Processed with Professional Annotation System**",
-        "🔥 Labels are positioned to prevent overlapping",
-        "⚡ Powered by YOLO26 AI Engine"
+        " **Processed with Professional Annotation System**",
+        " Labels are positioned to prevent overlapping",
+        " Powered by YOLO26 AI Engine"
     ])
     
     return "\n".join(summary_lines)

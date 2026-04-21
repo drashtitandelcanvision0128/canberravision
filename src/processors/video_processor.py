@@ -179,7 +179,7 @@ class VideoProcessor:
                 
                 if saved_video_path:
                     results['output_files']['saved_video'] = saved_video_path
-                    print(f"[INFO] ✅ Video saved: {saved_video_path}")
+                    print(f"[INFO]  Video saved: {saved_video_path}")
             
             # Calculate final stats
             processing_time = time.time() - start_time
@@ -572,20 +572,20 @@ def get_video_processing_stats() -> Dict:
 
 
 if __name__ == "__main__":
-    print("📹 Video Processor Module")
+    print(" Video Processor Module")
     print("=" * 30)
     
-    print("🧪 Testing video processor...")
+    print(" Testing video processor...")
     
     # Test video info extraction
     test_video_path = "test_video.mp4"  # This would be a real video file
     
-    print("📖 Usage:")
+    print(" Usage:")
     print("   from video_processor import process_single_video")
     print("   result = process_single_video('video.mp4')")
     print("   print(result['detections']['summary'])")
     
-    print("\n✅ Video processor ready!")
+    print("\n Video processor ready!")
     print("   Features:")
     print("   - Frame-by-frame processing")
     print("   - Memory-efficient streaming")

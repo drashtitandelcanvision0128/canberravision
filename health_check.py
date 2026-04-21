@@ -82,8 +82,8 @@ if __name__ == "__main__":
     
     success = health_check()
     if success:
-        print("[HEALTH_CHECK] ✅ Health check passed")
+        print("[HEALTH_CHECK]  Health check passed")
     else:
-        print("[HEALTH_CHECK] ❌ Health check failed")
+        print("[HEALTH_CHECK]  Health check failed")
     
     sys.exit(0 if success else 1)

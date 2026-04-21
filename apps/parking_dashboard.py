@@ -469,7 +469,7 @@ def create_templates():
 </head>
 <body>
     <div class="header">
-        <h1>🚗 YOLO26 Parking Dashboard</h1>
+        <h1> YOLO26 Parking Dashboard</h1>
     </div>
     
     <div class="container">
@@ -648,7 +648,7 @@ def create_templates():
                 const alertsContainer = document.getElementById('alerts-container');
                 
                 if (alerts.length === 0) {
-                    alertsContainer.innerHTML = '<div style="color: var(--color-success);">✅ No active alerts</div>';
+                    alertsContainer.innerHTML = '<div style="color: var(--color-success);"> No active alerts</div>';
                 } else {
                     alertsContainer.innerHTML = alerts.map(alert => `
                         <div class="alert ${alert.severity.toLowerCase()}">
@@ -813,20 +813,20 @@ if __name__ == '__main__':
     
     # Initialize system
     if initialize_system():
-        print("✅ System initialized successfully")
-        print("🌐 Starting web server on http://localhost:5000")
-        print("📊 Dashboard available at: http://localhost:5000")
-        print("🔗 API endpoints available at: http://localhost:5000/api/")
+        print(" System initialized successfully")
+        print(" Starting web server on http://localhost:5000")
+        print(" Dashboard available at: http://localhost:5000")
+        print(" API endpoints available at: http://localhost:5000/api/")
         
         try:
             app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
         except KeyboardInterrupt:
-            print("\n🛑 Shutting down web server...")
+            print("\n Shutting down web server...")
             parking_api.stop_monitoring()
-            print("✅ Server stopped")
+            print(" Server stopped")
         except Exception as e:
-            print(f"❌ Server error: {e}")
+            print(f" Server error: {e}")
             parking_api.stop_monitoring()
     else:
-        print("❌ Failed to initialize system")
+        print(" Failed to initialize system")
         exit(1)

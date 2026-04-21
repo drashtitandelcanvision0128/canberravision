@@ -23,8 +23,8 @@ def process_video_for_cars_and_plates(video_path, output_path=None, show_realtim
         Dictionary with detection results
     """
     
-    print("🚗 Starting Car & License Plate Detection")
-    print(f"📁 Input video: {video_path}")
+    print(" Starting Car & License Plate Detection")
+    print(f" Input video: {video_path}")
     
     # Check if video exists
     if not os.path.exists(video_path):
@@ -39,7 +39,7 @@ def process_video_for_cars_and_plates(video_path, output_path=None, show_realtim
         # Try to use the existing app.py video processing function
         from app import process_video_optimized_fast
         
-        print("🔄 Using existing video processing infrastructure...")
+        print(" Using existing video processing infrastructure...")
         
         # Process video with OCR enabled for license plate detection
         result_video, summary, json_results = process_video_optimized_fast(
@@ -67,25 +67,25 @@ def process_video_for_cars_and_plates(video_path, output_path=None, show_realtim
         # Save detailed results
         save_results_to_json(parsed_results, output_path.replace('.mp4', '_details.json'))
         
-        print(f"✅ Processing completed!")
-        print(f"📁 Output video: {result_video}")
-        print(f"📋 Cars detected: {parsed_results.get('cars_detected', 0)}")
-        print(f"🔢 Plates found: {parsed_results.get('plates_found', 0)}")
-        print(f"🎯 Unique plates: {len(parsed_results.get('unique_plates', []))}")
+        print(f" Processing completed!")
+        print(f" Output video: {result_video}")
+        print(f" Cars detected: {parsed_results.get('cars_detected', 0)}")
+        print(f" Plates found: {parsed_results.get('plates_found', 0)}")
+        print(f" Unique plates: {len(parsed_results.get('unique_plates', []))}")
         
         # Show unique plates found
         if parsed_results.get('unique_plates'):
-            print("\n📋 Detected License Plates:")
+            print("\n Detected License Plates:")
             for i, plate in enumerate(parsed_results['unique_plates'][:10], 1):
                 print(f"   {i}. {plate}")
         
         return parsed_results
         
     except ImportError:
-        print("⚠️ Existing infrastructure not available, using fallback method...")
+        print(" Existing infrastructure not available, using fallback method...")
         return fallback_video_processing(video_path, output_path, show_realtime)
     except Exception as e:
-        print(f"❌ Processing failed: {e}")
+        print(f" Processing failed: {e}")
         return {'error': str(e)}
 
 def parse_json_results(json_results):
@@ -136,7 +136,7 @@ def parse_json_results(json_results):
         }
         
     except Exception as e:
-        print(f"❌ Failed to parse JSON results: {e}")
+        print(f" Failed to parse JSON results: {e}")
         return {'cars_detected': 0, 'plates_found': 0, 'unique_plates': []}
 
 def is_likely_license_plate(text):
@@ -158,7 +158,7 @@ def is_likely_license_plate(text):
 
 def fallback_video_processing(video_path, output_path, show_realtime):
     """Fallback video processing with ACTUAL detection using basic methods"""
-    print("🔄 Using fallback video processing with detection...")
+    print(" Using fallback video processing with detection...")
     
     # Try to import Tesseract
     try:
@@ -166,10 +166,10 @@ def fallback_video_processing(video_path, output_path, show_realtime):
         if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
         tesseract_available = True
-        print("✅ Tesseract available for OCR")
+        print(" Tesseract available for OCR")
     except:
         tesseract_available = False
-        print("⚠️ Tesseract not available")
+        print(" Tesseract not available")
     
     try:
         # Open video
@@ -183,7 +183,7 @@ def fallback_video_processing(video_path, output_path, show_realtime):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"📹 Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
+        print(f" Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
         
         # Setup output video
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -199,7 +199,7 @@ def fallback_video_processing(video_path, output_path, show_realtime):
         plates_found = []
         unique_plates = set()
         
-        print("🔄 Processing with detection...")
+        print(" Processing with detection...")
         
         while True:
             ret, frame = cap.read()
@@ -311,16 +311,16 @@ def fallback_video_processing(video_path, output_path, show_realtime):
             }
         }
         
-        print(f"✅ Fallback processing completed: {output_path}")
-        print(f"🚗 Cars detected: {cars_detected}")
-        print(f"📋 Plates found: {len(plates_found)}")
+        print(f" Fallback processing completed: {output_path}")
+        print(f" Cars detected: {cars_detected}")
+        print(f" Plates found: {len(plates_found)}")
         if unique_plates:
-            print(f"📋 Unique plates: {', '.join(sorted(unique_plates))}")
+            print(f" Unique plates: {', '.join(sorted(unique_plates))}")
         
         return results
         
     except Exception as e:
-        print(f"❌ Fallback processing failed: {e}")
+        print(f" Fallback processing failed: {e}")
         import traceback
         traceback.print_exc()
         return {'error': str(e)}
@@ -330,26 +330,26 @@ def save_results_to_json(results, json_path):
     try:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
-        print(f"📁 Results saved to: {json_path}")
+        print(f" Results saved to: {json_path}")
     except Exception as e:
-        print(f"❌ Failed to save results: {e}")
+        print(f" Failed to save results: {e}")
 
 def demo_simple_detection():
     """Simple demo function"""
-    print("🚗 Simple Car & License Plate Detection Demo")
+    print(" Simple Car & License Plate Detection Demo")
     print("=" * 50)
     
     # Look for video files
     video_files = [f for f in os.listdir('.') if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv'))]
     
     if not video_files:
-        print("❌ No video files found. Please add a video to the current directory.")
+        print(" No video files found. Please add a video to the current directory.")
         return
     
     print(f"Found videos: {video_files}")
     video_path = video_files[0]
     
-    print(f"\n🎬 Processing: {video_path}")
+    print(f"\n Processing: {video_path}")
     
     # Process video
     results = process_video_for_cars_and_plates(
@@ -358,17 +358,17 @@ def demo_simple_detection():
     )
     
     if 'error' in results:
-        print(f"❌ Demo failed: {results['error']}")
+        print(f" Demo failed: {results['error']}")
         return
     
     # Display results
-    print("\n📊 Results Summary:")
-    print(f"🚗 Cars detected: {results.get('cars_detected', 0)}")
-    print(f"📋 Plates found: {results.get('plates_found', 0)}")
-    print(f"🔢 Unique plates: {len(results.get('unique_plates', []))}")
+    print("\n Results Summary:")
+    print(f" Cars detected: {results.get('cars_detected', 0)}")
+    print(f" Plates found: {results.get('plates_found', 0)}")
+    print(f" Unique plates: {len(results.get('unique_plates', []))}")
     
     if results.get('video_info', {}).get('output_path'):
-        print(f"📁 Output video: {results['video_info']['output_path']}")
+        print(f" Output video: {results['video_info']['output_path']}")
 
 if __name__ == "__main__":
     demo_simple_detection()

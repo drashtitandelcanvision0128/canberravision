@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🔧 Quick Fix for MockBoxes Error in app.py
+ Quick Fix for MockBoxes Error in app.py
 ==========================================
 
 This script will fix the MockBoxes error in the main app.py file.
@@ -17,10 +17,10 @@ def fix_mockboxes_error():
     app_file = Path(__file__).parent / "apps" / "app.py"
     
     if not app_file.exists():
-        print(f"❌ File not found: {app_file}")
+        print(f" File not found: {app_file}")
         return False
     
-    print(f"🔧 Fixing MockBoxes error in: {app_file}")
+    print(f" Fixing MockBoxes error in: {app_file}")
     
     try:
         # Read the file
@@ -45,21 +45,21 @@ def fix_mockboxes_error():
         with open(app_file, 'w', encoding='utf-8') as f:
             f.write(new_content)
         
-        print("✅ MockBoxes error fixed successfully!")
-        print("🚀 You can now run: python apps/app.py")
+        print(" MockBoxes error fixed successfully!")
+        print(" You can now run: python apps/app.py")
         return True
         
     except Exception as e:
-        print(f"❌ Error fixing file: {e}")
+        print(f" Error fixing file: {e}")
         return False
 
 if __name__ == "__main__":
-    print("🔧 Starting MockBoxes Error Fix...")
+    print(" Starting MockBoxes Error Fix...")
     print("=" * 50)
     
     if fix_mockboxes_error():
-        print("\n✅ Fix completed successfully!")
+        print("\n Fix completed successfully!")
         print("Now you can run the main app without errors.")
     else:
-        print("\n❌ Fix failed. Please use the simple working detector instead:")
+        print("\n Fix failed. Please use the simple working detector instead:")
         print("python apps/simple_working_plate_detector.py")

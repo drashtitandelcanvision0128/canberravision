@@ -207,7 +207,7 @@ def process_video_unified(video_path: str, progress=gr.Progress()) -> Tuple[str,
             
             # Create summary from last frame
             summary = create_summary_text(all_results[-1])
-            summary += f"\n\n📹 Video: {frame_count} frames processed"
+            summary += f"\n\n Video: {frame_count} frames processed"
         else:
             json_output = "{}"
             summary = "No detections found"
@@ -375,27 +375,27 @@ def create_summary_text(result) -> str:
     lines = []
     
     # Header
-    lines.append("🎯 UNIFIED DETECTION RESULTS")
+    lines.append(" UNIFIED DETECTION RESULTS")
     lines.append("=" * 40)
     
     # Vehicles
     if result.vehicle_detections:
-        lines.append(f"\n🚗 VEHICLES: {len(result.vehicle_detections)}")
+        lines.append(f"\n VEHICLES: {len(result.vehicle_detections)}")
         for v in result.vehicle_detections:
             lines.append(f"  • {v.vehicle_id}: {v.vehicle_type.upper()} ({v.color}) - {v.confidence:.2f}")
     
     # PPE
     if result.ppe_detections:
-        lines.append(f"\n👥 PERSONS: {len(result.ppe_detections)}")
+        lines.append(f"\n PERSONS: {len(result.ppe_detections)}")
         for p in result.ppe_detections:
-            helmet = "✅" if p.helmet else "❌"
-            seatbelt = "✅" if p.seatbelt else "❌"
-            vest = "✅" if p.vest else "❌"
+            helmet = "" if p.helmet else ""
+            seatbelt = "" if p.seatbelt else ""
+            vest = "" if p.vest else ""
             lines.append(f"  • {p.person_id}: H{helmet} S{seatbelt} V{vest} ({p.vehicle_type})")
     
     # Plates
     if result.plate_detections:
-        lines.append(f"\n📋 LICENSE PLATES: {len(result.plate_detections)}")
+        lines.append(f"\n LICENSE PLATES: {len(result.plate_detections)}")
         for plate in result.plate_detections:
             lines.append(f"  • {plate.text} (conf: {plate.confidence:.2f})")
     
@@ -403,11 +403,11 @@ def create_summary_text(result) -> str:
     if result.parking_detections:
         occupied = sum(1 for s in result.parking_detections if s.occupied)
         empty = len(result.parking_detections) - occupied
-        lines.append(f"\n🅿️ PARKING: {len(result.parking_detections)} slots")
+        lines.append(f"\n PARKING: {len(result.parking_detections)} slots")
         lines.append(f"  • Occupied: {occupied} | Empty: {empty}")
     
     # Performance
-    lines.append(f"\n⚡ Processing Time: {result.processing_time_ms:.1f}ms")
+    lines.append(f"\n Processing Time: {result.processing_time_ms:.1f}ms")
     
     return "\n".join(lines)
 
@@ -447,16 +447,16 @@ def create_interface():
     with gr.Blocks(css=css, title="Canberra Vision - Unified Detection") as interface:
         
         # Title
-        gr.HTML("<div class='title-text'>🚀 CANBERRA VISION</div>")
+        gr.HTML("<div class='title-text'> CANBERRA VISION</div>")
         gr.Markdown("## Unified Multi-Detection System (Object + Vehicle + Plate + PPE + Parking)", elem_classes="title-text")
         
         # Main detection panel
-        with gr.Tab("🎯 Unified Detection Panel"):
+        with gr.Tab(" Unified Detection Panel"):
             
             with gr.Row():
                 # Left column - Inputs
                 with gr.Column(scale=1):
-                    gr.Markdown("### 📥 Input Source")
+                    gr.Markdown("###  Input Source")
                     
                     # Input type selection
                     input_type = gr.Radio(
@@ -489,13 +489,13 @@ def create_interface():
                     # Process buttons
                     with gr.Row():
                         process_image_btn = gr.Button(
-                            "🔍 Detect All (Image)",
+                            " Detect All (Image)",
                             variant="primary",
                             size="lg",
                             visible=True
                         )
                         process_video_btn = gr.Button(
-                            "🔍 Detect All (Video)",
+                            " Detect All (Video)",
                             variant="primary",
                             size="lg",
                             visible=False
@@ -503,7 +503,7 @@ def create_interface():
                 
                 # Right column - Results
                 with gr.Column(scale=2):
-                    gr.Markdown("### 📊 Detection Results")
+                    gr.Markdown("###  Detection Results")
                     
                     with gr.Row():
                         # Annotated output
@@ -533,11 +533,11 @@ def create_interface():
                     )
         
         # Tab for detection history
-        with gr.Tab("📜 Detection History"):
+        with gr.Tab(" Detection History"):
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("### Recent Detections")
-                    history_btn = gr.Button("🔄 Refresh History")
+                    history_btn = gr.Button(" Refresh History")
                     history_output = gr.Dataframe(
                         headers=["Time", "Source", "Vehicles", "Persons", "Plates", "Parking"],
                         datatype=["str", "str", "number", "number", "number", "number"],
@@ -545,15 +545,15 @@ def create_interface():
                     )
         
         # Tab for statistics
-        with gr.Tab("📈 Statistics"):
+        with gr.Tab(" Statistics"):
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("### Detection Statistics")
-                    stats_btn = gr.Button("🔄 Refresh Stats")
+                    stats_btn = gr.Button(" Refresh Stats")
                     stats_output = gr.JSON(label="Statistics")
         
         # Tab for about
-        with gr.Tab("ℹ️ About"):
+        with gr.Tab("ℹ About"):
             gr.Markdown("""
             ## Canberra Vision - Unified Detection System
             

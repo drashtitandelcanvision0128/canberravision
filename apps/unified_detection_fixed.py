@@ -420,13 +420,13 @@ def process_unified_detection_simple(image, conf_threshold=0.5, get_model_func=N
         json_output = json.dumps(output, indent=2, ensure_ascii=False)
         
         summary_lines = [
-            "🎯 UNIFIED DETECTION RESULTS",
+            " UNIFIED DETECTION RESULTS",
             "=" * 40,
-            f"\n🚗 Vehicles: {len(detections['vehicles'])}",
-            f"👥 Persons: {len(detections['ppe'])}",
-            f"📋 Plates: {len(detections['number_plates'])}",
-            f"🅿️ Parking: {len(detections['parking'])} slots",
-            f"\n⚡ Processing: {output['metadata']['processing_time_ms']:.1f}ms"
+            f"\n Vehicles: {len(detections['vehicles'])}",
+            f" Persons: {len(detections['ppe'])}",
+            f" Plates: {len(detections['number_plates'])}",
+            f" Parking: {len(detections['parking'])} slots",
+            f"\n Processing: {output['metadata']['processing_time_ms']:.1f}ms"
         ]
         
         if detections['vehicles']:

@@ -50,11 +50,11 @@ def initialize_gpu_environment():
                 'device_memory': torch.cuda.get_device_properties(0).total_memory / 1e9,
                 'current_device': torch.cuda.current_device()
             }
-            print(f"[INFO] 🚀 CUDA GPU Detected: {_device_info['device_name']}")
+            print(f"[INFO]  CUDA GPU Detected: {_device_info['device_name']}")
             print(f"[INFO] GPU Memory: {_device_info['device_memory']:.1f} GB")
         else:
             _device_info = {'pytorch_cuda': False}
-            print("[INFO] ⚠️ CUDA not available, using CPU mode")
+            print("[INFO]  CUDA not available, using CPU mode")
             
         # Set PaddleOCR environment variables for optimal performance
         os.environ['PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK'] = 'True'
@@ -161,7 +161,7 @@ def get_paddle_ocr_instance(
         _paddle_ocr_instances[instance_key] = ocr_instance
         _ocr_initialized = True
         
-        device_type = "🚀 GPU" if use_gpu else "💻 CPU"
+        device_type = " GPU" if use_gpu else " CPU"
         print(f"[INFO] PaddleOCR initialized successfully on {device_type}")
         return ocr_instance
         
@@ -237,10 +237,10 @@ def extract_text_optimized(
     start_time = time.time()
     
     try:
-        print(f"[DEBUG] 🚀 extract_text_optimized called with: image_shape={image.shape if image is not None else 'None'}, threshold={confidence_threshold}")
+        print(f"[DEBUG]  extract_text_optimized called with: image_shape={image.shape if image is not None else 'None'}, threshold={confidence_threshold}")
         
         if image is None or image.size == 0:
-            print(f"[DEBUG] ❌ Invalid image provided")
+            print(f"[DEBUG]  Invalid image provided")
             return {"text": "", "confidence": 0.0, "processing_time": 0.0, "method": "none"}
         
         # Check cache first
@@ -264,10 +264,10 @@ def extract_text_optimized(
         print(f"[DEBUG] Getting PaddleOCR instance...")
         ocr = get_paddle_ocr_instance(lang=lang, use_gpu=use_gpu)
         if ocr is None:
-            print(f"[DEBUG] ❌ Failed to get PaddleOCR instance")
+            print(f"[DEBUG]  Failed to get PaddleOCR instance")
             return {"text": "", "confidence": 0.0, "processing_time": 0.0, "method": "error"}
         
-        print(f"[DEBUG] ✅ PaddleOCR instance obtained, running OCR on {image.shape} (GPU: {use_gpu})")
+        print(f"[DEBUG]  PaddleOCR instance obtained, running OCR on {image.shape} (GPU: {use_gpu})")
         
         # Run OCR with optimized parameters
         ocr_start = time.time()
@@ -303,15 +303,15 @@ def extract_text_optimized(
                                 "bbox": box_points,
                                 "area": calculate_bbox_area(box_points)
                             })
-                            print(f"[DEBUG] ✅ Accepted: '{cleaned_text}' (conf: {confidence:.3f})")
+                            print(f"[DEBUG]  Accepted: '{cleaned_text}' (conf: {confidence:.3f})")
                         else:
-                            print(f"[DEBUG] ❌ Rejected empty text")
+                            print(f"[DEBUG]  Rejected empty text")
                     else:
-                        print(f"[DEBUG] ❌ Rejected low confidence: '{text}' (conf: {confidence:.3f} < {confidence_threshold})")
+                        print(f"[DEBUG]  Rejected low confidence: '{text}' (conf: {confidence:.3f} < {confidence_threshold})")
                 else:
-                    print(f"[DEBUG] ❌ Invalid line format: {line}")
+                    print(f"[DEBUG]  Invalid line format: {line}")
         else:
-            print(f"[DEBUG] ❌ No text detected - result: {result}")
+            print(f"[DEBUG]  No text detected - result: {result}")
         
         # Calculate metrics
         final_text = ' '.join(extracted_texts)
@@ -349,7 +349,7 @@ def extract_text_optimized(
         
     except Exception as e:
         processing_time = time.time() - start_time
-        print(f"[ERROR] ❌ Optimized PaddleOCR extraction failed: {e}")
+        print(f"[ERROR]  Optimized PaddleOCR extraction failed: {e}")
         print(f"[ERROR] Error type: {type(e).__name__}")
         import traceback
         traceback.print_exc()
@@ -423,7 +423,7 @@ def extract_license_plates_optimized(
                         'processing_time': text_result["processing_time"],
                         'device': text_result["device"]
                     })
-                    print(f"[DEBUG] ✅ Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
+                    print(f"[DEBUG]  Found license plate: {cleaned_plate} (conf: {plate_confidence:.3f})")
         
         # Remove duplicates and return best results
         unique_plates = []

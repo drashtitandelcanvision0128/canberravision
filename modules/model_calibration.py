@@ -546,7 +546,7 @@ class ModelCalibrator:
                 report.append("")
                 
             if not low_precision_cameras and not low_recall_cameras:
-                report.append("✅ All cameras are performing well within acceptable ranges.")
+                report.append(" All cameras are performing well within acceptable ranges.")
                 report.append("- System ready for production deployment")
                 
             # Save report

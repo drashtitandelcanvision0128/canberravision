@@ -39,7 +39,7 @@ if torch.cuda.is_available():
     device = torch.device('cuda:0')
     torch.cuda.set_device(0)
     
-    print(f"🎉 GPU DETECTED!")
+    print(f" GPU DETECTED!")
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"CUDA Version: {torch.version.cuda}")
     print(f"GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
@@ -51,12 +51,12 @@ if torch.cuda.is_available():
     # Set CUDA memory allocation
     os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
     
-    print("✅ GPU optimizations enabled")
+    print(" GPU optimizations enabled")
     
 else:
     device = torch.device('cpu')
-    print("❌ GPU NOT AVAILABLE")
-    print("⚠️  Running on CPU (slower performance)")
+    print(" GPU NOT AVAILABLE")
+    print("  Running on CPU (slower performance)")
     print("")
     print("To enable GPU:")
     print("1. Install NVIDIA drivers: https://www.nvidia.com/drivers")
@@ -147,9 +147,9 @@ def load_model_gpu(model_name='yolov8n.pt'):
     # Move model to GPU if available
     if torch.cuda.is_available():
         model.to('cuda')
-        print(f"[✅] Model moved to GPU: {torch.cuda.get_device_name(0)}")
+        print(f"[] Model moved to GPU: {torch.cuda.get_device_name(0)}")
     else:
-        print(f"[⚠️] Model using CPU")
+        print(f"[] Model using CPU")
         
     return model
 
@@ -200,14 +200,14 @@ def create_gpu_interface():
     """Create Gradio interface with GPU indicators."""
     
     with gr.Blocks(title="YOLO Vision - GPU Enhanced", theme=gr.themes.Soft()) as interface:
-        gr.Markdown("# 🚀 YOLO Vision - GPU Enhanced Object Detection")
+        gr.Markdown("#  YOLO Vision - GPU Enhanced Object Detection")
         
         # GPU Status Indicator
         if torch.cuda.is_available():
-            gpu_status = f"🎉 **GPU Active**: {torch.cuda.get_device_name(0)}"
+            gpu_status = f" **GPU Active**: {torch.cuda.get_device_name(0)}"
             gpu_color = "green"
         else:
-            gpu_status = "⚠️ **CPU Only** - Install NVIDIA drivers for GPU acceleration"
+            gpu_status = " **CPU Only** - Install NVIDIA drivers for GPU acceleration"
             gpu_color = "orange"
             
         gr.Markdown(f"### Status: {gpu_status}")
@@ -223,7 +223,7 @@ def create_gpu_interface():
                         label="Model Selection"
                     )
                     conf_slider = gr.Slider(0.0, 1.0, 0.25, label="Confidence Threshold")
-                    detect_btn = gr.Button("🔍 Detect Objects", variant="primary")
+                    detect_btn = gr.Button(" Detect Objects", variant="primary")
                     
                 with gr.Column():
                     output_image = gr.Image(type="numpy", label="Detection Results")

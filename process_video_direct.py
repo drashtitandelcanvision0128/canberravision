@@ -28,12 +28,12 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         output_path: Path to processed video
     """
     try:
-        print(f"🚀 Starting video processing: {mode} mode")
-        print(f"📹 Input: {video_path}")
+        print(f" Starting video processing: {mode} mode")
+        print(f" Input: {video_path}")
         
         # Validate video
         if not os.path.exists(video_path):
-            print(f"❌ Video file not found: {video_path}")
+            print(f" Video file not found: {video_path}")
             return None
         
         # Import YOLO
@@ -42,37 +42,37 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         # Load model
         model_path = f"models/{model_name}.pt"
         if not os.path.exists(model_path):
-            print(f"❌ Model not found: {model_path}")
+            print(f" Model not found: {model_path}")
             return None
         
-        print(f"🤖 Loading model: {model_path}")
+        print(f" Loading model: {model_path}")
         model = YOLO(model_path)
         
         # Set device
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"💻 Using device: {device}")
+        print(f" Using device: {device}")
         
         # Mode settings
         if mode == "ultra_fast":
             conf_threshold = 0.4
             imgsz = 256
             skip_frames = 3
-            print("⚡ ULTRA-FAST MODE")
+            print(" ULTRA-FAST MODE")
         elif mode == "fast":
             conf_threshold = 0.35
             imgsz = 320
             skip_frames = 2
-            print("🚀 FAST MODE")
+            print(" FAST MODE")
         else:  # balanced
             conf_threshold = 0.3
             imgsz = 416
             skip_frames = 1
-            print("⚖️ BALANCED MODE")
+            print(" BALANCED MODE")
         
         # Open video
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
-            print("❌ Cannot open video")
+            print(" Cannot open video")
             return None
         
         # Get video properties
@@ -81,7 +81,7 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"📊 Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
+        print(f" Video: {width}x{height} @ {fps:.1f} FPS, {total_frames} frames")
         
         # Create output
         timestamp = int(time.time())
@@ -94,7 +94,7 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
         
         if not out.isOpened():
-            print("❌ Cannot create output video")
+            print(" Cannot create output video")
             cap.release()
             return None
         
@@ -104,7 +104,7 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         total_detections = 0
         start_time = time.time()
         
-        print("🎬 Processing frames...")
+        print(" Processing frames...")
         
         while True:
             ret, frame = cap.read()
@@ -125,7 +125,7 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
                 fps_processed = actual_processed / elapsed
                 progress = (processed_count / total_frames) * 100
                 eta = (total_frames - processed_count) / (fps_processed * skip_frames) / 60
-                print(f"📊 Progress: {progress:.1f}% - {fps_processed:.1f} FPS - ETA: {eta:.1f} min")
+                print(f" Progress: {progress:.1f}% - {fps_processed:.1f} FPS - ETA: {eta:.1f} min")
             
             try:
                 # Run detection
@@ -155,7 +155,7 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
                 out.write(annotated_frame)
                 
             except Exception as e:
-                print(f"⚠️ Frame {processed_count} error: {e}")
+                print(f" Frame {processed_count} error: {e}")
                 out.write(frame)
         
         # Cleanup
@@ -166,17 +166,17 @@ def process_video_direct(video_path, model_name="yolo26n", mode="ultra_fast"):
         total_time = time.time() - start_time
         final_fps = actual_processed / total_time
         
-        print(f"\n✅ Processing complete!")
-        print(f"⏱️ Total time: {total_time:.1f}s ({total_time/60:.1f} min)")
-        print(f"🚀 Speed: {final_fps:.1f} FPS")
-        print(f"📈 Processed: {actual_processed}/{total_frames} frames")
-        print(f"🔍 Detections: {total_detections}")
-        print(f"💾 Output: {output_path}")
+        print(f"\n Processing complete!")
+        print(f" Total time: {total_time:.1f}s ({total_time/60:.1f} min)")
+        print(f" Speed: {final_fps:.1f} FPS")
+        print(f" Processed: {actual_processed}/{total_frames} frames")
+        print(f" Detections: {total_detections}")
+        print(f" Output: {output_path}")
         
         return output_path
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -197,10 +197,10 @@ def main():
     output = process_video_direct(args.video_path, args.model, args.mode)
     
     if output:
-        print(f"\n🎥 Video processed successfully!")
+        print(f"\n Video processed successfully!")
         print(f"Output saved to: {output}")
     else:
-        print("\n❌ Video processing failed")
+        print("\n Video processing failed")
         sys.exit(1)
 
 

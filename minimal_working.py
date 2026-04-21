@@ -25,7 +25,7 @@ with demo:
     # Header
     gr.HTML("""
     <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #2563eb 0%, #1e40af 100%); border-radius: 12px; margin-bottom: 20px; color: white;">
-        <h1 style="margin: 0; font-size: 28px;">🚀 YOLO26 AI Vision</h1>
+        <h1 style="margin: 0; font-size: 28px;"> YOLO26 AI Vision</h1>
         <p style="margin: 5px 0 0 0; opacity: 0.9;">Advanced AI Vision Platform</p>
     </div>
     """)
@@ -37,7 +37,7 @@ with demo:
             with gr.Row():
                 with gr.Column(scale=1):
                     img_input = gr.Image(type="pil", label="Upload Image")
-                    img_btn = gr.Button("🚀 Detect Objects", variant="primary", size="lg")
+                    img_btn = gr.Button(" Detect Objects", variant="primary", size="lg")
                     
                 with gr.Column(scale=2):
                     img_output = gr.Image(type="pil", label="Detection Result")
@@ -55,7 +55,7 @@ with demo:
             gr.Markdown("**Note**: This is a minimal test version. Full video processing will be available in the complete app.")
             
             vid_input = gr.Video(label="Upload Video")
-            vid_btn = gr.Button("🚀 Process Video", variant="primary")
+            vid_btn = gr.Button(" Process Video", variant="primary")
             vid_output = gr.Video(label="Processed Video")
             
             def simple_process(video):

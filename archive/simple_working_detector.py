@@ -14,10 +14,10 @@ def simple_detect_plates(image_path):
     # Read image
     img = cv2.imread(image_path)
     if img is None:
-        print("❌ Cannot load image")
+        print(" Cannot load image")
         return []
     
-    print(f"📷 Processing image: {img.shape}")
+    print(f" Processing image: {img.shape}")
     
     # Try to import Tesseract
     try:
@@ -25,7 +25,7 @@ def simple_detect_plates(image_path):
         if os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
             pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     except:
-        print("❌ Tesseract not available")
+        print(" Tesseract not available")
         return []
     
     # Convert to grayscale
@@ -68,7 +68,7 @@ def simple_detect_plates(image_path):
     
     # Save result
     cv2.imwrite("plate_detection_result.jpg", img)
-    print(f"📁 Result saved: plate_detection_result.jpg")
+    print(f" Result saved: plate_detection_result.jpg")
     
     return plates
 
@@ -86,13 +86,13 @@ if __name__ == "__main__":
     # Find an image to test
     for file in os.listdir('.'):
         if file.lower().endswith(('.jpg', '.png', '.jpeg')):
-            print(f"\n🧪 Testing with: {file}")
+            print(f"\n Testing with: {file}")
             plates = simple_detect_plates(file)
             
             if plates:
-                print(f"✅ Found {len(plates)} plates:")
+                print(f" Found {len(plates)} plates:")
                 for p in plates:
-                    print(f"   📋 {p['text']}")
+                    print(f"    {p['text']}")
             else:
-                print("❌ No plates found")
+                print(" No plates found")
             break

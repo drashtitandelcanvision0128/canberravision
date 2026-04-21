@@ -409,26 +409,26 @@ def get_image_processing_stats() -> Dict:
 
 
 if __name__ == "__main__":
-    print("🖼️  Image Processor Module")
+    print("  Image Processor Module")
     print("=" * 30)
     
     # Test with dummy image
     test_image = np.zeros((480, 640, 3), dtype=np.uint8)
     
-    print("🧪 Testing image processing...")
+    print(" Testing image processing...")
     result = process_single_image(test_image)
     
     if 'error' not in result:
-        print("✅ Image processing test passed!")
+        print(" Image processing test passed!")
         print(f"   Objects found: {len(result['detections']['objects'])}")
         print(f"   License plates: {len(result['detections']['license_plates'])}")
         print(f"   Processing time: {result['processing_info']['processing_time']:.2f}s")
     else:
-        print(f"❌ Test failed: {result['error']}")
+        print(f" Test failed: {result['error']}")
     
-    print("\n📖 Usage:")
+    print("\n Usage:")
     print("   from image_processor import process_single_image")
     print("   result = process_single_image(image)")
     print("   print(result['detections']['license_plates'])")
     
-    print("\n✅ Image processor ready!")
+    print("\n Image processor ready!")

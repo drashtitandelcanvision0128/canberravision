@@ -39,7 +39,7 @@ def initialize_gpu_environment():
                 'device_memory': torch.cuda.get_device_properties(0).total_memory / 1e9,
                 'current_device': torch.cuda.current_device()
             }
-            print(f"[INFO] 🚀 CUDA GPU Detected: {_device_info['device_name']}")
+            print(f"[INFO]  CUDA GPU Detected: {_device_info['device_name']}")
             print(f"[INFO] GPU Memory: {_device_info['device_memory']:.1f} GB")
             
             # Set GPU optimization
@@ -48,7 +48,7 @@ def initialize_gpu_environment():
             
         else:
             _device_info = {'pytorch_cuda': False}
-            print("[INFO] ⚠️ CUDA not available, using CPU mode")
+            print("[INFO]  CUDA not available, using CPU mode")
             
         return _gpu_available
         
@@ -362,7 +362,7 @@ def extract_license_plates_optimized(
                     'processing_time': text_result["processing_time"],
                     'device': text_result["device"]
                 })
-                print(f"[DEBUG] ✅ Found license plate: {plate_text} (conf: {confidence:.3f})")
+                print(f"[DEBUG]  Found license plate: {plate_text} (conf: {confidence:.3f})")
         
         # Also check extracted text for license plates
         for pattern in patterns:
@@ -383,7 +383,7 @@ def extract_license_plates_optimized(
                             'processing_time': text_result["processing_time"],
                             'device': text_result["device"]
                         })
-                        print(f"[DEBUG] ✅ Found license plate from text: {cleaned_plate}")
+                        print(f"[DEBUG]  Found license plate from text: {cleaned_plate}")
         
         print(f"[DEBUG] Found {len(license_plates)} unique license plates")
         return license_plates

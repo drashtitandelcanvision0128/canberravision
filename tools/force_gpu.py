@@ -32,11 +32,11 @@ try:
         # Test GPU memory
         device = torch.device('cuda:0')
         x = torch.randn(1000, 1000).to(device)
-        print("✅ GPU test tensor created successfully")
-        print("🎉 GPU is ready for use!")
+        print(" GPU test tensor created successfully")
+        print(" GPU is ready for use!")
         
     else:
-        print("❌ CUDA not available")
+        print(" CUDA not available")
         
 except Exception as e:
     print(f"Error testing CUDA: {e}")

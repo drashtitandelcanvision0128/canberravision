@@ -254,7 +254,7 @@ def detect_vehicles_and_plates(frame, model):
         return detected_vehicles
         
     except Exception as e:
-        print(f"⚠️ Detection error: {e}")
+        print(f" Detection error: {e}")
         return []
 
 
@@ -392,7 +392,7 @@ def find_license_plate_in_crop(vehicle_crop):
         return [(x1, y1, x2, y2) for (x1, y1, x2, y2, _) in unique_candidates[:3]]
         
     except Exception as e:
-        print(f"⚠️ Plate detection error: {e}")
+        print(f" Plate detection error: {e}")
         return []
 
 
@@ -598,12 +598,12 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
     Process video with improved license plate detection
     """
     try:
-        print(f"🚀 Starting video processing with LICENSE PLATE detection: {mode} mode")
+        print(f" Starting video processing with LICENSE PLATE detection: {mode} mode")
         start_time = time.time()
         
         # Validate video
         if not os.path.exists(video_path):
-            print(f"❌ Video file not found: {video_path}")
+            print(f" Video file not found: {video_path}")
             return None, "Error: Video file not found"
         
         # Import YOLO
@@ -612,17 +612,17 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
         # Load model
         model_path = f"models/{model_name}.pt"
         if not os.path.exists(model_path):
-            print(f"❌ Model not found: {model_path}")
+            print(f" Model not found: {model_path}")
             return None, f"Error: Model not found: {model_path}"
         
-        print(f"🤖 Loading model: {model_path}")
+        print(f" Loading model: {model_path}")
         model = YOLO(model_path)
         
         # Check model classes
-        print(f"📋 Model classes: {model.names if hasattr(model, 'names') else 'Unknown'}")
+        print(f" Model classes: {model.names if hasattr(model, 'names') else 'Unknown'}")
         
         device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"💻 Device: {device}")
+        print(f" Device: {device}")
         
         # Mode settings
         settings = {
@@ -642,7 +642,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         
-        print(f"📹 Video: {width}x{height} @ {fps} FPS, {total_frames} frames")
+        print(f" Video: {width}x{height} @ {fps} FPS, {total_frames} frames")
         
         # Output
         timestamp = int(time.time())
@@ -670,7 +670,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
         all_detections = []  # For info panel display
         seen_plates = set()
         
-        print("🎬 Processing frames...")
+        print(" Processing frames...")
         
         while True:
             ret, frame = cap.read()
@@ -691,7 +691,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
                 fps_proc = actual_processed / elapsed if elapsed > 0 else 0
                 pct = (processed_count / total_frames) * 100
                 eta = ((total_frames - processed_count) / (fps_proc * cfg['skip'] + 1)) / 60
-                print(f"📊 {pct:.1f}% | {fps_proc:.1f} FPS | ETA: {eta:.1f}min | Vehicles: {total_vehicles}")
+                print(f" {pct:.1f}% | {fps_proc:.1f} FPS | ETA: {eta:.1f}min | Vehicles: {total_vehicles}")
             
             try:
                 # Detect vehicles with plates
@@ -742,7 +742,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
                                     plate_filename = f"plate_{safe_text}_f{processed_count}.jpg"
                                     plate_path = os.path.join(plates_dir, plate_filename)
                                     cv2.imwrite(plate_path, plate['crop'])
-                                    print(f"🚗 Frame {processed_count}: {vtype} {vcolor} | Plate: {plate_text}")
+                                    print(f" Frame {processed_count}: {vtype} {vcolor} | Plate: {plate_text}")
                         
                         # Add to frame detections for info panel
                         detection_info = {
@@ -760,7 +760,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
                 out.write(annotated_frame)
                 
             except Exception as e:
-                print(f"⚠️ Frame {processed_count} error: {e}")
+                print(f" Frame {processed_count} error: {e}")
                 out.write(frame)
         
         # Cleanup
@@ -771,48 +771,48 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
         total_time = time.time() - start_time
         avg_fps = actual_processed / total_time if total_time > 0 else 0
         
-        print(f"\n✅ Processing Complete!")
-        print(f"⏱️  Time: {total_time:.1f}s ({total_time/60:.1f} min)")
-        print(f"🚀 Speed: {avg_fps:.1f} FPS")
-        print(f"📊 Frames: {actual_processed}/{total_frames}")
-        print(f"� Total Vehicles: {total_vehicles}")
-        print(f"📝 Plates with Text: {plates_with_text}")
-        print(f"🎯 Unique Plates: {len(seen_plates)}")
+        print(f"\n Processing Complete!")
+        print(f"  Time: {total_time:.1f}s ({total_time/60:.1f} min)")
+        print(f" Speed: {avg_fps:.1f} FPS")
+        print(f" Frames: {actual_processed}/{total_frames}")
+        print(f" Total Vehicles: {total_vehicles}")
+        print(f" Plates with Text: {plates_with_text}")
+        print(f" Unique Plates: {len(seen_plates)}")
         
         # Show detected plates with vehicle info
         if seen_plates:
-            print(f"\n🚗 Detected License Plates:")
+            print(f"\n Detected License Plates:")
             for plate in sorted(seen_plates):
                 print(f"   • {plate}")
         
-        print(f"\n💾 Output: {output_path}")
-        print(f"📁 Crops: {plates_dir}")
+        print(f"\n Output: {output_path}")
+        print(f" Crops: {plates_dir}")
         
         # Summary with vehicle info
-        summary = f"""🎥 **ANPR Video Processing Complete!**
+        summary = f""" **ANPR Video Processing Complete!**
 
-📊 **Statistics:**
+ **Statistics:**
 • Mode: {mode.upper()}
 • Time: {total_time:.1f}s ({total_time/60:.1f} min)
 • Speed: {avg_fps:.1f} FPS
 • Frames: {actual_processed}/{total_frames}
 
-� **Vehicle Detection:**
+ **Vehicle Detection:**
 • Total Vehicles: {total_vehicles}
 • Plates Detected: {plates_with_text}
 • Unique Plates: {len(seen_plates)}
 
-� **Detected Plates:**
+ **Detected Plates:**
 """
         for plate in sorted(seen_plates)[:15]:
             summary += f"• {plate}\n"
         
         summary += f"""
-💾 **Output:**
+ **Output:**
 • Video: {output_path}
 • Crops: {plates_dir}
 
-✅ ANPR Processing finished! Video includes:
+ ANPR Processing finished! Video includes:
    - Vehicle bounding boxes (yellow)
    - Vehicle type & color labels
    - License plate boxes (green)
@@ -825,7 +825,7 @@ def process_video_with_license_plates(video_path, model_name="yolo26n", mode="ul
         
     except Exception as e:
         import traceback
-        print(f"❌ Error: {e}")
+        print(f" Error: {e}")
         traceback.print_exc()
         return None, f"Error: {str(e)}"
 
@@ -852,7 +852,7 @@ if __name__ == "__main__":
     output, summary = process_video_with_license_plates(args.video, args.model, args.mode)
     
     if output:
-        print(f"\n✅ Success: {output}")
+        print(f"\n Success: {output}")
         print(f"\n{summary}")
     else:
-        print(f"\n❌ Failed: {summary}")
+        print(f"\n Failed: {summary}")

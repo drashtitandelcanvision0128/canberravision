@@ -1,7 +1,5 @@
 # Ultralytics  AGPL-3.0 License - https://ultralytics.com/license
 
-
-
 import tempfile
 
 import signal
@@ -32,8 +30,6 @@ from pathlib import Path
 
 from typing import List, Dict, Tuple, Optional, Union
 
-
-
 # Set working directory to project root
 
 script_dir = Path(__file__).parent
@@ -44,13 +40,9 @@ os.chdir(project_root)
 
 sys.path.insert(0, str(project_root))
 
-
-
 print(f"[INFO] Working directory set to: {os.getcwd()}")
 
 print(f"[INFO] Project root: {project_root}")
-
-
 
 try:
 
@@ -59,8 +51,6 @@ try:
 except Exception:
 
     imageio_ffmpeg = None
-
-
 
 # Import new modules for Enhanced ANPR
 
@@ -80,8 +70,6 @@ except ImportError:
 
     print("[WARNING] Enhanced ANPR modules not available")
 
-
-
 # Import existing OCR modules
 
 try:
@@ -100,8 +88,6 @@ except ImportError:
 
     print("[WARNING] OCR modules not available")
 
-
-
 import cv2
 
 import numpy as np
@@ -119,8 +105,6 @@ import torchvision
 from torchvision.models import resnet18, ResNet18_Weights
 
 from ultralytics import YOLO
-
-
 
 # Import fast_alpr for license plate detection
 
@@ -151,8 +135,6 @@ except Exception as e:
     import traceback
 
     traceback.print_exc()
-
-
 
 # Initialize ALPR globally if available
 
@@ -201,8 +183,6 @@ if ALPR_AVAILABLE:
             import traceback
 
             traceback.print_exc()
-
-
 
 # Import fast_alpr for license plate detection
 try:
@@ -251,15 +231,11 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 print(f"[INFO] Using device: {device}")
 
-
-
 # Enhanced ANPR System Class
 
 class EnhancedANPRSystem:
 
     """Enhanced ANPR System with comprehensive vehicle analysis."""
-
-    
 
     def __init__(self):
 
@@ -268,8 +244,6 @@ class EnhancedANPRSystem:
         self.text_extractor = None
 
         self.license_detector = None
-
-        
 
         # New modules
 
@@ -283,11 +257,7 @@ class EnhancedANPRSystem:
 
         self.vehicle_matcher = None
 
-        
-
         self._initialize_models()
-
-    
 
     def _initialize_models(self):
 
@@ -303,8 +273,6 @@ class EnhancedANPRSystem:
 
             print("[INFO] YOLO model loaded successfully")
 
-            
-
             # Initialize OCR components
 
             if OCR_AVAILABLE:
@@ -314,8 +282,6 @@ class EnhancedANPRSystem:
                 self.license_detector = LicensePlateDetector()
 
                 print("[INFO] OCR components initialized")
-
-            
 
             # Initialize new classification modules
 
@@ -327,8 +293,6 @@ class EnhancedANPRSystem:
 
                 print("[INFO] Vehicle classification modules initialized")
 
-                
-
                 # Initialize database and alert system
 
                 self.vehicle_database = VehicleDatabase()
@@ -339,13 +303,9 @@ class EnhancedANPRSystem:
 
                 print("[INFO] Database and alert system initialized")
 
-            
-
         except Exception as e:
 
             print(f"[ERROR] Model initialization failed: {e}")
-
-    
 
     def detect_vehicles(self, image: np.ndarray) -> List[Dict]:
 
@@ -354,8 +314,6 @@ class EnhancedANPRSystem:
         results = self.yolo_model(image)
 
         vehicles = []
-
-        
 
         for result in results:
 
@@ -368,8 +326,6 @@ class EnhancedANPRSystem:
                     cls = int(box.cls[0])
 
                     conf = float(box.conf[0])
-
-                    
 
                     # Filter for vehicle classes
 
@@ -389,11 +345,7 @@ class EnhancedANPRSystem:
 
                         })
 
-        
-
         return vehicles
-
-    
 
     def classify_vehicle_type(self, vehicle_crop: np.ndarray) -> str:
 
@@ -402,8 +354,6 @@ class EnhancedANPRSystem:
         if self.vehicle_classifier is None:
 
             return 'Unknown'
-
-        
 
         try:
 
@@ -417,8 +367,6 @@ class EnhancedANPRSystem:
 
             return 'Unknown'
 
-    
-
     def detect_vehicle_color(self, vehicle_crop: np.ndarray) -> str:
 
         """Detect vehicle color using the enhanced color detector."""
@@ -426,8 +374,6 @@ class EnhancedANPRSystem:
         if self.color_detector is None:
 
             return 'Unknown'
-
-        
 
         try:
 
@@ -439,23 +385,17 @@ class EnhancedANPRSystem:
 
                 return result['color']
 
-            
-
             # Fallback to K-means if HSV confidence is low
 
             result = self.color_detector.detect_color_kmeans(vehicle_crop)
 
             return result['color']
 
-            
-
         except Exception as e:
 
             print(f"[ERROR] Color detection failed: {e}")
 
             return 'Unknown'
-
-    
 
     def extract_license_plate(self, image: np.ndarray, vehicle_bbox: Tuple[int, int, int, int]) -> Optional[str]:
 
@@ -467,13 +407,9 @@ class EnhancedANPRSystem:
 
                 return None
 
-                
-
             x1, y1, x2, y2 = vehicle_bbox
 
             vehicle_crop = image[y1:y2, x1:x2]
-
-            
 
             # Display debug images if available
 
@@ -488,8 +424,6 @@ class EnhancedANPRSystem:
                         if img is not None:
 
                             print(f"  - {name}: {img.shape}")
-
-            
 
             # Use reliable OCR function instead of strict OCR
 
@@ -513,8 +447,6 @@ class EnhancedANPRSystem:
 
             display_debug_images(result.get('debug_images'))
 
-            
-
             # Look for license plates in results
 
             for plate_info in result.get('license_plates', []):
@@ -523,19 +455,13 @@ class EnhancedANPRSystem:
 
                     return plate_info['text']
 
-            
-
             return None
-
-            
 
         except Exception as e:
 
             print(f"[ERROR] License plate extraction failed: {e}")
 
             return None
-
-    
 
     def query_database(self, license_plate: str) -> Dict:
 
@@ -554,8 +480,6 @@ class EnhancedANPRSystem:
                 'alert': False
 
             }
-
-        
 
         vehicle = self.vehicle_database.get_vehicle(license_plate)
 
@@ -577,8 +501,6 @@ class EnhancedANPRSystem:
 
             }
 
-        
-
         return {
 
             'make': 'Unknown',
@@ -591,8 +513,6 @@ class EnhancedANPRSystem:
 
         }
 
-    
-
     def check_alerts(self, license_plate: str, vehicle_data: Dict) -> List[Dict]:
 
         """Check for alerts related to the vehicle."""
@@ -601,11 +521,7 @@ class EnhancedANPRSystem:
 
             return []
 
-        
-
         return self.alert_system.check_alerts(license_plate, vehicle_data)
-
-    
 
     def find_similar_vehicles(self, license_plate: str) -> List[Dict]:
 
@@ -615,13 +531,9 @@ class EnhancedANPRSystem:
 
             return []
 
-        
-
         return self.vehicle_matcher.find_similar_vehicles(license_plate)
 
-    
-
-    def estimate_speed(self, current_position: Tuple[int, int], previous_position: Optional[Tuple[int, int]], 
+    def estimate_speed(self, current_position: Tuple[int, int], previous_position: Optional[Tuple[int, int]],
 
                       time_diff: float) -> float:
 
@@ -631,15 +543,11 @@ class EnhancedANPRSystem:
 
             return 0.0
 
-        
-
         # Calculate pixel distance
 
-        pixel_distance = np.sqrt((current_position[0] - previous_position[0])**2 + 
+        pixel_distance = np.sqrt((current_position[0] - previous_position[0])**2 +
 
                                 (current_position[1] - previous_position[1])**2)
-
-        
 
         # Convert to km/h (simplified conversion)
 
@@ -647,11 +555,7 @@ class EnhancedANPRSystem:
 
         speed_kmh = speed_ms * 3.6
 
-        
-
         return min(speed_kmh, 200)  # Cap at 200 km/h
-
-    
 
     def process_image(self, image: np.ndarray) -> Dict:
 
@@ -659,13 +563,9 @@ class EnhancedANPRSystem:
 
         start_time = time.time()
 
-        
-
         # Detect vehicles
 
         vehicles = self.detect_vehicles(image)
-
-        
 
         results = {
 
@@ -683,15 +583,11 @@ class EnhancedANPRSystem:
 
         }
 
-        
-
         for i, vehicle in enumerate(vehicles):
 
             x1, y1, x2, y2 = vehicle['bbox']
 
             vehicle_crop = image[y1:y2, x1:x2]
-
-            
 
             # Extract information
 
@@ -703,13 +599,9 @@ class EnhancedANPRSystem:
 
             speed = self.estimate_speed((x1 + x2) // 2, (y1 + y2) // 2, None, 1.0)
 
-            
-
             # Query database
 
             db_info = self.query_database(license_plate) if license_plate else {}
-
-            
 
             # Create vehicle data for alert checking
 
@@ -723,19 +615,13 @@ class EnhancedANPRSystem:
 
             }
 
-            
-
             # Check for alerts
 
             alerts = self.check_alerts(license_plate, vehicle_data) if license_plate else []
 
-            
-
             # Find similar vehicles
 
             similar_vehicles = self.find_similar_vehicles(license_plate) if license_plate else []
-
-            
 
             vehicle_info = {
 
@@ -767,13 +653,9 @@ class EnhancedANPRSystem:
 
             }
 
-            
-
             results['vehicles'].append(vehicle_info)
 
             results['alerts'].extend(alerts)
-
-            
 
             # Add unique similar vehicles to results
 
@@ -783,13 +665,9 @@ class EnhancedANPRSystem:
 
                     results['similar_vehicles'].append(similar)
 
-        
-
         results['processing_time'] = round(time.time() - start_time, 2)
 
         return results
-
-    
 
     def create_anpr_display(self, image: np.ndarray, results: Dict) -> np.ndarray:
 
@@ -799,15 +677,11 @@ class EnhancedANPRSystem:
 
         display_image = image.copy()
 
-        
-
         # Draw bounding boxes and information for each vehicle
 
         for vehicle in results['vehicles']:
 
             x1, y1, x2, y2 = vehicle['bbox']
-
-            
 
             # Draw bounding box with alert color
 
@@ -823,11 +697,7 @@ class EnhancedANPRSystem:
 
                 label_prefix = ""
 
-            
-
             cv2.rectangle(display_image, (x1, y1), (x2, y2), color, 2)
-
-            
 
             # Add license plate text
 
@@ -837,31 +707,25 @@ class EnhancedANPRSystem:
 
                 label = f"{label_prefix}{plate_text}"
 
-                cv2.putText(display_image, label, (x1, y1 - 10), 
+                cv2.putText(display_image, label, (x1, y1 - 10),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
-
-            
 
             # Add vehicle info
 
             info_text = f"{vehicle['make']} {vehicle['model']}"
 
-            cv2.putText(display_image, info_text, (x1, y2 + 25), 
+            cv2.putText(display_image, info_text, (x1, y2 + 25),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-
-            
 
             # Add speed
 
             speed_text = f"Speed: {vehicle['speed']} km/h"
 
-            cv2.putText(display_image, speed_text, (x1, y2 + 45), 
+            cv2.putText(display_image, speed_text, (x1, y2 + 45),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
-
-        
 
         # Add timestamp and date in small box
 
@@ -875,37 +739,27 @@ class EnhancedANPRSystem:
 
             cv2.addWeighted(overlay, 0.7, display_image, 0.3, 0, display_image)
 
-            
-
             # Add time with smaller font
 
-            cv2.putText(display_image, f"Time: {results['timestamp']}", (10, 25), 
+            cv2.putText(display_image, f"Time: {results['timestamp']}", (10, 25),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-            
+            # Add date with smaller font
 
-            # Add date with smaller font  
-
-            cv2.putText(display_image, f"Date: {results['date']}", (10, 50), 
+            cv2.putText(display_image, f"Date: {results['date']}", (10, 50),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-            
 
             # Add ANPR mode info
 
-            cv2.putText(display_image, "Mode: ANPR", (10, 75), 
+            cv2.putText(display_image, "Mode: ANPR", (10, 75),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
-
-            
 
         except Exception as e:
 
             print(f"[WARNING] Failed to add ANPR timestamp: {e}")
-
-        
 
         # Add alert summary if any alerts exist
 
@@ -913,21 +767,15 @@ class EnhancedANPRSystem:
 
             alert_text = f"ALERTS: {len(results['alerts'])} active"
 
-            cv2.putText(display_image, alert_text, (10, 110), 
+            cv2.putText(display_image, alert_text, (10, 110),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
-        
-
         return display_image
-
-
 
 # Initialize Enhanced ANPR System
 
 enhanced_anpr = EnhancedANPRSystem()
-
-
 
 def process_enhanced_anpr(input_image):
 
@@ -937,13 +785,9 @@ def process_enhanced_anpr(input_image):
 
         return None, "No image provided", "", ""
 
-    
-
     try:
 
         print("[DEBUG] Enhanced ANPR processing started")
-
-        
 
         # Convert PIL to numpy
 
@@ -953,8 +797,6 @@ def process_enhanced_anpr(input_image):
 
         print(f"[DEBUG] Image converted: {image.shape}")
 
-        
-
         # Check if enhanced ANPR system is available
 
         if not enhanced_anpr or not enhanced_anpr.yolo_model:
@@ -962,8 +804,6 @@ def process_enhanced_anpr(input_image):
             print("[ERROR] Enhanced ANPR system not properly initialized")
 
             return None, " Enhanced ANPR system not available. Please check system initialization.", "", ""
-
-        
 
         # Try enhanced processing first
 
@@ -978,8 +818,6 @@ def process_enhanced_anpr(input_image):
             print(f"[WARNING] Enhanced processing failed: {e}")
 
             print("[INFO] Using fallback simple detection...")
-
-            
 
             # Fallback to simple detection
 
@@ -999,21 +837,15 @@ def process_enhanced_anpr(input_image):
 
             }
 
-            
-
             # Simple vehicle detection
 
             vehicles = enhanced_anpr.detect_vehicles(image)
-
-            
 
             for i, vehicle in enumerate(vehicles):
 
                 x1, y1, x2, y2 = vehicle['bbox']
 
                 vehicle_crop = image[y1:y2, x1:x2]
-
-                
 
                 # Try to extract real license plate using available OCR
 
@@ -1044,8 +876,6 @@ def process_enhanced_anpr(input_image):
                     print(f"[DEBUG] Plate extraction failed: {plate_error}")
 
                     license_plate = f"DETECT{i+1:03d}"
-
-                
 
                 # Try to detect real vehicle color
 
@@ -1083,8 +913,6 @@ def process_enhanced_anpr(input_image):
 
                     detected_color = colors[i % len(colors)]
 
-                
-
                 # Try to classify vehicle make/model
 
                 make_model = "Unknown Vehicle"
@@ -1113,8 +941,6 @@ def process_enhanced_anpr(input_image):
 
                     make_model = vehicle_types.get(vehicle.get('class', 2), 'Car')
 
-                
-
                 # Database lookup with detected plate
 
                 db_info = {'make': 'Unknown', 'model': 'Unknown', 'color': detected_color, 'owner': 'Unknown', 'alert': False}
@@ -1129,8 +955,6 @@ def process_enhanced_anpr(input_image):
 
                     print(f"[DEBUG] Database lookup failed: {db_error}")
 
-                
-
                 # Use detected info or fallback
 
                 final_make = db_info.get('make', make_model.split()[0] if ' ' in make_model else make_model)
@@ -1140,8 +964,6 @@ def process_enhanced_anpr(input_image):
                 final_color = db_info.get('color', detected_color)
 
                 final_owner = db_info.get('owner', 'Unknown')
-
-                
 
                 vehicle_info = {
 
@@ -1173,8 +995,6 @@ def process_enhanced_anpr(input_image):
 
                 }
 
-                
-
                 # Add alerts if needed
 
                 if vehicle_info['alert']:
@@ -1199,21 +1019,13 @@ def process_enhanced_anpr(input_image):
 
                     })
 
-                
-
                 results['vehicles'].append(vehicle_info)
 
-            
-
             results['processing_time'] = 1.5
-
-        
 
         # Create display image
 
         display_image = enhanced_anpr.create_anpr_display(image, results)
-
-        
 
         # Generate detailed information text
 
@@ -1228,8 +1040,6 @@ def process_enhanced_anpr(input_image):
         info_text += f" Vehicles Detected: {len(results['vehicles'])}\n"
 
         info_text += f" Active Alerts: {len(results['alerts'])}\n\n"
-
-        
 
         for vehicle in results['vehicles']:
 
@@ -1251,8 +1061,6 @@ def process_enhanced_anpr(input_image):
 
             info_text += f" Status: {'ALERT' if vehicle['alert'] or vehicle['alerts'] else 'Clear'}\n"
 
-            
-
             # Add vehicle-specific alerts
 
             if vehicle['alerts']:
@@ -1261,21 +1069,15 @@ def process_enhanced_anpr(input_image):
 
                 for alert in vehicle['alerts']:
 
-                    info_text += f"   • {alert['message']}\n"
-
-            
+                    info_text += f"  • {alert['message']}\n"
 
             info_text += "\n"
-
-        
 
         # Generate database matches with similarity scores
 
         db_matches = f" Database Matches & Similar Vehicles\n"
 
         db_matches += f"\n\n"
-
-        
 
         # Add sample database matches
 
@@ -1289,37 +1091,31 @@ def process_enhanced_anpr(input_image):
 
         ]
 
-        
-
         for match in sample_matches:
 
             alert_status = " ALERT" if match.get('alert') else " Clear"
 
             db_matches += f" {match['plate']}\n"
 
-            db_matches += f"    Vehicle: {match['make']} {match['model']}\n"
+            db_matches += f"  Vehicle: {match['make']} {match['model']}\n"
 
-            db_matches += f"    Color: {match['color']}\n"
+            db_matches += f"  Color: {match['color']}\n"
 
-            db_matches += f"    Match: {match['similarity']:.1%}\n"
+            db_matches += f"  Match: {match['similarity']:.1%}\n"
 
-            db_matches += f"    Status: {alert_status}\n"
+            db_matches += f"  Status: {alert_status}\n"
 
             if match.get('reason'):
 
-                db_matches += f"    Reason: {match['reason']}\n"
+                db_matches += f"  Reason: {match['reason']}\n"
 
             db_matches += "\n"
-
-        
 
         # Generate active alerts summary
 
         alerts_summary = f" Active Alerts Summary\n"
 
         alerts_summary += f"\n\n"
-
-        
 
         if results['alerts']:
 
@@ -1329,27 +1125,21 @@ def process_enhanced_anpr(input_image):
 
                 alerts_summary += f"{i}. {severity_icon} {alert['type'].upper()}\n"
 
-                alerts_summary += f"    Plate: {alert['license_plate']}\n"
+                alerts_summary += f"  Plate: {alert['license_plate']}\n"
 
-                alerts_summary += f"    Message: {alert['message']}\n\n"
+                alerts_summary += f"  Message: {alert['message']}\n\n"
 
         else:
 
             alerts_summary += " No active alerts\n\n"
 
-        
-
         # Convert back to RGB for display
 
         display_image = cv2.cvtColor(display_image, cv2.COLOR_BGR2RGB)
 
-        
-
         print("[DEBUG] Enhanced ANPR processing completed successfully")
 
         return display_image, info_text, db_matches, alerts_summary
-
-        
 
     except Exception as e:
 
@@ -1358,8 +1148,6 @@ def process_enhanced_anpr(input_image):
         print(f"[ERROR] Enhanced ANPR processing failed: {e}")
 
         return None, error_msg, "", ""
-
-
 
 # Force CUDA device if available
 
@@ -1377,8 +1165,6 @@ else:
 
     print("[INFO] To enable GPU, install NVIDIA drivers and CUDA Toolkit")
 
-
-
 # Prefer GPU 0 for all CUDA-accelerated components (YOLO/PyTorch/Paddle)
 
 # Only set if user/environment hasn't already specified a device mask.
@@ -1387,15 +1173,11 @@ if "CUDA_VISIBLE_DEVICES" not in os.environ:
 
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-
-
 # Set OpenCV environment variables to reduce camera detection warnings
 
 os.environ['OPENCV_VIDEOIO_PRIORITY_MSMF'] = '0'
 
 os.environ['OPENCV_VIDEOIO_PRIORITY_DSHOW'] = '0'
-
-
 
 # Production Environment Configuration for Coolify
 
@@ -1407,13 +1189,9 @@ if IS_PRODUCTION:
 
     print("[INFO] Applying production optimizations...")
 
-    
-
     # Force CPU mode in production (Coolify servers typically don't have GPU)
 
     os.environ['CUDA_VISIBLE_DEVICES'] = ''
-
-    
 
     # Set production server settings
 
@@ -1422,8 +1200,6 @@ if IS_PRODUCTION:
     _gradio_server_port = int(os.environ.get('GRADIO_SERVER_PORT', '7860'))
 
     _open_browser = False  # Never open browser in production
-
-    
 
     print(f"[INFO] Production server config: {_gradio_server_name}:{_gradio_server_port}")
 
@@ -1436,8 +1212,6 @@ else:
     _gradio_server_port = 7863  # Changed to 7863 since 7860-7862 are in use
 
     _open_browser = True
-
-
 
 try:
 
@@ -1469,8 +1243,6 @@ except ImportError:
 
     pytesseract = None
 
-
-
 # Import LightOnOCR integration
 
 try:
@@ -1486,8 +1258,6 @@ except ImportError:
     LIGHTON_AVAILABLE = False
 
     print("[WARNING] LightOnOCR integration not available")
-
-
 
 # Import gender detection model
 
@@ -1516,8 +1286,6 @@ except ImportError:
     GENDER_MODEL_AVAILABLE = False
 
     print("[WARNING] Gender detection model not available")
-
-
 
 # Custom CSS for Obsidian Vision Professional Theme
 
@@ -1555,8 +1323,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* Global Container */
 
 .gradio-container {
@@ -1570,8 +1336,6 @@ CUSTOM_CSS = """
     min-height: 100vh;
 
 }
-
-
 
 /* ===== HEADER - OBSIDIAN STYLE ===== */
 
@@ -1593,8 +1357,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-logo {
 
     display: flex !important;
@@ -1610,8 +1372,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .obsidian-logo-icon {
 
@@ -1633,8 +1393,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-menu-btn {
 
     background: transparent !important;
@@ -1651,8 +1409,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== NAVIGATION TABS ===== */
 
 .tabs {
@@ -1666,8 +1422,6 @@ CUSTOM_CSS = """
     padding: 0 8px !important;
 
 }
-
-
 
 .tabs button,
 
@@ -1695,8 +1449,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .tabs button:hover,
 
 .tabs [role="tab"]:hover {
@@ -1708,8 +1460,6 @@ CUSTOM_CSS = """
     border-color: var(--obsidian-accent) !important;
 
 }
-
-
 
 .tabs button.selected,
 
@@ -1724,8 +1474,6 @@ CUSTOM_CSS = """
     box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4) !important;
 
 }
-
-
 
 /* ===== LIVE FEED SECTION ===== */
 
@@ -1744,8 +1492,6 @@ CUSTOM_CSS = """
     margin-bottom: 24px !important;
 
 }
-
-
 
 .obsidian-feed-badge {
 
@@ -1777,8 +1523,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-feed-badge::before {
 
     content: "" !important;
@@ -1795,8 +1539,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 @keyframes pulse {
 
     0%, 100% { opacity: 1; }
@@ -1804,8 +1546,6 @@ CUSTOM_CSS = """
     50% { opacity: 0.5; }
 
 }
-
-
 
 .obsidian-confidence-badge {
 
@@ -1831,8 +1571,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== TRAFFIC INSIGHTS PANEL ===== */
 
 .obsidian-insights {
@@ -1848,8 +1586,6 @@ CUSTOM_CSS = """
     margin-bottom: 24px !important;
 
 }
-
-
 
 .obsidian-insights-title {
 
@@ -1867,8 +1603,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-stats-row {
 
     display: flex !important;
@@ -1879,15 +1613,11 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-stat {
 
     flex: 1 !important;
 
 }
-
-
 
 .obsidian-stat-label {
 
@@ -1903,8 +1633,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-stat-value {
 
     font-size: 32px !important;
@@ -1916,8 +1644,6 @@ CUSTOM_CSS = """
     line-height: 1 !important;
 
 }
-
-
 
 .obsidian-stat-sub {
 
@@ -1931,8 +1657,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-trend-up {
 
     color: var(--obsidian-success) !important;
@@ -1943,8 +1667,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-status {
 
     font-size: 11px !important;
@@ -1954,8 +1676,6 @@ CUSTOM_CSS = """
     text-transform: uppercase !important;
 
 }
-
-
 
 /* ===== SLOT AVAILABILITY GRID ===== */
 
@@ -1973,8 +1693,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-slots-title {
 
     font-size: 12px !important;
@@ -1991,8 +1709,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-slots-grid {
 
     display: grid !important;
@@ -2002,8 +1718,6 @@ CUSTOM_CSS = """
     gap: 12px !important;
 
 }
-
-
 
 .obsidian-slot {
 
@@ -2023,8 +1737,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-slot-name {
 
     font-size: 14px !important;
@@ -2034,8 +1746,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .obsidian-slot-status {
 
@@ -2051,8 +1761,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-slot-available {
 
     background: rgba(16, 185, 129, 0.2) !important;
@@ -2061,8 +1769,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-slot-occupied {
 
     background: rgba(239, 68, 68, 0.2) !important;
@@ -2070,8 +1776,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-danger) !important;
 
 }
-
-
 
 /* ===== INTELLIGENCE LOG ===== */
 
@@ -2089,8 +1793,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-header {
 
     display: flex !important;
@@ -2102,8 +1804,6 @@ CUSTOM_CSS = """
     margin-bottom: 20px !important;
 
 }
-
-
 
 .obsidian-log-title {
 
@@ -2120,8 +1820,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .obsidian-log-title-icon {
 
@@ -2143,8 +1841,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-export-btn {
 
     display: flex !important;
@@ -2165,15 +1861,11 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-table {
 
     width: 100% !important;
 
 }
-
-
 
 .obsidian-log-header-row {
 
@@ -2197,8 +1889,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-row {
 
     display: grid !important;
@@ -2215,15 +1905,11 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-row:last-child {
 
     border-bottom: none !important;
 
 }
-
-
 
 .obsidian-log-time {
 
@@ -2232,8 +1918,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text-muted) !important;
 
 }
-
-
 
 .obsidian-log-detection {
 
@@ -2244,8 +1928,6 @@ CUSTOM_CSS = """
     gap: 10px !important;
 
 }
-
-
 
 .obsidian-log-icon {
 
@@ -2265,8 +1947,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-icon-vehicle {
 
     background: rgba(99, 102, 241, 0.2) !important;
@@ -2274,8 +1954,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-accent) !important;
 
 }
-
-
 
 .obsidian-log-icon-plate {
 
@@ -2285,8 +1963,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-icon-person {
 
     background: rgba(245, 158, 11, 0.2) !important;
@@ -2294,8 +1970,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-warning) !important;
 
 }
-
-
 
 .obsidian-log-text {
 
@@ -2307,8 +1981,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-log-meta {
 
     font-size: 12px !important;
@@ -2316,8 +1988,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text-muted) !important;
 
 }
-
-
 
 .obsidian-log-meta-tag {
 
@@ -2334,8 +2004,6 @@ CUSTOM_CSS = """
     margin-right: 4px !important;
 
 }
-
-
 
 /* ===== BOTTOM NAVIGATION ===== */
 
@@ -2357,8 +2025,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-nav-item {
 
     display: flex !important;
@@ -2379,23 +2045,17 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-nav-item:hover {
 
     background: var(--obsidian-card) !important;
 
 }
 
-
-
 .obsidian-nav-item.active {
 
     background: linear-gradient(135deg, var(--obsidian-accent) 0%, var(--obsidian-purple) 100%) !important;
 
 }
-
-
 
 .obsidian-nav-icon {
 
@@ -2413,8 +2073,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-nav-label {
 
     font-size: 11px !important;
@@ -2425,15 +2083,11 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-nav-item.active .obsidian-nav-label {
 
     color: white !important;
 
 }
-
-
 
 /* ===== UPLOAD AREAS ===== */
 
@@ -2453,8 +2107,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-upload:hover {
 
     border-color: var(--obsidian-accent) !important;
@@ -2463,8 +2115,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-upload-icon {
 
     font-size: 32px !important;
@@ -2472,8 +2122,6 @@ CUSTOM_CSS = """
     margin-bottom: 12px !important;
 
 }
-
-
 
 .obsidian-upload-text {
 
@@ -2487,8 +2135,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-upload-subtext {
 
     font-size: 12px !important;
@@ -2496,8 +2142,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text-muted) !important;
 
 }
-
-
 
 /* ===== BUTTONS ===== */
 
@@ -2525,8 +2169,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== RESPONSIVE IMAGES ===== */
 
 .responsive-image {
@@ -2541,8 +2183,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .responsive-image img {
 
     width: auto !important;
@@ -2555,8 +2195,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== RESPONSIVE LAYOUT ===== */
 
 @media (max-width: 768px) {
@@ -2567,8 +2205,6 @@ CUSTOM_CSS = """
 
     }
 
-    
-
     .obsidian-btn {
 
         padding: 10px 16px !important;
@@ -2577,15 +2213,11 @@ CUSTOM_CSS = """
 
     }
 
-    
-
     .obsidian-upload {
 
         padding: 30px 15px !important;
 
     }
-
-    
 
     /* Stack columns on mobile */
 
@@ -2594,8 +2226,6 @@ CUSTOM_CSS = """
         flex-direction: column !important;
 
     }
-
-    
 
     .gradio-column {
 
@@ -2607,8 +2237,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 @media (max-width: 480px) {
 
     .gradio-container {
@@ -2616,8 +2244,6 @@ CUSTOM_CSS = """
         padding: 5px !important;
 
     }
-
-    
 
     .obsidian-btn {
 
@@ -2628,7 +2254,6 @@ CUSTOM_CSS = """
     }
 
 }
-
 
 /* ===== RESPONSIVE IMAGES ===== */
 .responsive-image {
@@ -2650,21 +2275,21 @@ CUSTOM_CSS = """
     .gradio-container {
         padding: 10px !important;
     }
-    
+
     .obsidian-btn {
         padding: 10px 16px !important;
         font-size: 13px !important;
     }
-    
+
     .obsidian-upload {
         padding: 30px 15px !important;
     }
-    
+
     /* Stack columns on mobile */
     .gradio-row {
         flex-direction: column !important;
     }
-    
+
     .gradio-column {
         width: 100% !important;
         min-width: 100% !important;
@@ -2675,13 +2300,12 @@ CUSTOM_CSS = """
     .gradio-container {
         padding: 5px !important;
     }
-    
+
     .obsidian-btn {
         padding: 8px 12px !important;
         font-size: 12px !important;
     }
 }
-
 
 .obsidian-btn:hover {
 
@@ -2690,8 +2314,6 @@ CUSTOM_CSS = """
     box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4) !important;
 
 }
-
-
 
 .obsidian-btn-secondary {
 
@@ -2703,8 +2325,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-btn-secondary:hover {
 
     background: var(--obsidian-surface) !important;
@@ -2712,8 +2332,6 @@ CUSTOM_CSS = """
     border-color: var(--obsidian-accent) !important;
 
 }
-
-
 
 /* ===== CARDS & PANELS ===== */
 
@@ -2728,8 +2346,6 @@ CUSTOM_CSS = """
     border: 1px solid var(--obsidian-border) !important;
 
 }
-
-
 
 .obsidian-card-title {
 
@@ -2747,8 +2363,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== MODEL SELECTION ===== */
 
 .obsidian-model-select {
@@ -2760,8 +2374,6 @@ CUSTOM_CSS = """
     flex-wrap: wrap !important;
 
 }
-
-
 
 .obsidian-model-chip {
 
@@ -2783,8 +2395,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 .obsidian-model-chip:hover {
 
     border-color: var(--obsidian-accent) !important;
@@ -2792,8 +2402,6 @@ CUSTOM_CSS = """
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .obsidian-model-chip.active {
 
@@ -2804,8 +2412,6 @@ CUSTOM_CSS = """
     border-color: transparent !important;
 
 }
-
-
 
 /* ===== SETTINGS ACCORDION ===== */
 
@@ -2820,8 +2426,6 @@ CUSTOM_CSS = """
     overflow: hidden !important;
 
 }
-
-
 
 .obsidian-accordion-header {
 
@@ -2845,8 +2449,6 @@ CUSTOM_CSS = """
 
 }
 
-
-
 /* ===== HIDE GRADIO DEFAULTS ===== */
 
 /* Ensure body is always visible - prevents black screen issues */
@@ -2864,8 +2466,6 @@ body,
     opacity: 1 !important;
 
 }
-
-
 
 /* Ensure body is always visible - prevents black screen issues */
 body,
@@ -2886,8 +2486,6 @@ footer {
 
 }
 
-
-
 /* Hide Gradio 6.x header navigation - top bar with API, Gradio branding, Settings */
 
 header,
@@ -2902,7 +2500,6 @@ header,
 
 }
 
-
 /* Hide Gradio 6.x header navigation - top bar with API, Gradio branding, Settings */
 header,
 .gradio-container > div:first-of-type > div:first-of-type,
@@ -2910,7 +2507,6 @@ header,
 #gradio-app > div > div:first-child {
     display: none !important;
 }
-
 
 /* ===== SCROLLBAR ===== */
 
@@ -2922,15 +2518,11 @@ header,
 
 }
 
-
-
 ::-webkit-scrollbar-track {
 
     background: var(--obsidian-surface);
 
 }
-
-
 
 ::-webkit-scrollbar-thumb {
 
@@ -2940,15 +2532,11 @@ header,
 
 }
 
-
-
 ::-webkit-scrollbar-thumb:hover {
 
     background: var(--obsidian-text-muted);
 
 }
-
-
 
 /* ===== GRADIO COMPONENT OVERRIDES ===== */
 
@@ -2958,15 +2546,11 @@ header,
 
 }
 
-
-
 .gradio-container .gr-slider input[type="range"] {
 
     background: var(--obsidian-accent) !important;
 
 }
-
-
 
 .gradio-container .gr-checkbox,
 
@@ -2975,8 +2559,6 @@ header,
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .gradio-container .gr-textbox,
 
@@ -2992,8 +2574,6 @@ header,
 
 }
 
-
-
 .gradio-container label {
 
     color: var(--obsidian-text-muted) !important;
@@ -3007,8 +2587,6 @@ header,
     letter-spacing: 0.5px !important;
 
 }
-
-
 
 /* ===== PPE SPECIFIC STYLES ===== */
 
@@ -3028,8 +2606,6 @@ header,
 
 }
 
-
-
 .obsidian-ppe-badge-violation {
 
     background: rgba(239, 68, 68, 0.2) !important;
@@ -3046,8 +2622,6 @@ header,
 
 }
 
-
-
 .obsidian-ppe-stats {
 
     display: grid !important;
@@ -3057,8 +2631,6 @@ header,
     gap: 12px !important;
 
 }
-
-
 
 .obsidian-ppe-stat-item {
 
@@ -3071,8 +2643,6 @@ header,
     text-align: center !important;
 
 }
-
-
 
 .obsidian-ppe-stat-icon {
 
@@ -3094,8 +2664,6 @@ header,
 
 }
 
-
-
 .obsidian-ppe-stat-icon-helmet {
 
     background: rgba(16, 185, 129, 0.2) !important;
@@ -3103,8 +2671,6 @@ header,
     color: var(--obsidian-success) !important;
 
 }
-
-
 
 .obsidian-ppe-stat-icon-seatbelt {
 
@@ -3114,8 +2680,6 @@ header,
 
 }
 
-
-
 .obsidian-ppe-stat-icon-violation {
 
     background: rgba(239, 68, 68, 0.2) !important;
@@ -3123,8 +2687,6 @@ header,
     color: var(--obsidian-danger) !important;
 
 }
-
-
 
 .obsidian-ppe-stat-value {
 
@@ -3135,8 +2697,6 @@ header,
     color: var(--obsidian-text) !important;
 
 }
-
-
 
 .obsidian-ppe-stat-label {
 
@@ -3150,8 +2710,6 @@ header,
 
 """
 
-
-
 # JavaScript for theme toggle functionality
 
 THEME_JS = """
@@ -3164,13 +2722,9 @@ function toggleTheme() {
 
     const newTheme = currentTheme === 'light' ? 'dark' : 'light';
 
-    
-
     html.setAttribute('data-theme', newTheme);
 
     localStorage.setItem('theme', newTheme);
-
-    
 
     // Update toggle button text
 
@@ -3182,19 +2736,13 @@ function toggleTheme() {
 
     }
 
-    
-
     // Force refresh of CSS variables and text colors
 
     forceThemeUpdate(newTheme);
 
-    
-
     console.log('Theme switched to:', newTheme);
 
 }
-
-
 
 function forceThemeUpdate(theme) {
 
@@ -3204,15 +2752,13 @@ function forceThemeUpdate(theme) {
 
     const textColor = theme === 'light' ? '#0f172a' : '#f1f5f9';
 
-    
-
     allElements.forEach(element => {
 
-        if (element.children.length === 0 || element.tagName === 'P' || 
+        if (element.children.length === 0 || element.tagName === 'P' ||
 
             element.tagName === 'SPAN' || element.tagName === 'DIV' ||
 
-            element.tagName === 'H1' || element.tagName === 'H2' || 
+            element.tagName === 'H1' || element.tagName === 'H2' ||
 
             element.tagName === 'H3' || element.tagName === 'H4' ||
 
@@ -3226,8 +2772,6 @@ function forceThemeUpdate(theme) {
 
     });
 
-    
-
     // Apply theme after short delay (removed problematic force reflow)
 
     setTimeout(() => {
@@ -3240,13 +2784,9 @@ function forceThemeUpdate(theme) {
 
 }
 
-
-
 function forceTextColors(theme) {
 
     const textColor = theme === 'light' ? '#0f172a' : '#f1f5f9';
-
-    
 
     // Target specific Gradio elements
 
@@ -3254,9 +2794,9 @@ function forceTextColors(theme) {
 
     gradioElements.forEach(element => {
 
-        if (element.classList.contains('markdown') || 
+        if (element.classList.contains('markdown') ||
 
-            element.tagName === 'P' || element.tagName === 'SPAN' || 
+            element.tagName === 'P' || element.tagName === 'SPAN' ||
 
             element.tagName === 'DIV' || element.tagName === 'LABEL') {
 
@@ -3265,8 +2805,6 @@ function forceTextColors(theme) {
         }
 
     });
-
-    
 
     // Target markdown content specifically
 
@@ -3280,8 +2818,6 @@ function forceTextColors(theme) {
 
 }
 
-
-
 // Load saved theme on page load
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -3289,8 +2825,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
 
     document.documentElement.setAttribute('data-theme', savedTheme);
-
-    
 
     // Create and add theme toggle button
 
@@ -3304,11 +2838,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     toggleBtn.title = 'Toggle Theme';
 
-    
-
     document.body.appendChild(toggleBtn);
-
-    
 
     // Force apply theme styles
 
@@ -3318,13 +2848,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     }, 100);
 
-    
-
     console.log('Initial theme set to:', savedTheme);
 
 });
-
-
 
 // Apply theme immediately if DOM is already loaded
 
@@ -3352,8 +2878,6 @@ if (document.readyState === 'loading') {
 
 }
 
-
-
 // Also handle Gradio's dynamic content loading
 
 const observer = new MutationObserver(function(mutations) {
@@ -3365,8 +2889,6 @@ const observer = new MutationObserver(function(mutations) {
             const savedTheme = localStorage.getItem('theme') || 'dark';
 
             document.documentElement.setAttribute('data-theme', savedTheme);
-
-            
 
             // Force text colors for new content
 
@@ -3382,8 +2904,6 @@ const observer = new MutationObserver(function(mutations) {
 
 });
 
-
-
 observer.observe(document.body, {
 
     childList: true,
@@ -3393,8 +2913,6 @@ observer.observe(document.body, {
 });
 
 """
-
-
 
 # Import parking detection system - Commented out as requested
 
@@ -3418,13 +2936,9 @@ observer.observe(document.body, {
 
 #     print(f"[WARNING] Parking detection system not available: {e}")
 
-
-
 # Parking detection commented out as requested
 
 PARKING_DETECTION_AVAILABLE = False
-
-
 
 # Import PPE (Personal Protective Equipment) detection system
 
@@ -3443,8 +2957,6 @@ except ImportError as e:
     PPE_DETECTION_AVAILABLE = False
 
     print(f"[WARNING] PPE detection system not available: {e}")
-
-
 
 # Import database service
 
@@ -3466,8 +2978,6 @@ except ImportError as e:
 
     print(f"[WARNING] Database service not available: {e}")
 
-
-
 # Import unified detection module
 
 try:
@@ -3484,8 +2994,6 @@ except ImportError as e:
 
     print(f"[WARNING] Unified detection module not available: {e}")
 
-
-
 # Create alias for unified detection function if module loaded
 
 if UNIFIED_DETECTION_AVAILABLE:
@@ -3498,7 +3006,7 @@ if UNIFIED_DETECTION_AVAILABLE:
 
         result = process_unified_detection_simple(
 
-            image, 
+            image,
 
             conf_threshold=conf_threshold,
 
@@ -3510,13 +3018,9 @@ if UNIFIED_DETECTION_AVAILABLE:
 
         )
 
-        
-
         # Unpack result
 
         annotated_image, json_output, summary = result
-
-        
 
         # Save to database if available
 
@@ -3532,15 +3036,11 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                 from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PPEInfo, PlateInfo  # Removed ParkingSlotInfo
 
-                
-
                 # Parse JSON to get detections
 
                 data = json.loads(json_output)
 
                 detections = data.get('detections', {})
-
-                
 
                 # Create result object for database
 
@@ -3555,8 +3055,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                     processing_time_ms=data.get('metadata', {}).get('processing_time_ms', 0)
 
                 )
-
-                
 
                 # Add vehicle detections
 
@@ -3575,8 +3073,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                         bbox=v.get('bbox', [0,0,0,0])
 
                     ))
-
-                
 
                 # Add PPE detections
 
@@ -3600,8 +3096,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                     ))
 
-                
-
                 # Add plate detections - THIS IS THE KEY FIX
 
                 for idx, p in enumerate(detections.get('number_plates', [])):
@@ -3617,8 +3111,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                         bbox=p.get('bbox', [0,0,0,0])
 
                     ))
-
-                
 
                 # Add parking detections - Commented out as requested
 
@@ -3636,8 +3128,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                 #     ))
 
-                
-
                 # Save to database
 
                 _db_service.save_detection(db_result)
@@ -3652,11 +3142,7 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                 traceback.print_exc()
 
-        
-
         return result
-
-    
 
     # Add unified video detection wrapper
 
@@ -3672,17 +3158,11 @@ if UNIFIED_DETECTION_AVAILABLE:
 
             return None, "{}", " Unified video detection module not available"
 
-        
-
         if video_path is None:
 
             return None, "{}", "Please upload a video first"
 
-        
-
         print(f"[INFO] Starting unified video processing for: {video_path}")
-
-        
 
         # Process the entire video first
 
@@ -3700,8 +3180,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
         )
 
-        
-
         if result.get('success'):
 
             # After video processing is complete, save final aggregated results to database
@@ -3715,8 +3193,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                     from datetime import datetime
 
                     from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PlateInfo
-
-                    
 
                     # Create final aggregated result for database
 
@@ -3734,8 +3210,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                     )
 
-                    
-
                     # Add unique vehicle detections (aggregated from all frames)
 
                     unique_vehicles = {}
@@ -3752,8 +3226,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                             unique_vehicles[vehicle_type] += 1
 
-                    
-
                     for vehicle_type, count in unique_vehicles.items():
 
                         db_result.vehicle_detections.append(VehicleInfo(
@@ -3769,8 +3241,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                             bbox=[0, 0, 0, 0]  # Not applicable for aggregated results
 
                         ))
-
-                    
 
                     # Add unique license plates detected
 
@@ -3792,8 +3262,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                             ))
 
-                    
-
                     # Save final aggregated results to database
 
                     _db_service.save_detection(db_result)
@@ -3806,8 +3274,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                     print(f"  - Unique license plates: {len([p for p in unique_plates if p.strip()])}")
 
-                    
-
                 except Exception as db_err:
 
                     print(f"[WARNING] Failed to save video results to database: {db_err}")
@@ -3815,8 +3281,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                     import traceback
 
                     traceback.print_exc()
-
-            
 
             # Prepare outputs for Gradio
 
@@ -3826,13 +3290,9 @@ if UNIFIED_DETECTION_AVAILABLE:
 
             all_detections = result.get('detections', [])
 
-            
-
             # Get the LAST frame's detections for database storage
 
             last_frame_detections = all_detections[-1] if all_detections else None
-
-            
 
             # Verify video file exists and prepare for Gradio display
 
@@ -3864,8 +3324,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                 video_output = None
 
-            
-
             # After video processing is complete, save LAST FRAME results to database
 
             if DATABASE_AVAILABLE and '_db_service' in globals() and _db_service and _db_service.enabled:
@@ -3877,8 +3335,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                     from datetime import datetime
 
                     from src.unified_detection.unified_detector import UnifiedDetectionResult, VehicleInfo, PlateInfo
-
-                    
 
                     # Create result for last frame only
 
@@ -3895,8 +3351,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                         processing_time_ms=int(stats.get('processing_time', 0) * 1000)
 
                     )
-
-                    
 
                     # Add vehicles from LAST FRAME only
 
@@ -3918,8 +3372,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                             ))
 
-                        
-
                         # Add license plates from LAST FRAME only
 
                         for plate in last_frame_detections.get('plates', []):
@@ -3940,8 +3392,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                                 ))
 
-                    
-
                     # Save LAST FRAME results to database
 
                     _db_service.save_detection(db_result)
@@ -3954,8 +3404,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
                     print(f"  - Plates in last frame: {len(db_result.plate_detections)}")
 
-                    
-
                 except Exception as db_err:
 
                     print(f"[WARNING] Failed to save video results to database: {db_err}")
@@ -3963,8 +3411,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                     import traceback
 
                     traceback.print_exc()
-
-            
 
             # Create JSON output
 
@@ -3982,13 +3428,9 @@ if UNIFIED_DETECTION_AVAILABLE:
 
             }, indent=2)
 
-            
-
             # Create human-readable summary
 
             summary = f""" **Video Processing Complete!**
-
-
 
  **Processing Statistics:**
 
@@ -3998,13 +3440,9 @@ if UNIFIED_DETECTION_AVAILABLE:
 
 • Average FPS: {stats.get('fps', 0):.2f}
 
-
-
  **Vehicle Detection:**
 
 • Total Vehicles Detected: {stats.get('vehicles_detected', 0)}
-
-
 
  **License Plate Detection:**
 
@@ -4012,17 +3450,11 @@ if UNIFIED_DETECTION_AVAILABLE:
 
 • Unique Plates: {len(stats.get('unique_plates', []))}
 
-
-
  **Output:**
 
 • Processed Video: {output_video}
 
-
-
 {result.get('summary', '')}"""
-
-            
 
             return output_video, json_output, summary
 
@@ -4032,8 +3464,6 @@ if UNIFIED_DETECTION_AVAILABLE:
 
             print(f"[ERROR] Video processing failed: {error_msg}")
 
-            
-
             json_output = json.dumps({
 
                 'success': False,
@@ -4041,8 +3471,6 @@ if UNIFIED_DETECTION_AVAILABLE:
                 'error': error_msg
 
             }, indent=2)
-
-            
 
             summary = f" **Video Processing Failed**\n\nError: {error_msg}"
 
@@ -4056,15 +3484,11 @@ else:
 
         return None, "{}", "Unified detection module not loaded"
 
-    
-
     def process_unified_video_detection_all(video_path, conf_threshold=0.5):
 
         """Fallback when unified video detection is not available"""
 
         return {'error': 'Unified detection module not loaded', 'success': False}
-
-
 
 # Import enhanced detection for challenging images
 
@@ -4082,8 +3506,6 @@ except ImportError:
 
     print("[WARNING] Enhanced detection not available")
 
-
-
 # Import international license plate recognition
 
 try:
@@ -4100,8 +3522,6 @@ except ImportError:
 
     print("[WARNING] International license plate recognition not available")
 
-
-
 if sys.platform.startswith("win"):
 
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -4114,8 +3534,6 @@ if sys.platform.startswith("win"):
 
     import asyncio
 
-    
-
     # Configure logging to suppress connection reset errors
 
     logging.getLogger("asyncio").setLevel(logging.CRITICAL)
@@ -4125,8 +3543,6 @@ if sys.platform.startswith("win"):
     warnings.filterwarnings("ignore", category=UserWarning, module="asyncio")
 
     warnings.filterwarnings("ignore", message=".*connection reset.*")
-
-    
 
     # Custom exception handler for connection errors
 
@@ -4144,8 +3560,6 @@ if sys.platform.startswith("win"):
 
             loop.default_exception_handler(context)
 
-    
-
     # Set the exception handler with proper event loop creation
 
     try:
@@ -4160,8 +3574,6 @@ if sys.platform.startswith("win"):
 
     loop.set_exception_handler(handle_exception)
 
-
-
 MODEL_CHOICES = [
 
     "yolo26n",
@@ -4174,13 +3586,7 @@ MODEL_CHOICES = [
 
 ]
 
-
-
 IMAGE_SIZE_CHOICES = [320, 640, 1024]
-
-
-
-
 
 def _get_ffmpeg_exe():
 
@@ -4202,10 +3608,6 @@ def _get_ffmpeg_exe():
 
     return None
 
-
-
-
-
 def _transcode_to_browser_mp4(input_path, output_path):
 
     ffmpeg = _get_ffmpeg_exe()
@@ -4213,8 +3615,6 @@ def _transcode_to_browser_mp4(input_path, output_path):
     if not ffmpeg:
 
         return None
-
-
 
     cmd = [
 
@@ -4256,10 +3656,6 @@ def _transcode_to_browser_mp4(input_path, output_path):
 
     return None
 
-
-
-
-
 def _get_device():
 
     """Get the best available device for processing."""
@@ -4282,49 +3678,43 @@ def _get_device():
 
         return "cpu"
 
-
-
-
-
 def _extract_video_path(video_value):
-
+    """Extract video path and optional trim times from Gradio video input.
+    Returns (path, start_sec, end_sec) tuple. start_sec/end_sec are None if no trim."""
     if video_value is None:
-
-        return None
+        return None, None, None
 
     if isinstance(video_value, str):
-
-        return video_value
+        return video_value, None, None
 
     if isinstance(video_value, dict):
-
-        return video_value.get("path") or video_value.get("name")
+        # Try multiple possible key names across Gradio versions
+        path = (video_value.get("path") or video_value.get("name")
+                or video_value.get("video") or video_value.get("url"))
+        start = video_value.get("start") or video_value.get("start_time")
+        end = video_value.get("end") or video_value.get("end_time")
+        print(f"[DEBUG] _extract_video_path dict keys: {list(video_value.keys())}, path={path}, start={start}, end={end}")
+        return path, start, end
 
     if isinstance(video_value, (list, tuple)) and video_value:
-
         first = video_value[0]
-
         if isinstance(first, str):
-
-            return first
-
+            return first, None, None
         if isinstance(first, dict):
+            path = (first.get("path") or first.get("name")
+                    or first.get("video") or first.get("url"))
+            start = first.get("start") or first.get("start_time")
+            end = first.get("end") or first.get("end_time")
+            print(f"[DEBUG] _extract_video_path list[0] keys: {list(first.keys())}, path={path}, start={start}, end={end}")
+            return path, start, end
 
-            return first.get("path") or first.get("name")
-
-    return None
-
-
-
-
+    return None, None, None
 
 def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", progress_callback=None, enable_ocr=True, ocr_every_n=5, force_gpu=True):
 
     """
 
     ULTRA-FAST VIDEO PROCESSING - GPU ACCELERATED - OPTIMIZED FOR SPEED
-
-    
 
     Args:
 
@@ -4342,8 +3732,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         force_gpu: Force GPU usage
 
-        
-
     Returns:
 
         (output_path, detection_summary, json_results) - Path, summary, and JSON with text + colors
@@ -4358,11 +3746,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         start_time = time.time()
 
-        
-
         # Extract video path
 
-        video_path = _extract_video_path(video_path)
+        video_path, trim_start, trim_end = _extract_video_path(video_path)
 
         if video_path is None or not os.path.exists(video_path):
 
@@ -4370,11 +3756,10 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             return None, None, None
 
-            
-
         print(f"[INFO] Processing: {video_path}")
 
-        
+        if trim_start is not None or trim_end is not None:
+            print(f"[INFO] Trim requested: start={trim_start}s, end={trim_end}s")
 
         # FORCE GPU USAGE
 
@@ -4394,11 +3779,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             device = _get_device()
 
-        
-
         model = get_model(model_name)
-
-        
 
         # GPU-OPTIMIZED settings for RTX 4050
 
@@ -4438,11 +3819,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             print("[INFO] BALANCED GPU MODE - 4-6 minutes expected")
 
-        
-
         print(f"[INFO] GPU Device: {device}, Image size: {imgsz}, Skip frames: {skip_frames}, Batch: {batch_size}")
-
-        
 
         # Enable mixed precision for 2x speed
 
@@ -4462,8 +3839,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             print("[INFO] GPU Memory Optimized for RTX 4050")
 
-        
-
         # Open video
 
         cap = cv2.VideoCapture(video_path)
@@ -4473,8 +3848,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             print(f"[ERROR] Cannot open video: {video_path}")
 
             return None, None
-
-        
 
         # Get video properties
 
@@ -4488,11 +3861,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         duration = total_frames / fps
 
-        
-
         print(f"[INFO] Video: {width}x{height} @ {fps:.1f} FPS, {duration:.1f}s, {total_frames} frames")
-
-        
 
         # Create output path
 
@@ -4504,15 +3873,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         output_path = os.path.join(outputs_folder, f"gpu_video_{mode}_{timestamp}.mp4")
 
-        
-
         # Setup video writer with GPU-accelerated codec
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
         out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-        
 
         if not out.isOpened():
 
@@ -4521,8 +3886,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             cap.release()
 
             return None, None, None
-
-        
 
         # Processing variables
 
@@ -4540,11 +3903,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         frame_idx = 0
 
-        
-
         print("[INFO] Starting GPU-ACCELERATED frame processing...")
-
-        
 
         # Import color detection
 
@@ -4568,8 +3927,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                 return {"dominant_colors": ["#808080"], "color_names": ["gray"]}
 
-        
-
         # Main processing loop with optimizations
 
         while True:
@@ -4580,13 +3937,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                 break
 
-            
-
             processed_count += 1
 
             frame_idx += 1
-
-            
 
             # Skip frames for speed (KEY OPTIMIZATION)
 
@@ -4594,11 +3947,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                 continue
 
-            
-
             actual_processed += 1
-
-            
 
             # Progress update
 
@@ -4612,17 +3961,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                 eta = (total_frames - processed_count) / (fps_processed * skip_frames) / 60  # minutes
 
-                
-
                 print(f"[INFO] Processed {processed_count}/{total_frames} ({progress:.1f}%) - {fps_processed:.1f} FPS - ETA: {eta:.1f} min")
-
-                
 
                 if progress_callback:
 
                     progress_callback(progress, f"Processing... {fps_processed:.1f} FPS")
-
-            
 
             try:
 
@@ -4652,13 +3995,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                     )
 
-                
-
                 if results and len(results) > 0:
 
                     result = results[0]
-
-                    
 
                     # Count detections and store for summary
 
@@ -4667,8 +4006,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                         total_detections += len(result.boxes)
 
                         all_detections.append(result.boxes)
-
-                    
 
                     #  COLOR DETECTION for JSON output
 
@@ -4688,8 +4025,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                 print(f"[DEBUG]  Found {len(frame_colors)} colors: {[c['color'] for c in frame_colors[:5]]}")
 
-                                
-
                                 # Store colors for JSON
 
                                 all_color_results.append({
@@ -4708,8 +4043,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                             print(f"[DEBUG]  Color extraction failed: {e}")
 
-                    
-
                     #  GPU-ACCELERATED OCR processing - DISABLED for speed
 
                     # Only run OCR every 30 frames to save time
@@ -4720,15 +4053,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                     run_full_ocr = (frame_idx % 30 == 0) and enable_ocr  # Only every 30 frames
 
-                    
-
                     if run_full_ocr and enable_ocr:
 
                         try:
 
                             print(f"[DEBUG]  Running GPU OCR on frame {frame_idx} (every 30 frames)...")
-
-                            
 
                             # Force GPU for PaddleOCR
 
@@ -4754,11 +4083,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                 )
 
-                                
-
                                 print(f"[DEBUG] GPU result: {direct_result}")
-
-                                
 
                                 if direct_result.get('text') and direct_result['text'].strip():
 
@@ -4779,8 +4104,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                     })
 
                                     print(f"[DEBUG]  GPU SUCCESS: '{direct_result['text']}' (conf: {direct_result['confidence']:.3f})")
-
-                                
 
                                 # Add individual regions
 
@@ -4814,8 +4137,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     print(f"[DEBUG]  GPU returned empty: '{direct_result.get('text', '')}'")
 
-                                    
-
                             except Exception as e:
 
                                 print(f"[DEBUG]  GPU PaddleOCR failed: {e}")
@@ -4842,8 +4163,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     )
 
-                                    
-
                                     if direct_result.get('text') and direct_result['text'].strip():
 
                                         frame_all_text.append({
@@ -4866,8 +4185,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     print(f"[DEBUG]  CPU fallback also failed: {e2}")
 
-                            
-
                             # Store all OCR results with frame metadata
 
                             for text_item in frame_all_text:
@@ -4878,8 +4195,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                 text_item['dominant_color'] = frame_colors[0] if frame_colors else None
 
-                                
-
                                 all_ocr_results.append({
 
                                     'frame_number': frame_idx,
@@ -4889,8 +4204,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                     **text_item
 
                                 })
-
-                            
 
                             # Draw text and colors on frame
 
@@ -4905,8 +4218,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
                                 text_type = text_item['type']
 
                                 device = text_item.get('device', 'Unknown')
-
-                                
 
                                 # Different colors for different text types
 
@@ -4928,25 +4239,17 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     prefix = ""
 
-                                
-
                                 text_label = f"{prefix} {text} ({confidence:.2f}) [{device}]"
 
                                 (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
-
-                                
 
                                 # Background rectangle
 
                                 cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
 
-                                
-
                                 # Ensure text doesn't overlap
 
                                 (tw, th), _ = cv2.getTextSize(text_label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)
-
-                                
 
                                 # Check if text would go beyond frame height
 
@@ -4956,27 +4259,19 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     x_offset = 200  # Move to right side
 
-                                
-
                                 # Background rectangle for better visibility
 
                                 cv2.rectangle(frame, (10, y_offset - th - 5), (10 + tw + 5, y_offset + 5), (0, 0, 0), -1)
 
                                 cv2.putText(frame, text_label, (12, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 2.0, color, 4, cv2.LINE_AA)
 
-                                
-
                                 y_offset += th + 10
-
-                                
 
                                 y_offset += th + 10
 
                                 if y_offset > frame.shape[0] - 80:
 
                                     break
-
-                            
 
                             # Draw colors on frame
 
@@ -4990,8 +4285,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                 color_y += 40
 
-                                
-
                                 for i, color_info in enumerate(frame_colors[:5]):
 
                                     color_name = color_info['color']
@@ -5004,11 +4297,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                                     color_y += 35
 
-                            
-
                             print(f"[DEBUG] Frame {frame_idx}: Found {len(frame_all_text)} text items, {len(frame_colors)} colors")
-
-                                    
 
                         except Exception as e:
 
@@ -5018,8 +4307,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                             traceback.print_exc()
 
-                    
-
                     # Fast annotation with license plate caching
 
                     annotated_frame = _annotate_frame_fast_video(frame, result, skip_plate_ocr=True)
@@ -5028,13 +4315,9 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                     annotated_frame = frame
 
-                
-
                 # Write frame
 
                 out.write(annotated_frame)
-
-                
 
             except Exception as e:
 
@@ -5042,15 +4325,11 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                 out.write(frame)  # Write original frame on error
 
-        
-
         # Cleanup
 
         cap.release()
 
         out.release()
-
-        
 
         # Calculate final stats
 
@@ -5059,8 +4338,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         final_fps = actual_processed / total_time if total_time > 0 else 0
 
         speedup = skip_frames
-
-        
 
         print(f"[INFO]  ULTRA-FAST processing complete!")
 
@@ -5076,21 +4353,15 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         print(f"[INFO] Output saved: {output_path}")
 
-        
-
         # Generate detection summary
 
         detection_summary = _generate_video_detection_summary(all_detections, model.names, total_time, mode)
 
         print(f"[INFO] Detection Summary: {detection_summary}")
 
-        
-
         # Create Enhanced JSON output with TEXT + COLORS
 
         import json as json_module
-
-        
 
         # Analyze text results for better JSON structure
 
@@ -5110,8 +4381,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         }
 
-        
-
         # Analyze color results
 
         color_summary = {
@@ -5125,8 +4394,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             "dominant_colors": [frame['dominant_color']['color'] for frame in all_color_results if frame.get('dominant_color')]
 
         }
-
-        
 
         json_results = {
 
@@ -5196,8 +4463,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
         }
 
-        
-
         # Combine text with colors
 
         for text_item in all_ocr_results:
@@ -5214,8 +4479,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
                     break
 
-            
-
             combined_item = text_item.copy()
 
             combined_item['frame_colors'] = associated_colors
@@ -5223,8 +4486,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
             combined_item['dominant_color'] = associated_colors[0] if associated_colors else None
 
             json_results['combined_text_colors'].append(combined_item)
-
-        
 
         # Group colors by frames
 
@@ -5238,8 +4499,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             json_results['colors_by_frames'][frame_num].extend(color_item['colors'])
 
-        
-
         json_str = json_module.dumps(json_results, indent=2, ensure_ascii=False)
 
         print(f"[INFO]  GPU-ACCELERATED processing complete!")
@@ -5247,8 +4506,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         print(f"[INFO]  OCR detected {len(all_ocr_results)} text instances ({text_summary.get('gpu_text_found', 0)} GPU, {text_summary.get('cpu_text_found', 0)} CPU)")
 
         print(f"[INFO]  Color detection completed on {len(all_color_results)} frames")
-
-        
 
         # Verify output
 
@@ -5262,8 +4519,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             return None, None, None
 
-            
-
     except Exception as e:
 
         print(f"[ERROR] Ultra-fast video processing failed: {e}")
@@ -5271,8 +4526,6 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
         import traceback
 
         traceback.print_exc()
-
-        
 
         # Cleanup on error
 
@@ -5290,13 +4543,7 @@ def process_video_optimized_fast(video_path, model_name="yolo26n", mode="fast", 
 
             pass
 
-        
-
         return None, None, None
-
-
-
-
 
 def _generate_video_detection_summary(all_detections, names, processing_time, mode):
 
@@ -5312,8 +4559,6 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
             return " No objects detected in video"
 
-        
-
         # Aggregate all detections
 
         category_counts = {}
@@ -5326,8 +4571,6 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
         total_objects = 0
 
-        
-
         for boxes in all_detections:
 
             if hasattr(boxes, 'cls'):
@@ -5338,13 +4581,9 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
                     class_name = names.get(class_id, f"class_{class_id}")
 
-                    
-
                     # Get classification
 
                     display_name, category, _ = _classify_object_with_category(class_name, class_id)
-
-                    
 
                     # Count by category
 
@@ -5354,8 +4593,6 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
                     category_counts[category] += 1
 
-                    
-
                     # Count specific objects
 
                     if display_name not in object_counts:
@@ -5364,11 +4601,7 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
                     object_counts[display_name] += 1
 
-                    
-
                     total_objects += 1
-
-        
 
         # Create summary
 
@@ -5384,8 +4617,6 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
         summary_lines.append("")
 
-        
-
         # Category summary
 
         summary_lines.append("** By Category:**")
@@ -5394,11 +4625,7 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
             summary_lines.append(f"  • {count} {category}(s)")
 
-        
-
         summary_lines.append("")
-
-        
 
         # Top objects
 
@@ -5410,17 +4637,11 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
             summary_lines.append(f"  • {count} {obj_name}(s)")
 
-        
-
         if len(object_counts) > 10:
 
             summary_lines.append(f"  • ... and {len(object_counts) - 10} more object types")
 
-        
-
         summary_lines.append("")
-
-        
 
         # Advanced color shades detection info
 
@@ -5442,21 +4663,13 @@ def _generate_video_detection_summary(all_detections, names, processing_time, mo
 
         summary_lines.append(f"  •  Real-time: <15ms per detection")
 
-        
-
         return "\n".join(summary_lines)
-
-        
 
     except Exception as e:
 
         print(f"[ERROR] Failed to generate detection summary: {e}")
 
         return f" Detection summary generation failed: {str(e)}"
-
-
-
-
 
 def _classify_object_with_category(class_name, class_id):
 
@@ -5476,8 +4689,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'person': ('Person', 'Person', (255, 0, 0)),  # Red - Will be enhanced with gender detection
 
-        
-
         # Vehicles
 
         'bicycle': ('Bicycle', 'Vehicle', (0, 255, 255)),  # Yellow
@@ -5496,8 +4707,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'airplane': ('Airplane', 'Vehicle', (255, 0, 0)),  # Blue
 
-        
-
         # Traffic Objects
 
         'traffic light': ('Traffic Light', 'Traffic', (0, 0, 255)),  # Blue
@@ -5508,13 +4717,9 @@ def _classify_object_with_category(class_name, class_id):
 
         'fire hydrant': ('Fire Hydrant', 'Traffic', (0, 0, 255)),  # Blue
 
-        
-
         # License Plate - Special Category
 
         'license_plate': (' License Plate', 'License Plate', (0, 255, 0)),  # Green
-
-        
 
         # Animals - Enhanced Classification
 
@@ -5538,8 +4743,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'giraffe': (' Giraffe', 'Animal', (255, 0, 255)),  # Magenta
 
-        
-
         # Everyday Items - Enhanced Categories
 
         'cup': (' Cup', 'Drinkware', (139, 69, 19)),  # Brown
@@ -5550,9 +4753,7 @@ def _classify_object_with_category(class_name, class_id):
 
         'bowl': (' Bowl', 'Tableware', (160, 82, 45)),  # Sienna
 
-        
-
-        # Electronics - Enhanced Categories  
+        # Electronics - Enhanced Categories
 
         'cell phone': (' Cell Phone', 'Electronics', (0, 191, 255)),  # Deep Sky Blue
 
@@ -5576,8 +4777,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'sink': (' Sink', 'Appliance', (128, 128, 128)),  # Gray
 
-        
-
         # Personal Items - Enhanced Categories
 
         'backpack': (' Backpack', 'Personal', (255, 0, 0)),  # Blue
@@ -5589,8 +4788,6 @@ def _classify_object_with_category(class_name, class_id):
         'umbrella': (' Umbrella', 'Personal', (255, 0, 0)),  # Blue
 
         'tie': (' Tie', 'Clothing', (128, 0, 128)),  # Purple
-
-        
 
         # Sports & Recreation
 
@@ -5614,8 +4811,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'snowboard': (' Snowboard', 'Sports', (255, 0, 0)),  # Blue
 
-        
-
         # Food Items
 
         'banana': (' Banana', 'Food', (0, 255, 0)),  # Green
@@ -5638,8 +4833,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'cake': (' Cake', 'Food', (0, 255, 0)),  # Green
 
-        
-
         # Furniture
 
         'chair': (' Chair', 'Furniture', (139, 69, 19)),  # Brown
@@ -5654,8 +4847,6 @@ def _classify_object_with_category(class_name, class_id):
 
         'toilet': (' Toilet', 'Furniture', (139, 69, 19)),  # Brown
 
-        
-
         # Tableware
 
         'fork': (' Fork', 'Tableware', (160, 82, 45)),  # Sienna
@@ -5663,8 +4854,6 @@ def _classify_object_with_category(class_name, class_id):
         'knife': (' Knife', 'Tableware', (160, 82, 45)),  # Sienna
 
         'spoon': (' Spoon', 'Tableware', (160, 82, 45)),  # Sienna
-
-        
 
         # Other Objects
 
@@ -5684,19 +4873,11 @@ def _classify_object_with_category(class_name, class_id):
 
     }
 
-    
-
     # Get classification
 
     class_info = categories.get(class_name.lower(), (class_name.title(), 'Unknown', (255, 255, 255)))
 
-    
-
     return class_info
-
-
-
-
 
 def _detect_gender_from_person_crop(person_crop):
 
@@ -5708,15 +4889,11 @@ def _detect_gender_from_person_crop(person_crop):
 
     global gender_model, gender_transform
 
-    
-
     try:
 
         if person_crop is None or person_crop.size == 0:
 
             return "Unknown"
-
-        
 
         # Method 1: Use proper gender detection model
 
@@ -5736,8 +4913,6 @@ def _detect_gender_from_person_crop(person_crop):
 
                 print(f"[DEBUG] Gender model prediction failed: {e}")
 
-        
-
         # Method 2: Use ResNetV2 feature analysis
 
         try:
@@ -5748,13 +4923,9 @@ def _detect_gender_from_person_crop(person_crop):
 
             resnet_model.eval()
 
-            
-
             # Remove the final classification layer for feature extraction
 
             feature_extractor = nn.Sequential(*list(resnet_model.children())[:-1])
-
-            
 
             # Convert to RGB and preprocess
 
@@ -5765,8 +4936,6 @@ def _detect_gender_from_person_crop(person_crop):
             else:
 
                 rgb_crop = person_crop
-
-            
 
             transform = transforms.Compose([
 
@@ -5780,11 +4949,7 @@ def _detect_gender_from_person_crop(person_crop):
 
             ])
 
-            
-
             input_tensor = transform(rgb_crop).unsqueeze(0)
-
-            
 
             with torch.no_grad():
 
@@ -5792,13 +4957,9 @@ def _detect_gender_from_person_crop(person_crop):
 
                 features = features.flatten()
 
-            
-
             # Analyze features along with visual cues
 
             hsv = cv2.cvtColor(person_crop, cv2.COLOR_BGR2HSV)
-
-            
 
             # Hair analysis
 
@@ -5810,8 +4971,6 @@ def _detect_gender_from_person_crop(person_crop):
 
             hair_edges = edges[:int(person_crop.shape[0]*0.4), :]
 
-            
-
             if hair_region.size > 0:
 
                 hair_complexity = np.sum(hair_edges > 0) / (hair_region.shape[0] * hair_region.shape[1])
@@ -5820,21 +4979,15 @@ def _detect_gender_from_person_crop(person_crop):
 
                 hair_complexity = 0
 
-            
-
             # Clothing and color analysis
 
             avg_brightness = np.mean(hsv[:, :, 2])
 
             clothing_region = person_crop[int(person_crop.shape[0]*0.4):int(person_crop.shape[0]*0.8), :]
 
-            
-
             # Enhanced heuristic combining multiple features
 
             feature_sum = torch.sum(features).item()
-
-            
 
             # Decision logic based on combined features
 
@@ -5858,8 +5011,6 @@ def _detect_gender_from_person_crop(person_crop):
 
                     gender = "Man "
 
-            
-
             # Add some variation based on feature patterns
 
             import random
@@ -5882,19 +5033,13 @@ def _detect_gender_from_person_crop(person_crop):
 
                     gender = "Woman "
 
-            
-
             print(f"[DEBUG] ResNetV2 gender detected: {gender}")
 
             return gender
 
-            
-
         except Exception as e:
 
             print(f"[DEBUG] ResNetV2 gender detection failed: {e}")
-
-        
 
         # Method 3: Simple color-based fallback
 
@@ -5903,8 +5048,6 @@ def _detect_gender_from_person_crop(person_crop):
             hsv = cv2.cvtColor(person_crop, cv2.COLOR_BGR2HSV)
 
             avg_brightness = np.mean(hsv[:, :, 2])
-
-            
 
             # Basic color heuristic
 
@@ -5918,33 +5061,21 @@ def _detect_gender_from_person_crop(person_crop):
 
                 gender = random.choice(["Woman ", "Man "])
 
-            
-
             print(f"[DEBUG] Fallback gender detected: {gender}")
 
             return gender
-
-            
 
         except Exception as e:
 
             print(f"[DEBUG] Fallback gender detection failed: {e}")
 
-        
-
         return "Person"
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Gender detection failed: {e}")
 
         return "Person"
-
-
-
-
 
 def _detect_charger_in_image(image_crop):
 
@@ -5960,25 +5091,17 @@ def _detect_charger_in_image(image_crop):
 
             return False
 
-        
-
         # Convert to grayscale for edge detection
 
         gray = cv2.cvtColor(image_crop, cv2.COLOR_BGR2GRAY)
-
-        
 
         # Edge detection
 
         edges = cv2.Canny(gray, 50, 150)
 
-        
-
         # Find contours
 
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        
 
         # Look for cable-like shapes (long, thin rectangles)
 
@@ -5990,13 +5113,9 @@ def _detect_charger_in_image(image_crop):
 
             x, y, w, h = cv2.boundingRect(contour)
 
-            
-
             # Check aspect ratio - cables are typically long and thin
 
             aspect_ratio = w / h if h > 0 else 0
-
-            
 
             # Check if it looks like a cable or charger
 
@@ -6006,8 +5125,6 @@ def _detect_charger_in_image(image_crop):
 
                 roi = image_crop[y:y+h, x:x+w]
 
-                
-
                 # Look for USB-like connectors or power adapter shapes
 
                 if _has_charger_features(roi):
@@ -6016,21 +5133,13 @@ def _detect_charger_in_image(image_crop):
 
                     break
 
-        
-
         return charger_detected
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Charger detection failed: {e}")
 
         return False
-
-
-
-
 
 def _has_charger_features(roi):
 
@@ -6046,13 +5155,9 @@ def _has_charger_features(roi):
 
             return False
 
-        
-
         # Look for metallic colors (USB connectors) or specific shapes
 
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-
-        
 
         # Check for metallic/silver colors (typical of USB connectors)
 
@@ -6064,8 +5169,6 @@ def _has_charger_features(roi):
 
         silver_pixels = np.sum(silver_mask > 0)
 
-        
-
         # If significant silver pixels detected, likely a charger
 
         total_pixels = roi.shape[0] * roi.shape[1]
@@ -6074,19 +5177,11 @@ def _has_charger_features(roi):
 
             return True
 
-        
-
         return False
-
-        
 
     except Exception:
 
         return False
-
-
-
-
 
 def _get_detections_summary(boxes, names):
 
@@ -6100,13 +5195,9 @@ def _get_detections_summary(boxes, names):
 
         return "No objects detected"
 
-    
-
     category_counts = {}
 
     object_details = []
-
-    
 
     for i in range(len(boxes)):
 
@@ -6116,13 +5207,9 @@ def _get_detections_summary(boxes, names):
 
             class_name = names.get(class_id, f"class_{class_id}")
 
-            
-
             # Get classification
 
             display_name, category, _ = _classify_object_with_category(class_name, class_id)
-
-            
 
             # Count by category
 
@@ -6132,13 +5219,9 @@ def _get_detections_summary(boxes, names):
 
             category_counts[category] += 1
 
-            
-
             # Add object details
 
             object_details.append(f"{display_name}")
-
-    
 
     # Create summary
 
@@ -6150,21 +5233,13 @@ def _get_detections_summary(boxes, names):
 
             summary_parts.append(f"{count} {category}(s)")
 
-    
-
     objects_str = ", ".join(object_details[:10])  # Show first 10 objects
 
     if len(object_details) > 10:
 
         objects_str += f" and {len(object_details) - 10} more..."
 
-    
-
     return f" Detected: {' | '.join(summary_parts)}\n Objects: {objects_str}"
-
-
-
-
 
 # Global cache for license plate results to avoid re-detection on every frame
 
@@ -6172,23 +5247,15 @@ _license_plate_cache = {}
 
 _frame_counter = 0
 
-
-
-
-
 def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarray:
 
     """
 
     Detect license plate within a vehicle crop using contour analysis and aspect ratio.
 
-    
-
     Args:
 
         vehicle_crop: Cropped vehicle image in BGR format
-
-        
 
     Returns:
 
@@ -6202,37 +5269,25 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
             return None
 
-            
-
         # Convert to grayscale
 
         gray = cv2.cvtColor(vehicle_crop, cv2.COLOR_BGR2GRAY)
-
-        
 
         # Apply bilateral filter to reduce noise
 
         bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
 
-        
-
         # Edge detection
 
         edges = cv2.Canny(bilateral, 50, 200)
-
-        
 
         # Find contours
 
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        
-
         # Filter contours based on license plate characteristics
 
         plate_candidates = []
-
-        
 
         for contour in contours:
 
@@ -6240,15 +5295,11 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
             x, y, w, h = cv2.boundingRect(contour)
 
-            
-
             # Skip very small or very large contours
 
             if w < 40 or h < 10 or w > vehicle_crop.shape[1] * 0.8 or h > vehicle_crop.shape[0] * 0.3:
 
                 continue
-
-                
 
             # License plate aspect ratio (typically 2:1 to 5:1)
 
@@ -6258,8 +5309,6 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
                 continue
 
-                
-
             # Area filter
 
             area = cv2.contourArea(contour)
@@ -6268,15 +5317,11 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
                 continue
 
-                
-
             # Check if it has rectangular shape
 
             peri = cv2.arcLength(contour, True)
 
             approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-
-            
 
             # Add to candidates if it has 4 corners (rectangle-like)
 
@@ -6284,13 +5329,9 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
                 plate_candidates.append((x, y, w, h, area, aspect_ratio))
 
-        
-
         # Sort by area (largest first)
 
         plate_candidates.sort(key=lambda x: x[4], reverse=True)
-
-        
 
         # Return the best candidate
 
@@ -6304,11 +5345,7 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
             return plate_crop
 
-            
-
         return None
-
-        
 
     except Exception as e:
 
@@ -6316,23 +5353,15 @@ def _detect_license_plate_in_vehicle_crop(vehicle_crop: np.ndarray) -> np.ndarra
 
         return None
 
-
-
-
-
 def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
     """
 
     Extract text from a detected license plate crop.
 
-    
-
     Args:
 
         plate_crop: License plate crop in BGR format
-
-        
 
     Returns:
 
@@ -6346,13 +5375,9 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
             return ""
 
-            
-
         # Convert to grayscale
 
         gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
-
-        
 
         # Enhance contrast
 
@@ -6360,13 +5385,9 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
         enhanced = clahe.apply(gray)
 
-        
-
         # Multiple preprocessing methods
 
         methods = []
-
-        
 
         # Method 1: Binary threshold
 
@@ -6374,15 +5395,11 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
         methods.append(binary1)
 
-        
-
         # Method 2: Adaptive threshold
 
         binary2 = cv2.adaptiveThreshold(enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
         methods.append(binary2)
-
-        
 
         # Method 3: Inverted
 
@@ -6391,8 +5408,6 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
         _, binary3 = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
         methods.append(binary3)
-
-        
 
         # Try OCR with multiple configurations
 
@@ -6410,13 +5425,9 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
         ]
 
-        
-
         best_text = ""
 
         best_confidence = 0
-
-        
 
         for i, processed_img in enumerate(methods):
 
@@ -6428,8 +5439,6 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
                     data = pytesseract.image_to_data(processed_img, config=config, output_type=pytesseract.Output.DICT)
 
-                    
-
                     # Extract text with confidence
 
                     text_parts = []
@@ -6438,15 +5447,11 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
                     count = 0
 
-                    
-
                     for j in range(len(data['text'])):
 
                         text = data['text'][j].strip()
 
                         conf = int(data['conf'][j])
-
-                        
 
                         if text and conf > 30:  # Confidence threshold
 
@@ -6456,15 +5461,11 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
                             count += 1
 
-                    
-
                     if text_parts:
 
                         combined_text = ''.join(text_parts)
 
                         avg_conf = total_conf / count if count > 0 else 0
-
-                        
 
                         if len(combined_text) >= 4 and avg_conf > best_confidence:
 
@@ -6474,27 +5475,17 @@ def _extract_text_from_plate_crop(plate_crop: np.ndarray) -> str:
 
                             print(f"[DEBUG] OCR Method {i+1} found: {combined_text} (conf: {avg_conf:.1f})")
 
-                            
-
                 except Exception as e:
 
                     continue
 
-        
-
         return best_text
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Text extraction from plate crop failed: {e}")
 
         return ""
-
-
-
-
 
 def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
@@ -6504,13 +5495,9 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
     This handles close-up shots where car fills the entire frame.
 
-    
-
     Args:
 
         image: Full image in BGR format
-
-        
 
     Returns:
 
@@ -6524,51 +5511,35 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
             return None, ""
 
-        
-
         h, w = image.shape[:2]
 
         print(f"[DEBUG] Running direct license plate detection on image {w}x{h}")
-
-        
 
         # Convert to grayscale
 
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        
-
         # Apply bilateral filter to reduce noise
 
         bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
-
-        
 
         # Edge detection
 
         edges = cv2.Canny(bilateral, 50, 200)
 
-        
-
         # Find contours
 
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        
-
         # Filter contours based on license plate characteristics
 
         plate_candidates = []
-
-        
 
         for contour in contours:
 
             # Get bounding rectangle
 
             x, y, bw, bh = cv2.boundingRect(contour)
-
-            
 
             # Skip very small or very large contours (relative to image size)
 
@@ -6582,8 +5553,6 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
                 continue
 
-                
-
             # License plate aspect ratio (typically 2:1 to 6:1)
 
             aspect_ratio = bw / bh if bh > 0 else 0
@@ -6591,8 +5560,6 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
             if aspect_ratio < 2.0 or aspect_ratio > 7.0:
 
                 continue
-
-            
 
             # Area filter (relative to image)
 
@@ -6604,15 +5571,11 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
                 continue
 
-            
-
             # Check if it has rectangular shape
 
             peri = cv2.arcLength(contour, True)
 
             approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-
-            
 
             # Add to candidates if it has 4 corners (rectangle-like)
 
@@ -6624,13 +5587,9 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
                 plate_candidates.append((x, y, bw, bh, area, aspect_ratio, score))
 
-        
-
         # Sort by score (best aspect ratio match first)
 
         plate_candidates.sort(key=lambda x: x[6], reverse=True)
-
-        
 
         # Try each candidate
 
@@ -6640,23 +5599,15 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
             plate_crop = image[y:y+bh, x:x+bw]
 
-            
-
             if plate_crop.size == 0:
 
                 continue
 
-            
-
             print(f"[DEBUG] Trying plate candidate: {bw}x{bh}, ratio: {aspect_ratio:.2f}, score: {score:.2f}")
-
-            
 
             # Extract text from this crop
 
             plate_text = _extract_text_from_plate_crop(plate_crop)
-
-            
 
             if plate_text and len(plate_text) >= 4:
 
@@ -6668,11 +5619,7 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
                     return plate_crop, cleaned
 
-        
-
         return None, ""
-
-        
 
     except Exception as e:
 
@@ -6680,17 +5627,11 @@ def _detect_license_plate_direct(image: np.ndarray) -> Tuple[np.ndarray, str]:
 
         return None, ""
 
-
-
-
-
 def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
     """
 
     Enhanced fast frame annotation with professional non-overlapping labels.
-
-    
 
     Args:
 
@@ -6703,8 +5644,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
     """
 
     global _license_plate_cache, _frame_counter
-
-    
 
     try:
 
@@ -6724,25 +5663,17 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 sys.path.insert(0, project_root)
 
-            
-
             from src.processors.professional_annotator import professional_annotator
-
-            
 
             if result is None or not hasattr(result, 'boxes') or result.boxes is None:
 
                 return frame
-
-            
 
             boxes = result.boxes
 
             if not hasattr(boxes, '__len__') or len(boxes) == 0:
 
                 return frame
-
-            
 
             # Convert to detections format
 
@@ -6756,8 +5687,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
             names = result.names
 
-            
-
             for i in range(len(boxes)):
 
                 if conf[i] > 0.3:
@@ -6770,8 +5699,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                     class_name = names.get(class_id, f"class_{class_id}")
 
-                    
-
                     detection = {
 
                         'bbox': [x1, y1, x2, y2],
@@ -6783,8 +5710,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                         'class_id': class_id
 
                     }
-
-                    
 
                     # Add simple color detection
 
@@ -6799,8 +5724,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                             avg_color = np.average(avg_color_per_row, axis=0)
 
                             b, g, r = map(int, avg_color)
-
-                            
 
                             # Simple color classification
 
@@ -6840,19 +5763,13 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                 color = "gray"
 
-                            
-
                             detection['color'] = color
 
                     except Exception:
 
                         detection['color'] = 'unknown'
 
-                    
-
                     detections.append(detection)
-
-            
 
             # Use professional annotator
 
@@ -6874,15 +5791,11 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 annotated = frame
 
-            
-
             # Add processing info - SUPER BIG FONT
 
-            cv2.putText(annotated, "FAST MODE - PROFESSIONAL ANNOTATION", (10, 100), 
+            cv2.putText(annotated, "FAST MODE - PROFESSIONAL ANNOTATION", (10, 100),
 
                       cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
-
-            
 
             # Add time and date timestamp with small box
 
@@ -6892,8 +5805,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 current_date = datetime.now().strftime('%d/%m/%Y')
 
-                
-
                 # Create semi-transparent background for timestamp
 
                 overlay = annotated.copy()
@@ -6902,41 +5813,29 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 cv2.addWeighted(overlay, 0.7, annotated, 0.3, 0, annotated)
 
-                
-
                 # Add time with smaller font
 
-                cv2.putText(annotated, f"Time: {current_time}", (10, 25), 
+                cv2.putText(annotated, f"Time: {current_time}", (10, 25),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                
+                # Add date with smaller font
 
-                # Add date with smaller font  
-
-                cv2.putText(annotated, f"Date: {current_date}", (10, 50), 
+                cv2.putText(annotated, f"Date: {current_date}", (10, 50),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-                
 
                 # Add frame info
 
-                cv2.putText(annotated, "Mode: Video", (10, 75), 
+                cv2.putText(annotated, "Mode: Video", (10, 75),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
-
-                
 
             except Exception as time_error:
 
                 print(f"[WARNING] Failed to add timestamp to video: {time_error}")
 
-            
-
             return annotated
-
-            
 
         except ImportError:
 
@@ -6950,19 +5849,13 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
             pass
 
-        
-
         # Fallback to original annotation method
 
         annotated = frame.copy()
 
-        
-
         if result is None or not hasattr(result, 'boxes') or result.boxes is None:
 
             return annotated
-
-        
 
         boxes = result.boxes
 
@@ -6992,17 +5885,15 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                         label = f"License Plate: {plate_text}"
 
-                        cv2.putText(annotated, label, (10, 200), 
+                        cv2.putText(annotated, label, (10, 200),
 
                                   cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 255), 5)
-
-                        
 
                         # Add info text - SUPER BIG
 
                         info_text = "Direct license plate detection (no vehicle detected)"
 
-                        cv2.putText(annotated, info_text, (10, 300), 
+                        cv2.putText(annotated, info_text, (10, 300),
 
                                   cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
 
@@ -7010,23 +5901,15 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 print(f"[DEBUG] Direct license plate detection failed: {e}")
 
-            
-
             return annotated
-
-        
 
         # Increment frame counter
 
         _frame_counter += 1
 
-        
-
         # Only run license plate OCR every 5 frames for speed
 
         run_plate_ocr = (_frame_counter % 5 == 0) or not skip_plate_ocr
-
-        
 
         # Get detections
 
@@ -7038,13 +5921,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
         names = result.names
 
-        
-
         # Vehicle classes that need license plate detection
 
         vehicle_classes = {'car', 'truck', 'bus', 'motorcycle'}
-
-        
 
         # Draw detections with enhanced classification and advanced color detection
 
@@ -7060,13 +5939,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 class_name = names.get(class_id, f"class_{class_id}")
 
-                
-
                 # Get enhanced classification
 
                 display_name, category, color = _classify_object_with_category(class_name, class_id)
-
-                
 
                 # Extract crop for advanced color detection and license plate extraction
 
@@ -7076,19 +5951,13 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                 license_plate_text = None
 
-                
-
                 # Create cache key based on position and class
 
                 cache_key = f"{class_name}_{x1}_{y1}_{x2}_{y2}"
 
-                
-
                 # Enhanced detection for specific categories
 
                 enhanced_label = display_name
-
-                
 
                 # Charger detection for electronics
 
@@ -7109,8 +5978,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                     except Exception as e:
 
                         print(f"[DEBUG] Charger detection failed: {e}")
-
-                
 
                 # License plate detection for vehicles - RUN EVERY FRAME for better detection
 
@@ -7134,15 +6001,11 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                             print(f"[DEBUG] Running license plate OCR on {class_name}...")
 
-                            
-
                             # STEP 1: Try to find license plate within the vehicle crop
 
                             plate_found = False
 
                             plate_crop = _detect_license_plate_in_vehicle_crop(crop)
-
-                            
 
                             if plate_crop is not None:
 
@@ -7166,8 +6029,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                         print(f"[DEBUG]  License plate detected on {class_name}: {license_plate_text}")
 
-                            
-
                             # STEP 2: If no plate found, try OCR on entire vehicle crop
 
                             if not plate_found:
@@ -7176,13 +6037,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                 gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-                                
-
                                 # Multiple preprocessing methods
 
                                 methods = []
-
-                                
 
                                 # Method 1: Basic threshold
 
@@ -7190,15 +6047,11 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                 methods.append(binary1)
 
-                                
-
                                 # Method 2: Adaptive threshold
 
                                 binary2 = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
 
                                 methods.append(binary2)
-
-                                
 
                                 # Method 3: Inverted
 
@@ -7207,8 +6060,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                                 _, binary3 = cv2.threshold(inverted, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
                                 methods.append(binary3)
-
-                                
 
                                 # Try OCR with multiple methods
 
@@ -7223,8 +6074,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                                         config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
                                         plate_text = pytesseract.image_to_string(processed_img, config=config).strip()
-
-                                        
 
                                         # Clean and validate
 
@@ -7242,8 +6091,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                         print(f"[DEBUG] Method {i+1} failed: {e}")
 
-                                
-
                                 # Use the best result
 
                                 if best_text:
@@ -7258,13 +6105,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                                     print(f"[DEBUG]  No license plate text found on {class_name}")
 
-                                
-
                         except Exception as e:
 
                             print(f"[DEBUG] License plate extraction failed: {e}")
-
-                
 
                 # Special handling for license plate objects - extract text directly
 
@@ -7278,15 +6121,11 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                         _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-                        
-
                         # Tesseract config for license plates
 
                         config = r'--oem 3 --psm 7 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
                         plate_text = pytesseract.image_to_string(binary, config=config).strip()
-
-                        
 
                         if plate_text and len(plate_text) >= 4:
 
@@ -7301,8 +6140,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                     except Exception as e:
 
                         print(f"[DEBUG] License plate OCR failed: {e}")
-
-                
 
                 if crop.size > 0:
 
@@ -7319,8 +6156,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                         except Exception:
 
                             color_result = None
-
-                        
 
                         if color_result and color_result.get('confidence', 0) > 0.3:
 
@@ -7345,8 +6180,6 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
                                 'family': 'unknown'
 
                             }
-
-                            
 
                     except Exception as e:
 
@@ -7374,19 +6207,13 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                             color_info = {'name': 'unknown', 'hex': '#000000', 'confidence': 0.0}
 
-                
-
                 # Draw box with category-specific color
 
                 cv2.rectangle(annotated, (x1, y1), (x2, y2), color, 2)
 
-                
-
                 # Build enhanced label with object name, color, and license plate
 
                 label_parts = [display_name]
-
-                
 
                 # Add color info
 
@@ -7394,55 +6221,39 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
                     label_parts.append(color_info['name'])
 
-                
-
                 # Add license plate text for vehicles and license plate objects
 
                 if license_plate_text:
 
                     label_parts.append(f"Plate: {license_plate_text}")
 
-                
-
                 # Add confidence
 
                 label_parts.append(f"{confidence:.2f}")
-
-                
 
                 # Join all parts with clear separator
 
                 label = " | ".join(label_parts)
 
-                
-
                 label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 2.0, 4)[0]
-
-                
 
                 # Background for label
 
-                cv2.rectangle(annotated, (x1, y1 - label_size[1] - 25), 
+                cv2.rectangle(annotated, (x1, y1 - label_size[1] - 25),
 
                             (x1 + label_size[0], y1), color, -1)
 
-                
-
                 # Text - SUPER BIG FONT
 
-                cv2.putText(annotated, label, (x1, y1 - 15), 
+                cv2.putText(annotated, label, (x1, y1 - 15),
 
                           cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
 
-        
-
         # Add processing info and detection summary - SUPER BIG FONT
 
-        cv2.putText(annotated, "FAST MODE - GPU + LICENSE PLATE", (10, 100), 
+        cv2.putText(annotated, "FAST MODE - GPU + LICENSE PLATE", (10, 100),
 
                   cv2.FONT_HERSHEY_SIMPLEX, 2.5, (0, 255, 0), 5)
-
-        
 
         # Add detection summary - SUPER BIG FONT
 
@@ -7456,15 +6267,11 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
             for i, line in enumerate(lines[:2]):  # Show first 2 lines
 
-                cv2.putText(annotated, line[:50], (10, 180 + i*80), 
+                cv2.putText(annotated, line[:50], (10, 180 + i*80),
 
                           cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), 4)
 
-        
-
         return annotated
-
-        
 
     except Exception as e:
 
@@ -7472,15 +6279,9 @@ def _annotate_frame_fast_video(frame, result, skip_plate_ocr=True):
 
         return frame
 
-
-
-
-
 # JSON-based text extraction system
 
 _text_extraction_cache = {}
-
-
 
 def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) -> dict:
 
@@ -7490,15 +6291,11 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
 
     NEW APPROACH: First detect vehicles, then extract text only if vehicles are present.
 
-    
-
     Args:
 
         image_bgr: Input image in BGR format
 
         image_id: Unique identifier for the image
-
-        
 
     Returns:
 
@@ -7520,10 +6317,6 @@ def extract_text_from_image_json(image_bgr: np.ndarray, image_id: str = None) ->
 
         return _fallback_text_extraction(image_bgr, image_id)
 
-
-
-
-
 def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> dict:
 
     """
@@ -7536,11 +6329,7 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
 
         image_id = f"img_{int(time.time() * 1000)}"
 
-    
-
     print(f"[DEBUG] Starting fallback text extraction for {image_id}")
-
-    
 
     result = {
 
@@ -7572,8 +6361,6 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
 
     }
 
-    
-
     try:
 
         # STEP 0: Check if vehicles are present in the image
@@ -7581,8 +6368,6 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
         print(f"[DEBUG] Step 0: Checking for vehicles in the image...")
 
         vehicles_detected = _detect_vehicles_in_image_fallback(image_bgr)
-
-        
 
         if not vehicles_detected:
 
@@ -7592,19 +6377,13 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
 
             return result
 
-        
-
         print(f"[DEBUG]  Vehicles detected: {[v['class_name'] for v in vehicles_detected]}")
 
         print(f"[DEBUG] Proceeding with text extraction...")
 
-        
-
         # Continue with existing text extraction logic...
 
         # [Rest of the original function would go here]
-
-        
 
     except Exception as e:
 
@@ -7612,13 +6391,7 @@ def _fallback_text_extraction(image_bgr: np.ndarray, image_id: str = None) -> di
 
         result["error"] = str(e)
 
-    
-
     return result
-
-
-
-
 
 def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
 
@@ -7634,7 +6407,7 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
 
         VEHICLE_CLASSES = {
 
-            'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'van', 
+            'car', 'truck', 'bus', 'motorcycle', 'bicycle', 'van',
 
             'taxi', 'ambulance', 'police', 'fire truck', 'tractor',
 
@@ -7642,25 +6415,17 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
 
         }
 
-        
-
         # Get YOLO model
 
         model = get_model("yolo26n.pt")
 
         detection_results = model(image_bgr)
 
-        
-
         detected_vehicles = []
-
-        
 
         if detection_results and len(detection_results) > 0:
 
             detection = detection_results[0]
-
-            
 
             if hasattr(detection, 'boxes') and detection.boxes is not None:
 
@@ -7674,21 +6439,15 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
 
                 names = detection.names
 
-                
-
                 for i in range(len(xyxy)):
 
                     x1, y1, x2, y2 = xyxy[i]
 
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-                    
-
                     if x2 <= x1 or y2 <= y1:
 
                         continue
-
-                    
 
                     # Get class name
 
@@ -7697,8 +6456,6 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
                     class_name = names.get(class_id, f"class_{class_id}")
 
                     confidence = float(conf[i]) if i < len(conf) else 0.0
-
-                    
 
                     # Check if this is a vehicle (case insensitive)
 
@@ -7722,21 +6479,13 @@ def _detect_vehicles_in_image_fallback(image_bgr: np.ndarray) -> list:
 
                         print(f"[DEBUG]  Vehicle detected: {class_name} (conf: {confidence:.3f})")
 
-        
-
         return detected_vehicles
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Error in fallback vehicle detection: {e}")
 
         return []
-
-
-
-
 
 def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
@@ -7746,13 +6495,9 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
     PRIMARY: PaddleOCR -> FALLBACK: LightOnOCR -> LAST: Tesseract
 
-    
-
     Args:
 
         plate_crop: Cropped license plate image in BGR format
-
-        
 
     Returns:
 
@@ -7764,11 +6509,7 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
         print(f"[DEBUG] Extracting text from license plate crop: {plate_crop.shape}")
 
-        
-
         all_candidates = []
-
-        
 
         # Method 1: Optimized PaddleOCR GPU (PRIMARY - BEST SPEED + ACCURACY)
 
@@ -7780,13 +6521,11 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
             print("[DEBUG]  Trying Optimized PaddleOCR GPU for license plate")
 
-            
-
             # Extract text with optimized GPU processing
 
             paddleocr_result = extract_text_optimized(
 
-                plate_crop, 
+                plate_crop,
 
                 confidence_threshold=0.3,  # Lower threshold for license plates
 
@@ -7799,8 +6538,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                 preprocess=True
 
             )
-
-            
 
             if paddleocr_result["text"] and paddleocr_result["text"].strip():
 
@@ -7816,8 +6553,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                     print(f"[DEBUG]  Optimized PaddleOCR found: {cleaned} (conf: {confidence:.3f}, device: {device})")
 
-                    
-
                     # Also try specialized license plate extraction
 
                     paddle_plates = extract_license_plates_optimized(
@@ -7829,8 +6564,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                         use_gpu=None
 
                     )
-
-                    
 
                     for plate_info in paddle_plates:
 
@@ -7846,8 +6579,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                             print(f"[DEBUG]  Optimized PaddleOCR specialized found: {plate_text} (device: {plate_device})")
 
-            
-
         except ImportError:
 
             print("[DEBUG] Optimized PaddleOCR not available, trying alternatives...")
@@ -7855,8 +6586,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
         except Exception as e:
 
             print(f"[DEBUG]  Optimized PaddleOCR failed: {e}")
-
-        
 
         # Method 2: Legacy PaddleOCR (SECONDARY if optimized fails)
 
@@ -7868,27 +6597,21 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 print("[DEBUG]  Trying Legacy PaddleOCR for license plate")
 
-                
-
                 # Preprocess for better PaddleOCR results
 
                 processed_plate = preprocess_image_for_paddleocr(plate_crop)
-
-                
 
                 # Extract text with PaddleOCR
 
                 paddleocr_result = extract_text_with_paddleocr(
 
-                    processed_plate, 
+                    processed_plate,
 
                     confidence_threshold=0.3,
 
                     lang='en'
 
                 )
-
-                
 
                 if paddleocr_result and paddleocr_result.strip():
 
@@ -7900,8 +6623,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                         print(f"[DEBUG]  Legacy PaddleOCR found: {cleaned}")
 
-                        
-
                         # Also try specialized license plate extraction
 
                         paddle_plates = extract_license_plates_with_paddleocr(
@@ -7911,8 +6632,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                             confidence_threshold=0.4
 
                         )
-
-                        
 
                         for plate_info in paddle_plates:
 
@@ -7924,8 +6643,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                                 print(f"[DEBUG]  Legacy PaddleOCR specialized found: {plate_text}")
 
-                
-
             except ImportError:
 
                 print("[DEBUG] Legacy PaddleOCR not available...")
@@ -7933,8 +6650,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
             except Exception as e:
 
                 print(f"[DEBUG]  Legacy PaddleOCR failed: {e}")
-
-        
 
         # Method 3: LightOnOCR (FALLBACK when PaddleOCR fails)
 
@@ -7964,8 +6679,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 print(f"[DEBUG]  LightOnOCR failed for plate: {e}")
 
-        
-
         # Method 4: Tesseract OCR (LAST FALLBACK when all OCR methods fail)
 
         if not all_candidates and TESSERACT_AVAILABLE:
@@ -7978,19 +6691,13 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
 
-                
-
                 # Multiple preprocessing attempts
 
                 preprocessing_methods = []
 
-                
-
                 # Method 4a: Basic grayscale
 
                 preprocessing_methods.append(("gray", gray))
-
-                
 
                 # Method 4b: Contrast enhancement
 
@@ -8000,15 +6707,11 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 preprocessing_methods.append(("clahe", clahe_enhanced))
 
-                
-
                 # Method 4c: Binary threshold
 
                 _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
                 preprocessing_methods.append(("binary", binary))
-
-                
 
                 # Method 4d: Adaptive threshold
 
@@ -8016,15 +6719,11 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 preprocessing_methods.append(("adaptive", adaptive))
 
-                
-
                 # Method 4e: Inverted (for dark plates with light text)
 
                 inverted = cv2.bitwise_not(gray)
 
                 preprocessing_methods.append(("inverted", inverted))
-
-                
 
                 # Method 4f: Upscaled for better OCR
 
@@ -8035,8 +6734,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     upscaled = cv2.resize(gray, (w*3, h*3), interpolation=cv2.INTER_CUBIC)
 
                     preprocessing_methods.append(("upscaled", upscaled))
-
-                
 
                 # Tesseract configurations optimized for license plates
 
@@ -8057,8 +6754,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     (r'--oem 3 --psm 6', "flexible"),
 
                 ]
-
-                
 
                 for method_name, processed_img in preprocessing_methods:
 
@@ -8084,13 +6779,9 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                             continue
 
-                
-
             except Exception as e:
 
                 print(f"[DEBUG]  Tesseract fallback failed: {e}")
-
-        
 
         # Method 5: Morphological operations + OCR (EXTRA FALLBACK)
 
@@ -8102,15 +6793,11 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
 
-                
-
                 # Remove noise
 
                 kernel = np.ones((2,2), np.uint8)
 
                 opening = cv2.morphologyEx(gray, cv2.MORPH_OPEN, kernel)
-
-                
 
                 # Enhance contrast
 
@@ -8118,13 +6805,9 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 enhanced = clahe.apply(opening)
 
-                
-
                 # Binarize
 
                 _, binary = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-                
 
                 # OCR with multiple configs
 
@@ -8137,8 +6820,6 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
                     r'--oem 3 --psm 7'
 
                 ]
-
-                
 
                 for config in morph_configs:
 
@@ -8162,13 +6843,9 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                         continue
 
-                        
-
             except Exception as e:
 
                 print(f"[DEBUG]  Morphological method failed: {e}")
-
-        
 
         # Select the best result from all candidates
 
@@ -8178,17 +6855,13 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
             for method, text, conf, device in all_candidates:
 
-                print(f"[DEBUG]   {method}: {text} (conf: {conf:.3f}, device: {device})")
-
-            
+                print(f"[DEBUG]  {method}: {text} (conf: {conf:.3f}, device: {device})")
 
             # Filter by valid Indian license plates
 
-            valid_candidates = [(method, text, conf, device) for method, text, conf, device in all_candidates 
+            valid_candidates = [(method, text, conf, device) for method, text, conf, device in all_candidates
 
                               if _is_valid_indian_license_plate(text)]
-
-            
 
             if valid_candidates:
 
@@ -8212,19 +6885,11 @@ def _extract_text_from_license_plate_crop(plate_crop: np.ndarray) -> str:
 
                 return best_candidate[1]
 
-    
-
     except Exception as e:
 
         print(f"[DEBUG] Error in license plate OCR: {e}")
 
-    
-
     return ""
-
-
-
-
 
 def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:
 
@@ -8232,13 +6897,9 @@ def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:
 
     Preprocess license plate crop for better OCR results.
 
-    
-
     Args:
 
         plate_crop: Original license plate crop in BGR format
-
-        
 
     Returns:
 
@@ -8252,13 +6913,9 @@ def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:
 
         gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
 
-        
-
         # Apply bilateral filter to reduce noise while preserving edges
 
         bilateral = cv2.bilateralFilter(gray, 9, 75, 75)
-
-        
 
         # Apply CLAHE for contrast enhancement
 
@@ -8266,25 +6923,17 @@ def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:
 
         clahe_enhanced = clahe.apply(bilateral)
 
-        
-
         # Sharpen the image
 
         kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
 
         sharpened = cv2.filter2D(clahe_enhanced, -1, kernel)
 
-        
-
         # Convert back to BGR for LightOnOCR
 
         processed_bgr = cv2.cvtColor(sharpened, cv2.COLOR_GRAY2BGR)
 
-        
-
         return processed_bgr
-
-        
 
     except Exception as e:
 
@@ -8292,25 +6941,17 @@ def _preprocess_license_plate(plate_crop: np.ndarray) -> np.ndarray:
 
         return plate_crop
 
-
-
-
-
 def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict:
 
     """
 
     Extract all text from an object crop using multiple methods.
 
-    
-
     Args:
 
         crop_bgr: Object crop in BGR format
 
         class_name: Class name of the object
-
-        
 
     Returns:
 
@@ -8327,8 +6968,6 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
         "general_text": []
 
     }
-
-    
 
     try:
 
@@ -8369,8 +7008,6 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                             "method": "license_plate_detection"
 
                         })
-
-        
 
         # Method 2: LightOnOCR for general text
 
@@ -8414,8 +7051,6 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
 
                 print(f"[DEBUG] LightOnOCR failed: {e}")
 
-        
-
         # Method 3: Tesseract OCR for general text
 
         tess_result = _extract_text_ocr(crop_bgr)
@@ -8437,8 +7072,6 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
                         is_duplicate = True
 
                         break
-
-                
 
                 if not is_duplicate:
 
@@ -8466,8 +7099,6 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
 
                     })
 
-        
-
         # Method 4: Specialized OCR for different object types
 
         specialized_text = _extract_specialized_text(crop_bgr, class_name)
@@ -8490,27 +7121,17 @@ def _extract_all_text_from_object(crop_bgr: np.ndarray, class_name: str) -> dict
 
                 })
 
-    
-
     except Exception as e:
 
         print(f"[DEBUG] Error extracting text from object: {e}")
 
-    
-
     return text_results
-
-
-
-
 
 def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
 
     """Extract text from the entire image using general OCR methods."""
 
     text_items = []
-
-    
 
     try:
 
@@ -8538,8 +7159,6 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
 
                         })
 
-                        
-
                         # Special handling: Look for license plates in full image text
 
                         license_plates = _extract_license_plates_from_text(cleaned)
@@ -8559,8 +7178,6 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
             except:
 
                 pass
-
-        
 
         # Try Tesseract on full image
 
@@ -8586,8 +7203,6 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
 
                     })
 
-                    
-
                     # Special handling: Look for license plates in full image text
 
                     license_plates = _extract_license_plates_from_text(cleaned)
@@ -8608,19 +7223,11 @@ def _extract_general_text_from_image(image_bgr: np.ndarray) -> list:
 
             pass
 
-    
-
     except Exception as e:
 
         print(f"[DEBUG] Error in full image text extraction: {e}")
 
-    
-
     return text_items
-
-
-
-
 
 def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) -> bool:
 
@@ -8630,15 +7237,11 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
     This prevents false positives from OCR hallucination.
 
-    
-
     Args:
 
         plate_crop: Cropped license plate image in BGR format
 
         plate_text: Extracted license plate text
-
-        
 
     Returns:
 
@@ -8650,15 +7253,11 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
         print(f"[DEBUG] Validating license plate: {plate_text}")
 
-        
-
         # Method 1: Check if the characters in plate_text can be visually confirmed
 
         # Convert to grayscale for analysis
 
         gray = cv2.cvtColor(plate_crop, cv2.COLOR_BGR2GRAY)
-
-        
 
         # Method 1a: Character count validation based on image size
 
@@ -8666,21 +7265,15 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
         expected_chars = len(plate_text)
 
-        
-
         # Estimate if the plate size can accommodate the detected text
 
         min_char_width = 8  # Minimum width per character
 
         max_char_width = 30  # Maximum width per character
 
-        
-
         estimated_min_width = expected_chars * min_char_width
 
         estimated_max_width = expected_chars * max_char_width
-
-        
 
         if not (estimated_min_width <= w <= estimated_max_width * 2):
 
@@ -8688,21 +7281,15 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             return False
 
-        
-
         # Method 2: Visual character verification
 
         # Apply threshold to get binary image
 
         _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        
-
         # Find contours (potential characters)
 
         contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        
 
         # Filter contours by size (character-like)
 
@@ -8716,11 +7303,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             aspect_ratio = cw / ch if ch > 0 else 0
 
-            
-
             # Character-like properties
 
-            if (area > 50 and area < (w * h * 0.3) and 
+            if (area > 50 and area < (w * h * 0.3) and
 
                 5 <= cw <= w // 3 and 10 <= ch <= h // 2 and
 
@@ -8728,13 +7313,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
                 char_contours.append(contour)
 
-        
-
         visual_char_count = len(char_contours)
 
         print(f"[DEBUG] Visual character count: {visual_char_count}, Expected: {expected_chars}")
-
-        
 
         # Allow some tolerance (some characters might be merged or split)
 
@@ -8744,27 +7325,19 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             # Don't immediately reject, continue with other validations
 
-        
-
         # Method 3: Cross-validate with different OCR methods
 
         # If multiple OCR methods agree on similar text, it's more likely real
 
         cross_validation_results = []
 
-        
-
         # Try different preprocessing methods
 
         preprocessing_methods = []
 
-        
-
         # Basic grayscale
 
         preprocessing_methods.append(gray)
-
-        
 
         # Binary threshold
 
@@ -8772,15 +7345,11 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
         preprocessing_methods.append(binary_val)
 
-        
-
         # Inverted
 
         inverted = cv2.bitwise_not(gray)
 
         preprocessing_methods.append(inverted)
-
-        
 
         # CLAHE enhanced
 
@@ -8789,8 +7358,6 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
         clahe_enhanced = clahe.apply(gray)
 
         preprocessing_methods.append(clahe_enhanced)
-
-        
 
         # Test with different Tesseract configs
 
@@ -8803,8 +7370,6 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
             r'--oem 3 --psm 7'
 
         ]
-
-        
 
         for processed_img in preprocessing_methods:
 
@@ -8826,11 +7391,7 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
                     continue
 
-        
-
         print(f"[DEBUG] Cross-validation results: {cross_validation_results}")
-
-        
 
         # Check if any results are similar to the main result
 
@@ -8844,17 +7405,11 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             similarity = len(common_chars) / max(len(plate_text), len(result))
 
-            
-
             if similarity >= 0.7:  # 70% similarity
 
                 similar_count += 1
 
-        
-
         print(f"[DEBUG] Similar OCR results: {similar_count}/{len(cross_validation_results)}")
-
-        
 
         # Method 4: Plate structure validation
 
@@ -8866,13 +7421,9 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             return False
 
-        
-
         # Final decision based on all validations
 
         validation_score = 0
-
-        
 
         # Visual character count validation (less strict)
 
@@ -8884,8 +7435,6 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             validation_score -= 1  # Penalty for no visual characters
 
-        
-
         # Cross-validation
 
         if similar_count >= 2:
@@ -8896,25 +7445,17 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             validation_score += 1
 
-        
-
         # Size validation
 
         if estimated_min_width <= w <= estimated_max_width * 2:
 
             validation_score += 1
 
-        
-
         print(f"[DEBUG] Validation score: {validation_score}/4")
-
-        
 
         # Need at least 2 points to pass validation
 
         is_valid = validation_score >= 2
-
-        
 
         if is_valid:
 
@@ -8924,21 +7465,13 @@ def _validate_license_plate_in_image(plate_crop: np.ndarray, plate_text: str) ->
 
             print(f"[DEBUG]  License plate validation FAILED: {plate_text}")
 
-        
-
         return is_valid
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Error in license plate validation: {e}")
 
         return False
-
-
-
-
 
 def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
@@ -8948,13 +7481,9 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
     This helps filter out OCR hallucinations.
 
-    
-
     Args:
 
         plate_text: License plate text to validate
-
-        
 
     Returns:
 
@@ -8966,23 +7495,17 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
         plate_upper = plate_text.upper()
 
-        
-
         # Rule 1: Must have at least one digit and one letter
 
         has_digit = any(c.isdigit() for c in plate_upper)
 
         has_letter = any(c.isalpha() for c in plate_upper)
 
-        
-
         if not (has_digit and has_letter):
 
             print(f"[DEBUG]  Plate missing digits or letters: {plate_text}")
 
             return False
-
-        
 
         # Rule 2: Reject patterns that look like OCR errors
 
@@ -8996,8 +7519,6 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
             return False
 
-        
-
         # Rule 3: Reject obviously unrealistic patterns
 
         # Check for common OCR error patterns
@@ -9008,15 +7529,13 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
             r'^[0-9]{1,3}$',  # Just 1-3 digits
 
-            r'^[A-Z]{4,}$',   # Too many letters
+            r'^[A-Z]{4,}$',  # Too many letters
 
-            r'^[0-9]{6,}$',   # Too many digits
+            r'^[0-9]{6,}$',  # Too many digits
 
-            r'^(.)\1{5,}',    # Same character repeated 6+ times
+            r'^(.)\1{5,}',  # Same character repeated 6+ times
 
         ]
-
-        
 
         import re
 
@@ -9028,8 +7547,6 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
                 return False
 
-        
-
         # Rule 4: Length should be reasonable (6-12 characters for most plates)
 
         if not (6 <= len(plate_upper) <= 12):
@@ -9038,15 +7555,11 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
             return False
 
-        
-
         # Rule 5: Should follow some basic license plate structure
 
         # Common patterns: 2 letters + 2-4 digits + 2-3 letters + 1-4 digits
 
         # Or: 2 letters + 1-4 digits + 1-3 letters + 1-4 digits
-
-        
 
         # Check for Indian-like patterns
 
@@ -9054,25 +7567,21 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
         indian_pattern2 = r'^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$'
 
-        
-
         # Check for Serbian/European format: 2 letters + 2 letters + 3-4 numbers (e.g., PG AN 112)
 
         serbian_pattern = r'^[A-Z]{2}[A-Z]{2}[0-9]{3,4}$'
 
         # Check for extended European format: 2-4 letters + 1-2 letters + 2-4 numbers
 
-        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$' 
+        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$'
 
         # Check for Serbian/European format: 2 letters + 2 letters + 3-4 numbers (e.g., PG AN 112)
         serbian_pattern = r'^[A-Z]{2}[A-Z]{2}[0-9]{3,4}$'
         # Check for extended European format: 2-4 letters + 1-2 letters + 2-4 numbers
-        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$' 
+        european_extended_pattern = r'^[A-Z]{2,4}[A-Z]{1,2}[0-9]{2,4}$'
         # Check for international patterns
 
         international_pattern = r'^[A-Z0-9]{6,12}$'
-
-        
 
         if (re.match(indian_pattern1, plate_upper) or
 
@@ -9088,15 +7597,11 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
             return True
 
-        
-
         # If it doesn't match standard patterns but passes other checks, allow it
 
         print(f"[DEBUG]  Non-standard but acceptable pattern: {plate_text}")
 
         return True
-
-        
 
     except Exception as e:
 
@@ -9104,25 +7609,17 @@ def _is_realistic_license_plate_pattern(plate_text: str) -> bool:
 
         return False
 
-
-
-
-
 def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y1: int, plate_x2: int, plate_y2: int) -> str:
 
     """
 
     Detect the car color by analyzing the area around the license plate.
 
-    
-
     Args:
 
         image_bgr: Full image in BGR format
 
         plate_x1, plate_y1, plate_x2, plate_y2: License plate bounding box
-
-        
 
     Returns:
 
@@ -9138,13 +7635,9 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
         plate_height = plate_y2 - plate_y1
 
-        
-
         # Define sampling areas around the license plate
 
         sampling_areas = []
-
-        
 
         # Area above the plate (most likely car body)
 
@@ -9160,8 +7653,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
             sampling_areas.append((above_x1, above_y1, above_x2, above_y2))
 
-        
-
         # Area below the plate (car body)
 
         below_y1 = plate_y2
@@ -9175,8 +7666,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
         if below_y2 > below_y1 and below_x2 > below_x1:
 
             sampling_areas.append((below_x1, below_y1, below_x2, below_y2))
-
-        
 
         # Area to the left of the plate
 
@@ -9192,8 +7681,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
             sampling_areas.append((left_x1, left_y1, left_x2, left_y2))
 
-        
-
         # Area to the right of the plate
 
         right_x1 = plate_x2
@@ -9208,13 +7695,9 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
             sampling_areas.append((right_x1, right_y1, right_x2, right_y2))
 
-        
-
         # Analyze each sampling area
 
         color_votes = {}
-
-        
 
         for area_x1, area_y1, area_x2, area_y2 in sampling_areas:
 
@@ -9222,13 +7705,9 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
             area_crop = image_bgr[area_y1:area_y2, area_x1:area_x2]
 
-            
-
             if area_crop.size == 0:
 
                 continue
-
-            
 
             # Skip if the area is too white (might be plate background)
 
@@ -9238,13 +7717,9 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
                 continue  # Skip very white areas
 
-            
-
             # Detect color in this area
 
             area_color = _classify_color_bgr(area_crop)
-
-            
 
             # Vote for this color
 
@@ -9256,8 +7731,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
                 color_votes[area_color] = 1
 
-        
-
         # Select the color with the most votes
 
         if color_votes:
@@ -9267,8 +7740,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
             print(f"[DEBUG] Car color detected around license plate: {best_color} (votes: {color_votes})")
 
             return best_color
-
-        
 
         # Fallback: analyze a larger area around the plate
 
@@ -9284,8 +7755,6 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
         large_y2 = min(h, plate_y2 + expand_y)
 
-        
-
         large_area = image_bgr[large_y1:large_y2, large_x1:large_x2]
 
         if large_area.size > 0:
@@ -9296,19 +7765,11 @@ def _detect_car_color_around_plate(image_bgr: np.ndarray, plate_x1: int, plate_y
 
             return fallback_color
 
-    
-
     except Exception as e:
 
         print(f"[DEBUG] Error detecting car color around plate: {e}")
 
-    
-
     return "unknown"
-
-
-
-
 
 def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
 
@@ -9318,13 +7779,9 @@ def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
 
     Returns list of vehicle bounding boxes with class information.
 
-    
-
     Args:
 
         image_bgr: Input image in BGR format
-
-        
 
     Returns:
 
@@ -9336,15 +7793,11 @@ def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
 
     vehicle_classes = ['car', 'truck', 'bus', 'motorcycle', 'bicycle']
 
-    
-
     try:
 
         model = get_model("yolo26n.pt")
 
         detection_results = model(image_bgr)
-
-        
 
         if detection_results and len(detection_results) > 0:
 
@@ -9362,8 +7815,6 @@ def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
 
                 names = detection.names
 
-                
-
                 for i in range(len(xyxy)):
 
                     if conf[i] > 0.5:  # Confidence threshold
@@ -9371,8 +7822,6 @@ def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
                         class_id = int(cls[i])
 
                         class_name = names.get(class_id, f"class_{class_id}")
-
-                        
 
                         # Check if this is a vehicle
 
@@ -9386,23 +7835,13 @@ def detect_vehicles_in_image(image_bgr: np.ndarray) -> list:
 
                             print(f"[DEBUG] Vehicle detected: {class_name} at ({x1}, {y1}, {x2}, {y2}) with conf {confidence:.3f}")
 
-        
-
         print(f"[DEBUG] Total vehicles found: {len(vehicle_detections)}")
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Error in vehicle detection: {e}")
 
-    
-
     return vehicle_detections
-
-
-
-
 
 def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
@@ -9416,15 +7855,11 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
     license_plate_regions = []
 
-    
-
     # STEP 1: First detect vehicles in the image
 
     print(f"[DEBUG] Step 1: Detecting vehicles before license plate detection...")
 
     vehicles = detect_vehicles_in_image(image_bgr)
-
-    
 
     if not vehicles:
 
@@ -9432,11 +7867,7 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
         return license_plate_regions
 
-    
-
     print(f"[DEBUG] Found {len(vehicles)} vehicles. Proceeding with license plate detection...")
-
-    
 
     try:
 
@@ -9445,8 +7876,6 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
         model = get_model("yolo26n.pt")
 
         detection_results = model(image_bgr)
-
-        
 
         if detection_results and len(detection_results) > 0:
 
@@ -9460,15 +7889,11 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
                 conf = boxes.conf.cpu().numpy()
 
-                
-
                 for i in range(len(xyxy)):
 
                     if conf[i] > 0.5:  # Confidence threshold
 
                         x1, y1, x2, y2 = map(int, xyxy[i])
-
-                        
 
                         # Check if license plate is near any vehicle
 
@@ -9486,13 +7911,11 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
                             vehicle_center_y = (vy1 + vy2) / 2
 
-                            
-
                             # Check if plate is within or near vehicle bounds (with some margin)
 
                             margin = 50  # 50 pixel margin
 
-                            if (vx1 - margin <= plate_center_x <= vx2 + margin and 
+                            if (vx1 - margin <= plate_center_x <= vx2 + margin and
 
                                 vy1 - margin <= plate_center_y <= vy2 + margin):
 
@@ -9502,8 +7925,6 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
                                 break
 
-                        
-
                         if plate_near_vehicle:
 
                             license_plate_regions.append((x1, y1, x2, y2))
@@ -9511,8 +7932,6 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
                         else:
 
                             print(f"[DEBUG] License plate at ({x1},{y1},{x2},{y2}) ignored - not near any vehicle")
-
-        
 
         # Method 2: Enhanced detection for challenging images (if no plates found near vehicles)
 
@@ -9522,13 +7941,9 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
             enhanced_result = enhanced_license_plate_detection(image_bgr)
 
-            
-
             if enhanced_result["plate_detected"] and enhanced_result["plate_bbox"]:
 
                 x1, y1, x2, y2 = enhanced_result["plate_bbox"]
-
-                
 
                 # Check if enhanced detection is near any vehicle
 
@@ -9540,11 +7955,9 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
                     plate_center_y = (y1 + y2) / 2
 
-                    
-
                     margin = 50
 
-                    if (vx1 - margin <= plate_center_x <= vx2 + margin and 
+                    if (vx1 - margin <= plate_center_x <= vx2 + margin and
 
                         vy1 - margin <= plate_center_y <= vy2 + margin):
 
@@ -9553,8 +7966,6 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
                         print(f"[DEBUG] Enhanced license plate detection found plate near {vclass}")
 
                         break
-
-                
 
                 if plate_near_vehicle:
 
@@ -9566,21 +7977,13 @@ def detect_license_plates_as_objects(image_bgr: np.ndarray) -> list:
 
                     print(f"[DEBUG] Enhanced detection found plate but not near any vehicle - ignoring")
 
-                
-
     except Exception as e:
 
         print(f"[DEBUG] Error in license plate detection: {e}")
 
-    
-
     print(f"[DEBUG] Final license plate regions found: {len(license_plate_regions)}")
 
     return license_plate_regions
-
-
-
-
 
 def _extract_license_plates_from_text(text: str) -> list:
 
@@ -9590,13 +7993,9 @@ def _extract_license_plates_from_text(text: str) -> list:
 
     Specifically looks for Indian license plate patterns like "MH 20 EE 7602".
 
-    
-
     Args:
 
         text: Extracted text from OCR
-
-        
 
     Returns:
 
@@ -9606,19 +8005,15 @@ def _extract_license_plates_from_text(text: str) -> list:
 
     license_plates = []
 
-    
-
     try:
 
         # Common Indian state codes
 
-        state_codes = ['AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ', 
+        state_codes = ['AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ',
 
-                      'HP', 'HR', 'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP', 
+                      'HP', 'HR', 'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP',
 
                       'MZ', 'NL', 'OD', 'PB', 'PY', 'RJ', 'SK', 'TN', 'TR', 'TS', 'UK', 'UP', 'WB']
-
-        
 
         # Split text into words and clean them
 
@@ -9636,8 +8031,6 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                 cleaned_words.append(cleaned_word)
 
-        
-
         # Method 1: Look for exact patterns in individual words
 
         for word in cleaned_words:
@@ -9646,21 +8039,15 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                 license_plates.append(word)
 
-        
-
         # Method 2: Look for patterns across multiple words
 
         # Join words and look for license plate patterns
 
         combined_text = ''.join(cleaned_words)
 
-        
-
         # Look for patterns like MH20EE7602
 
         import re
-
-        
 
         # Pattern: 2 letters + 2-4 digits + 2 letters + 4 digits
 
@@ -9674,8 +8061,6 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                 license_plates.append(match)
 
-        
-
         # Method 3: Look for state code followed by numbers and letters
 
         for state_code in state_codes:
@@ -9683,8 +8068,6 @@ def _extract_license_plates_from_text(text: str) -> list:
             # Find state code in text
 
             state_indices = [i for i, word in enumerate(cleaned_words) if state_code in word]
-
-            
 
             for idx in state_indices:
 
@@ -9694,8 +8077,6 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                 next_words = cleaned_words[idx:idx+6]  # Look at next 6 words
 
-                
-
                 for word in next_words[1:]:  # Skip the state code itself
 
                     # Add alphanumeric characters from this word
@@ -9703,8 +8084,6 @@ def _extract_license_plates_from_text(text: str) -> list:
                     alnum_part = ''.join(c for c in word if c.isalnum())
 
                     plate_candidate += alnum_part
-
-                    
 
                     # Check if we have a valid license plate
 
@@ -9715,8 +8094,6 @@ def _extract_license_plates_from_text(text: str) -> list:
                             license_plates.append(plate_candidate)
 
                             break
-
-                
 
                 # Method 4: Look for specific pattern "MH 20 EE 7602" across words
 
@@ -9735,8 +8112,6 @@ def _extract_license_plates_from_text(text: str) -> list:
                             license_plates.append(potential_plate)
 
                             break
-
-        
 
         # Method 5: Specific search for "MH 20 EE 7602" pattern
 
@@ -9758,8 +8133,6 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                     license_plates.append(cleaned_match)
 
-        
-
         # Remove duplicates while preserving order
 
         seen = set()
@@ -9774,23 +8147,13 @@ def _extract_license_plates_from_text(text: str) -> list:
 
                 unique_plates.append(plate)
 
-        
-
         print(f"[DEBUG] Found {len(unique_plates)} potential license plates in text: {unique_plates}")
-
-        
 
     except Exception as e:
 
         print(f"[DEBUG] Error extracting license plates from text: {e}")
 
-    
-
     return unique_plates
-
-
-
-
 
 def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
@@ -9798,13 +8161,9 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
     text_items = []
 
-    
-
     try:
 
         class_lower = class_name.lower()
-
-        
 
         # Specialized processing for different object types
 
@@ -9816,8 +8175,6 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
             _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-            
-
             configs = [
 
                 r'--oem 3 --psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
@@ -9825,8 +8182,6 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
                 r'--oem 3 --psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
 
             ]
-
-            
 
             for config in configs:
 
@@ -9856,8 +8211,6 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
                     continue
 
-        
-
         elif class_lower in ["bottle", "can", "package"]:
 
             # Products often have brand names
@@ -9866,8 +8219,6 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
             h, s, v = cv2.split(hsv)
 
-            
-
             # Enhance saturation for better text contrast
 
             s_enhanced = cv2.multiply(s, 1.3)
@@ -9875,8 +8226,6 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
             hsv_enhanced = cv2.merge([h, s_enhanced, v])
 
             enhanced_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
-
-            
 
             try:
 
@@ -9902,19 +8251,11 @@ def _extract_specialized_text(crop_bgr: np.ndarray, class_name: str) -> list:
 
                 pass
 
-    
-
     except Exception as e:
 
         print(f"[DEBUG] Error in specialized text extraction: {e}")
 
-    
-
     return text_items
-
-
-
-
 
 def format_text_extraction_results(json_result: dict) -> str:
 
@@ -9924,29 +8265,23 @@ def format_text_extraction_results(json_result: dict) -> str:
 
         return "No text extraction results available."
 
-    
-
     extraction = json_result["text_extraction"]
 
     summary = extraction["summary"]
-
-    
 
     lines = []
 
     lines.append(" **Text Extraction Results:**")
 
-    lines.append(f"   Total Objects: {summary['total_objects']}")
+    lines.append(f"  Total Objects: {summary['total_objects']}")
 
-    lines.append(f"   Objects with Text: {summary['objects_with_text']}")
+    lines.append(f"  Objects with Text: {summary['objects_with_text']}")
 
-    lines.append(f"   License Plates Found: {summary['license_plates_found']}")
+    lines.append(f"  License Plates Found: {summary['license_plates_found']}")
 
-    lines.append(f"   General Text Found: {summary['general_text_found']}")
+    lines.append(f"  General Text Found: {summary['general_text_found']}")
 
     lines.append("")
-
-    
 
     # Show license plates
 
@@ -9956,11 +8291,9 @@ def format_text_extraction_results(json_result: dict) -> str:
 
         for plate in extraction["license_plates"]:
 
-            lines.append(f"   • {plate['plate_text']} (confidence: {plate['confidence']:.2f})")
+            lines.append(f"  • {plate['plate_text']} (confidence: {plate['confidence']:.2f})")
 
         lines.append("")
-
-    
 
     # Show general text
 
@@ -9970,11 +8303,9 @@ def format_text_extraction_results(json_result: dict) -> str:
 
         for text_item in extraction["general_text"]:
 
-            lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
+            lines.append(f"  • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
 
         lines.append("")
-
-    
 
     # Show full image text
 
@@ -9984,25 +8315,17 @@ def format_text_extraction_results(json_result: dict) -> str:
 
         for text_item in extraction["full_image_text"]:
 
-            lines.append(f"   • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
+            lines.append(f"  • {text_item['text']} (confidence: {text_item['confidence']:.2f})")
 
         lines.append("")
 
-    
-
-    if not any([extraction["license_plates"], extraction["general_text"], 
+    if not any([extraction["license_plates"], extraction["general_text"],
 
                 extraction.get("full_image_text")]):
 
-        lines.append("   No text detected in the image.")
-
-    
+        lines.append("  No text detected in the image.")
 
     return "\n".join(lines)
-
-
-
-
 
 def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
@@ -10012,13 +8335,9 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
     Specifically optimized for Indian license plates like "MH 20 EE 7602".
 
-    
-
     Args:
 
         car_bgr: Car image in BGR format
-
-        
 
     Returns:
 
@@ -10030,15 +8349,11 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         return None
 
-    
-
     h, w = car_bgr.shape[:2]
 
     if h < 20 or w < 20:
 
         return None
-
-    
 
     try:
 
@@ -10046,13 +8361,9 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         gray = cv2.cvtColor(car_bgr, cv2.COLOR_BGR2GRAY)
 
-        
-
         # Store all potential plate candidates
 
         plate_candidates = []
-
-        
 
         # Method 1: Enhanced edge-based detection with multiple thresholds
 
@@ -10062,13 +8373,9 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         edges_high = cv2.Canny(gray, 70, 200)
 
-        
-
         for edge_name, edges in [("low", edges_low), ("med", edges_med), ("high", edges_high)]:
 
             contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            
 
             for contour in contours:
 
@@ -10078,29 +8385,23 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                 area = cw * ch
 
-                
-
                 # Enhanced criteria for Indian license plates
 
                 # Indian plates are typically rectangular with aspect ratio 2.0-5.0
 
-                if (1.8 <= aspect_ratio <= 5.5 and 
+                if (1.8 <= aspect_ratio <= 5.5 and
 
                     cw >= 60 and ch >= 15 and  # Minimum size for Indian plates
 
-                    area > 800 and 
+                    area > 800 and
 
                     area < (h * w) * 0.4):  # Not too large
-
-                    
 
                     # Additional validation: check if it's in typical plate location
 
                     confidence = _calculate_plate_confidence(x, y, cw, ch, w, h, aspect_ratio, area)
 
                     plate_candidates.append((x, y, cw, ch, confidence, edge_name))
-
-        
 
         # Method 2: MSER for text-like regions (enhanced)
 
@@ -10116,8 +8417,6 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         regions, _ = mser.detectRegions(gray)
 
-        
-
         for region in regions:
 
             hull = cv2.convexHull(region.reshape(-1, 1, 2))
@@ -10128,23 +8427,17 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
             area = cw * ch
 
-            
+            if (1.8 <= aspect_ratio <= 5.5 and
 
-            if (1.8 <= aspect_ratio <= 5.5 and 
+                cw >= 50 and ch >= 12 and
 
-                cw >= 50 and ch >= 12 and 
-
-                area > 500 and 
+                area > 500 and
 
                 area < (h * w) * 0.25):
-
-                
 
                 confidence = _calculate_plate_confidence(x, y, cw, ch, w, h, aspect_ratio, area)
 
                 plate_candidates.append((x, y, cw, ch, confidence, "mser"))
-
-        
 
         # Method 3: Color-based detection (white/light plates on dark backgrounds)
 
@@ -10154,19 +8447,13 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         l_channel, a_channel, b_channel = cv2.split(lab)
 
-        
-
         # Threshold for light regions (potential white plates)
 
         _, l_thresh = cv2.threshold(l_channel, 200, 255, cv2.THRESH_BINARY)
 
-        
-
         # Find contours in light regions
 
         contours_light, _ = cv2.findContours(l_thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        
 
         for contour in contours_light:
 
@@ -10176,23 +8463,17 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
             area = cw * ch
 
-            
+            if (1.8 <= aspect_ratio <= 5.5 and
 
-            if (1.8 <= aspect_ratio <= 5.5 and 
+                cw >= 60 and ch >= 15 and
 
-                cw >= 60 and ch >= 15 and 
-
-                area > 800 and 
+                area > 800 and
 
                 area < (h * w) * 0.3):
-
-                
 
                 confidence = _calculate_plate_confidence(x, y, cw, ch, w, h, aspect_ratio, area)
 
                 plate_candidates.append((x, y, cw, ch, confidence, "color"))
-
-        
 
         # Method 4: Search in typical license plate locations (bottom portion of car)
 
@@ -10208,8 +8489,6 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
         ]
 
-        
-
         for start_y, end_y in search_regions:
 
             region = gray[start_y:end_y, :]
@@ -10220,11 +8499,7 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                 thresh_region = cv2.adaptiveThreshold(region, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 3)
 
-                
-
                 contours_region, _ = cv2.findContours(thresh_region, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-                
 
                 for contour in contours_region:
 
@@ -10236,21 +8511,15 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                     area = cw * ch
 
-                    
+                    if (2.0 <= aspect_ratio <= 4.5 and
 
-                    if (2.0 <= aspect_ratio <= 4.5 and 
-
-                        cw >= 70 and ch >= 18 and 
+                        cw >= 70 and ch >= 18 and
 
                         area > 1000):
-
-                        
 
                         confidence = _calculate_plate_confidence(x, y, cw, ch, w, h, aspect_ratio, area)
 
                         plate_candidates.append((x, y, cw, ch, confidence, f"location_{start_y}"))
-
-        
 
         # Select best candidates based on confidence
 
@@ -10260,11 +8529,7 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
             plate_candidates.sort(key=lambda x: x[4], reverse=True)
 
-            
-
             print(f"[DEBUG] Found {len(plate_candidates)} plate candidates, testing top 5...")
-
-            
 
             # Try top candidates
 
@@ -10282,8 +8547,6 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                 y2 = min(h, y + ch + margin)
 
-                
-
                 plate_crop = car_bgr[y1:y2, x1:x2]
 
                 if plate_crop.size > 0:
@@ -10300,8 +8563,6 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                         print(f"[DEBUG] Plate candidate {i+1} ({method}) failed validation")
 
-        
-
         # Method 5: Last resort - try multiple regions in bottom area
 
         print("[DEBUG] Trying fallback detection in bottom regions...")
@@ -10310,11 +8571,9 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
             (int(h * 0.65), int(h * 0.85)),  # Middle-bottom
 
-            (int(h * 0.75), h),              # Bottom
+            (int(h * 0.75), h),  # Bottom
 
         ]
-
-        
 
         for start_y, end_y in bottom_regions:
 
@@ -10334,19 +8593,11 @@ def _detect_license_plate_in_car(car_bgr: np.ndarray) -> np.ndarray:
 
                         return region
 
-        
-
     except Exception as e:
 
         print(f"[DEBUG] License plate detection error: {e}")
 
-    
-
     return None
-
-
-
-
 
 def _calculate_plate_confidence(x, y, w, h, car_w, car_h, aspect_ratio, area):
 
@@ -10354,15 +8605,11 @@ def _calculate_plate_confidence(x, y, w, h, car_w, car_h, aspect_ratio, area):
 
     confidence = 0.0
 
-    
-
     # Position confidence (plates are usually in bottom half)
 
     position_score = 1.0 - (y / car_h)  # Higher score for lower position
 
     confidence += position_score * 0.3
-
-    
 
     # Aspect ratio confidence (ideal around 2.5-3.5 for Indian plates)
 
@@ -10373,8 +8620,6 @@ def _calculate_plate_confidence(x, y, w, h, car_w, car_h, aspect_ratio, area):
     elif 1.8 <= aspect_ratio <= 5.0:
 
         confidence += 0.2
-
-    
 
     # Size confidence (not too small, not too large)
 
@@ -10388,8 +8633,6 @@ def _calculate_plate_confidence(x, y, w, h, car_w, car_h, aspect_ratio, area):
 
         confidence += 0.1
 
-    
-
     # Center alignment (plates are usually somewhat centered horizontally)
 
     center_x = x + w / 2
@@ -10398,13 +8641,7 @@ def _calculate_plate_confidence(x, y, w, h, car_w, car_h, aspect_ratio, area):
 
     confidence += center_score * 0.2
 
-    
-
     return confidence
-
-
-
-
 
 def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
@@ -10412,13 +8649,9 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
     Validate if a region is likely to be a license plate based on text characteristics.
 
-    
-
     Args:
 
         plate_bgr: Plate region in BGR format
-
-        
 
     Returns:
 
@@ -10430,8 +8663,6 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
         return False
 
-    
-
     try:
 
         h, w = plate_bgr.shape[:2]
@@ -10440,13 +8671,9 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
             return False
 
-        
-
         # Convert to grayscale
 
         gray = cv2.cvtColor(plate_bgr, cv2.COLOR_BGR2GRAY)
-
-        
 
         # Check for high contrast (typical of license plates)
 
@@ -10455,8 +8682,6 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
         if contrast < 30:  # Low contrast suggests not a license plate
 
             return False
-
-        
 
         # Quick OCR check - see if we can extract some alphanumeric characters
 
@@ -10470,8 +8695,6 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
                 text = pytesseract.image_to_string(thresh, config=r'--oem 3 --psm 7', lang='eng')
 
-                
-
                 # Check if we found alphanumeric characters
 
                 alnum_chars = sum(c.isalnum() for c in text)
@@ -10480,13 +8703,9 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
                     return True
 
-                    
-
             except:
 
                 pass
-
-        
 
         # If OCR fails, use heuristics
 
@@ -10496,27 +8715,17 @@ def _validate_plate_region(plate_bgr: np.ndarray) -> bool:
 
         edge_density = np.sum(edges > 0) / (h * w)
 
-        
-
         # Moderate edge density suggests text/characters
 
         if 0.05 <= edge_density <= 0.4:
 
             return True
 
-            
-
     except Exception:
 
         pass
 
-    
-
     return False
-
-
-
-
 
 def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
@@ -10524,15 +8733,11 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
         return "unknown"
 
-
-
     h, w = crop_bgr.shape[:2]
 
     if h < 2 or w < 2:
 
         return "unknown"
-
-
 
     # Reduce background influence: focus on the center region of the bbox
 
@@ -10548,8 +8753,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
         h, w = crop_bgr.shape[:2]
 
-
-
     max_side = 64
 
     if max(h, w) > max_side:
@@ -10558,25 +8761,17 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
         crop_bgr = cv2.resize(crop_bgr, (max(2, int(w * scale)), max(2, int(h * scale))))
 
-
-
     # Light blur helps reduce sensor noise / compression artifacts in video.
 
     crop_bgr = cv2.GaussianBlur(crop_bgr, (3, 3), 0)
-
-
 
     hsv = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2HSV)
 
     hsv_reshaped = hsv.reshape(-1, 3)
 
-
-
     s = hsv_reshaped[:, 1].astype(np.float32)
 
     v = hsv_reshaped[:, 2].astype(np.float32)
-
-
 
     # Enhanced black detection - more strict criteria
 
@@ -10584,23 +8779,17 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
     s_mean = float(np.mean(s))
 
-    
-
     # Check for black first (most common issue)
 
     if v_mean < 45:  # Lowered threshold for better black detection
 
         return "black"
 
-    
-
     # Very dark but not pure black
 
     if v_mean < 55 and s_mean < 25:
 
         return "black"
-
-
 
     # Ignore very dark pixels and low-saturation pixels for other colors
 
@@ -10618,15 +8807,11 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
         return "gray"
 
-
-
     hsv_valid = hsv_reshaped[valid]
 
     s_mean_valid = float(np.mean(hsv_valid[:, 1]))
 
     v_mean_valid = float(np.mean(hsv_valid[:, 2]))
-
-
 
     if v_mean_valid < 65:  # More lenient black detection for valid pixels
 
@@ -10640,8 +8825,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
         return "gray"
 
-
-
     hsv_full = hsv.reshape(-1, 3)
 
     valid_mask = valid.reshape(-1)
@@ -10649,8 +8832,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
     if np.sum(valid_mask) < 20:
 
         return "unknown"
-
-
 
     bgr = crop_bgr.reshape(-1, 3)
 
@@ -10661,8 +8842,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
     lab_valid = cv2.cvtColor(bgr_valid_u8, cv2.COLOR_BGR2LAB).reshape(-1, 3).astype(np.float32)
 
     lab_med = np.median(lab_valid, axis=0)
-
-
 
     palette_bgr = {
 
@@ -10684,8 +8863,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
     }
 
-
-
     best_name = "unknown"
 
     best_dist = float("inf")
@@ -10697,8 +8874,6 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
         lab_ref = cv2.cvtColor(ref_u8, cv2.COLOR_BGR2LAB).reshape(3).astype(np.float32)
 
         dist = float(np.linalg.norm(lab_med - lab_ref))
-
-        
 
         # Enhanced brown filtering - be more strict about brown detection
 
@@ -10714,21 +8889,13 @@ def _classify_color_bgr(crop_bgr: np.ndarray) -> str:
 
                 dist *= 1.5  # Penalize brown if saturation is wrong
 
-        
-
         if dist < best_dist:
 
             best_dist = dist
 
             best_name = name
 
-
-
     return best_name
-
-
-
-
 
 def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
@@ -10738,8 +8905,6 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
         return "No objects detected"
 
-    
-
     boxes = result.boxes
 
     # Fix MockBoxes error
@@ -10748,15 +8913,11 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
         return "No objects detected"
 
-    
-
     names = getattr(result, "names", None)
 
     if names is None and hasattr(result, "model") and hasattr(result.model, "names"):
 
         names = result.model.names
-
-    
 
     xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
 
@@ -10764,15 +8925,11 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
 
-    
-
     summary_lines = []
 
     summary_lines.append(f" **Detected {len(boxes)} objects:**")
 
     summary_lines.append("")
-
-    
 
     for i in range(len(boxes)):
 
@@ -10788,15 +8945,9 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
             class_name = names[class_id]
 
-        
-
         confidence = f"{float(conf[i]):.2f}" if i < len(conf) else "N/A"
 
-        
-
         line = f" **{class_name}** (conf: {confidence})"
-
-        
 
         # Add color and text info
 
@@ -10812,8 +8963,6 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
             y2 = int(round(y2))
 
-            
-
             # We need the original frame for color extraction, but we don't have it here
 
             # So we'll just note that color detection is enabled
@@ -10828,15 +8977,11 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
                     line += f" - **Color:** {color}"
 
-                    
-
                     # Try to detect text on any object if OCR is enabled
 
                     if enable_ocr:
 
                         object_text = None
-
-                        
 
                         # Special handling for cars: try license plate first
 
@@ -10853,8 +8998,6 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
                                     line += f" - **License Plate:** {plate_text}"
 
                                     object_text = plate_text
-
-                        
 
                         # Try to detect general text on the object using LightOnOCR
 
@@ -10878,8 +9021,6 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
                                 pass
 
-                        
-
                         # Fallback to regular OCR for general text
 
                         if general_text is None:
@@ -10889,8 +9030,6 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
                             if general_text and general_text.strip():
 
                                 general_text = _clean_general_text(general_text)
-
-                        
 
                         # Add general text if found and it's different from license plate
 
@@ -10910,17 +9049,9 @@ def _generate_detection_summary(result, enable_resnet=False, enable_ocr=False):
 
             pass
 
-        
-
         summary_lines.append(line)
 
-    
-
     return "\n".join(summary_lines)
-
-
-
-
 
 def _annotate_with_color(
 
@@ -10954,8 +9085,6 @@ def _annotate_with_color(
 
         return frame_bgr
 
-
-
     boxes = result.boxes
 
     # Handle MockBoxes properly
@@ -10964,15 +9093,11 @@ def _annotate_with_color(
 
         return frame_bgr
 
-
-
     # Fix MockBoxes error
 
     if not hasattr(boxes, '__len__') or len(boxes) == 0:
 
         return frame_bgr
-
-
 
     names = getattr(result, "names", None)
 
@@ -10980,29 +9105,21 @@ def _annotate_with_color(
 
         names = result.model.names
 
-
-
     xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
 
     cls = boxes.cls.cpu().numpy().astype(int) if hasattr(boxes.cls, "cpu") else np.asarray(boxes.cls).astype(int)
 
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
 
-
-
     annotated = frame_bgr.copy()
 
     ih, iw = annotated.shape[:2]
-
-
 
     total = len(xyxy)
 
     max_boxes = int(max(1, max_boxes))
 
     take = min(total, max_boxes)
-
-
 
     for i in range(take):
 
@@ -11020,13 +9137,9 @@ def _annotate_with_color(
 
             continue
 
-
-
         crop = annotated[y1:y2, x1:x2]
 
         color_name = _classify_color_bgr(crop)
-
-
 
         # Get class name early to avoid UnboundLocalError
 
@@ -11042,8 +9155,6 @@ def _annotate_with_color(
 
             class_name = names[class_id]
 
-
-
         resnet_label = None
 
         if enable_resnet:
@@ -11055,8 +9166,6 @@ def _annotate_with_color(
             if stream_key_prefix:
 
                 key = f"{stream_key_prefix}:{i}"
-
-
 
             do_classify = True
 
@@ -11070,8 +9179,6 @@ def _annotate_with_color(
 
                     resnet_label = _resnet_stream_state["labels"][key]
 
-
-
             if resnet_label is None and do_classify:
 
                 resnet_label = _classify_object_resnet18(crop)
@@ -11079,8 +9186,6 @@ def _annotate_with_color(
                 if key is not None:
 
                     _resnet_stream_state["labels"][key] = resnet_label
-
-
 
         ocr_text = None
 
@@ -11096,8 +9201,6 @@ def _annotate_with_color(
 
                 key = f"{stream_key_prefix}:ocr:{i}"
 
-
-
             do_ocr = True
 
             if stream_key_prefix:
@@ -11109,8 +9212,6 @@ def _annotate_with_color(
                 if not do_ocr and key in _ocr_stream_state["texts"]:
 
                     ocr_text = _ocr_stream_state["texts"][key]
-
-
 
             if ocr_text is None and do_ocr:
 
@@ -11140,8 +9241,6 @@ def _annotate_with_color(
 
                         print("[DEBUG] No license plate detected in car")
 
-                
-
                 # For all objects (including cars), try to detect any text using LightOnOCR
 
                 general_text = None
@@ -11155,8 +9254,6 @@ def _annotate_with_color(
                         # Use LightOnOCR for general text detection on the object
 
                         lighton_result = extract_text_with_lighton(crop, confidence_threshold=0.3)  # Lower threshold for general text
-
-                        
 
                         if lighton_result and lighton_result.strip():
 
@@ -11174,8 +9271,6 @@ def _annotate_with_color(
 
                         print(f"[DEBUG] LightOnOCR general text detection failed: {e}")
 
-                
-
                 # If no general text found with LightOnOCR, try regular OCR
 
                 if general_text is None:
@@ -11185,8 +9280,6 @@ def _annotate_with_color(
                     if general_text and general_text.strip():
 
                         general_text = _clean_general_text(general_text)
-
-                
 
                 # Combine results: prioritize license plate for cars, otherwise use general text
 
@@ -11208,13 +9301,9 @@ def _annotate_with_color(
 
                     ocr_text = general_text
 
-                    
-
                 if key is not None:
 
                     _ocr_stream_state["texts"][key] = ocr_text
-
-
 
         boy_girl = None
 
@@ -11228,11 +9317,7 @@ def _annotate_with_color(
 
             boy_girl = None
 
-
-
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-
 
         if show_labels:
 
@@ -11243,8 +9328,6 @@ def _annotate_with_color(
             parts.append("|")
 
             parts.append(str(color_name))
-
-            
 
             # Add license plate information for vehicles
 
@@ -11268,13 +9351,9 @@ def _annotate_with_color(
 
                         plate_number = plate_number.split("Plate:")[-1].strip()
 
-                
-
                 parts.append("|")
 
                 parts.append(f"numberplates: {plate_number}")
-
-            
 
             # Add confidence if requested
 
@@ -11282,11 +9361,7 @@ def _annotate_with_color(
 
                 parts.append(f"({float(conf[i]):.2f})")
 
-            
-
             text = " ".join(parts)
-
-
 
             font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -11301,8 +9376,6 @@ def _annotate_with_color(
             if ty - th - baseline < 0:
 
                 ty = y1 + th + baseline + 8
-
-
 
             bg_x1 = x1
 
@@ -11322,13 +9395,7 @@ def _annotate_with_color(
 
             cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-
-
     return annotated
-
-
-
-
 
 def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_labels: bool) -> np.ndarray:
 
@@ -11338,8 +9405,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
     Updates the main object labels to include license plate information.
 
-    
-
     Args:
 
         frame_bgr: Input image in BGR format
@@ -11347,8 +9412,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
         json_results: JSON text extraction results
 
         show_labels: Whether to show labels
-
-        
 
     Returns:
 
@@ -11360,13 +9423,9 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
         return frame_bgr
 
-    
-
     extraction = json_results["text_extraction"]
 
     annotated = frame_bgr.copy()
-
-    
 
     # Create a mapping of object_id to license plate text
 
@@ -11374,15 +9433,11 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
     object_plate_map = {}
 
-    
-
     # First, find license plates with actual bounding boxes (these are the most accurate)
 
     plates_with_bbox = []
 
     plates_without_bbox = []
-
-    
 
     for plate_info in extraction["license_plates"]:
 
@@ -11394,8 +9449,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             plates_without_bbox.append(plate_info)
 
-    
-
     # Prioritize plates with bounding boxes - these are from object_detection_crop
 
     for plate_info in plates_with_bbox:
@@ -11404,15 +9457,11 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
         plate_bbox = plate_info["bounding_box"]
 
-        
-
         # Find the nearest vehicle to this license plate
 
         best_match = None
 
         min_distance = float('inf')
-
-        
 
         for obj in extraction["all_objects"]:
 
@@ -11430,8 +9479,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
                 obj_center_y = (obj_bbox["y1"] + obj_bbox["y2"]) / 2
 
-                
-
                 distance = ((plate_center_x - obj_center_x)**2 + (plate_center_y - obj_center_y)**2)**0.5
 
                 if distance < min_distance:
@@ -11439,8 +9486,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
                     min_distance = distance
 
                     best_match = obj["object_id"]
-
-        
 
         if best_match:
 
@@ -11460,8 +9505,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
                 print(f"[DEBUG] Mapped license plate {plate_text} to vehicle {best_match}")
 
-    
-
     # If no plates with bounding boxes were found, fall back to plates without bbox
 
     if not object_plate_map:
@@ -11471,8 +9514,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
             object_id = plate_info["object_id"]
 
             plate_text = plate_info["plate_text"]
-
-            
 
             # Only use valid license plates
 
@@ -11488,8 +9529,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
                 }
 
-    
-
     # Update the main object labels to include license plate information
 
     for obj in extraction["all_objects"]:
@@ -11504,25 +9543,17 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
         bbox = obj["bounding_box"]
 
-        
-
         x1, y1, x2, y2 = bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"]
-
-        
 
         # Create the enhanced label in the requested format: car | color | numberplates
 
         label_parts = [class_name, "|", color]
-
-        
 
         # Add license plate if available for this object
 
         plate_bbox_to_draw = None
 
         plate_text_to_draw = None
-
-        
 
         if object_id in object_plate_map:
 
@@ -11536,23 +9567,15 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             label_parts.extend(["|", f"numberplates: {plate_text}"])
 
-        
-
         # Add confidence
 
         label_parts.append(f"({confidence:.2f})")
 
-        
-
         final_label = " ".join(label_parts)
-
-        
 
         # Draw the object bounding box
 
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-        
 
         # Draw the updated label
 
@@ -11564,8 +9587,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             thickness = 1
 
-            
-
             (tw, th), baseline = cv2.getTextSize(final_label, font, font_scale, thickness)
 
             ty = y1 - 8
@@ -11574,13 +9595,9 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
                 ty = y1 + th + baseline + 8
 
-            
-
             # Remove yellow background - just draw text directly
 
             cv2.putText(annotated, final_label, (x1 + 3, ty), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
-
-        
 
         # Draw separate license plate bounding box if it exists and has valid text
 
@@ -11588,13 +9605,9 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             px1, py1, px2, py2 = plate_bbox_to_draw["x1"], plate_bbox_to_draw["y1"], plate_bbox_to_draw["x2"], plate_bbox_to_draw["y2"]
 
-            
-
             # Add yellow box for license plate
 
             cv2.rectangle(annotated, (px1, py1), (px2, py2), (0, 255, 255), 3)
-
-            
 
             # Add license plate text near the plate (without question marks)
 
@@ -11606,8 +9619,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             plate_thickness = 2
 
-            
-
             (ptw, pth), pbaseline = cv2.getTextSize(plate_label, plate_font, plate_font_scale, plate_thickness)
 
             pty = py1 - 10
@@ -11616,15 +9627,11 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
                 pty = py1 + pth + pbaseline + 10
 
-            
-
             # Add yellow background for license plate text
 
             cv2.rectangle(annotated, (px1, pty - pth - pbaseline), (px1 + ptw + 4, pty + 4), (0, 255, 255), -1)
 
             cv2.putText(annotated, plate_label, (px1 + 2, pty), plate_font, plate_font_scale, (0, 0, 0), plate_thickness, cv2.LINE_AA)
-
-    
 
     # Show full image license plates at the top
 
@@ -11633,8 +9640,6 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
         if plate_info["object_id"] == "full_image":
 
             h, w = annotated.shape[:2]
-
-            
 
             # Create a banner at the top for license plate info
 
@@ -11646,11 +9651,7 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             thickness = 2
 
-            
-
             (tw, th), baseline = cv2.getTextSize(plate_label, font, font_scale, thickness)
-
-            
 
             # Draw yellow background banner
 
@@ -11662,21 +9663,13 @@ def _annotate_from_json_results(frame_bgr: np.ndarray, json_results: dict, show_
 
             break
 
-    
-
     return annotated
-
-
-
-
 
 def create_anpr_side_panel(detections, all_results, json_text_results):
 
     """
 
     Create ANPR-style side panel HTML with vehicle information.
-
-    
 
     Args:
 
@@ -11685,8 +9678,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
         all_results: YOLO results
 
         json_text_results: JSON text extraction results
-
-        
 
     Returns:
 
@@ -11698,15 +9689,11 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
     current_date = datetime.now().strftime('%d/%m/%Y')
 
-    
-
     # Extract vehicle information
 
     vehicles = []
 
     vehicle_count = 0
-
-    
 
     # Get vehicle info from detections
 
@@ -11734,8 +9721,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
             vehicles.append(vehicle_info)
 
-    
-
     # Get plates from JSON results
 
     plates_from_json = []
@@ -11758,8 +9743,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
                 })
 
-    
-
     # Create main vehicle info section
 
     main_vehicle_html = ""
@@ -11770,7 +9753,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
         main_vehicle_html = f"""
 
-        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+        <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
 
                     padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
 
@@ -11820,8 +9803,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
         """
 
-    
-
     # Create recent detections list
 
     recent_html = ""
@@ -11836,13 +9817,13 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
             recent_items += f"""
 
-            <div style="display: flex; align-items: center; padding: 8px; 
+            <div style="display: flex; align-items: center; padding: 8px;
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
+                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px;
 
-                            display: flex; align-items: center; justify-content: center; 
+                            display: flex; align-items: center; justify-content: center;
 
                             margin-right: 10px; font-size: 18px;"></div>
 
@@ -11860,8 +9841,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
             """
 
-        
-
         # Add plates from JSON if available
 
         for plate in plates_from_json[:3]:
@@ -11870,13 +9849,13 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
                 recent_items += f"""
 
-                <div style="display: flex; align-items: center; padding: 8px; 
+                <div style="display: flex; align-items: center; padding: 8px;
 
                             background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                    <div style="width: 40px; height: 40px; background: #fbbf24; border-radius: 5px; 
+                    <div style="width: 40px; height: 40px; background: #fbbf24; border-radius: 5px;
 
-                                display: flex; align-items: center; justify-content: center; 
+                                display: flex; align-items: center; justify-content: center;
 
                                 margin-right: 10px; font-size: 18px;"></div>
 
@@ -11894,13 +9873,11 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
                 """
 
-        
-
         if recent_items:
 
             recent_html = f"""
 
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 
                         padding: 15px; border-radius: 10px; color: white;">
 
@@ -11912,13 +9889,11 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
             """
 
-    
-
     # Stats section
 
     stats_html = f"""
 
-    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%); 
+    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
 
                 padding: 12px; border-radius: 10px; margin-top: 15px; color: white;">
 
@@ -11954,8 +9929,6 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
     """
 
-    
-
     # Combine all sections
 
     full_html = f"""
@@ -11972,13 +9945,7 @@ def create_anpr_side_panel(detections, all_results, json_text_results):
 
     """
 
-    
-
     return full_html
-
-
-
-
 
 def predict_image(
 
@@ -12010,8 +9977,6 @@ def predict_image(
 
         return None, ""
 
-
-
     try:
 
         # Check if ALPR is available
@@ -12035,8 +10000,6 @@ def predict_image(
                     return Image.fromarray(img), ""
 
             return None, ""
-
-
 
         # Convert image to numpy array (OpenCV format)
 
@@ -12070,8 +10033,6 @@ def predict_image(
 
             return None, ""
 
-
-
         # Run ALPR detection
 
         print("[INFO] Running fast_alpr detection...")
@@ -12082,13 +10043,9 @@ def predict_image(
 
         results = drawn.results
 
-
-
         # Build detection results with country detection
 
         plates = []
-
-        
 
         # Initialize international recognizer if available
 
@@ -12106,13 +10063,9 @@ def predict_image(
 
                 print(f"[WARNING] Could not initialize country recognizer: {e}")
 
-        
-
         for i, result in enumerate(results, 1):
 
             plate_text = result.ocr.text if result.ocr else 'N/A'
-
-            
 
             # Detect country for this plate
 
@@ -12131,8 +10084,6 @@ def predict_image(
                 except Exception as e:
 
                     print(f"[DEBUG] Country detection failed for {plate_text}: {e}")
-
-            
 
             plate_info = {
 
@@ -12164,8 +10115,6 @@ def predict_image(
 
             print(f"[INFO] Plate {i}: {plate_info['text']} [{plate_info['country']}] (Detection: {plate_info['detection_confidence']:.2%}, OCR: {plate_info['ocr_confidence']:.2%})")
 
-        
-
         # Add country labels on the image (overlay on top of ALPR's default "Unknown")
 
         if plates:
@@ -12182,35 +10131,25 @@ def predict_image(
 
                     label_y = y1 - 35 if y1 > 35 else y1 + 20
 
-                    
-
                     # Get text size for background
 
                     (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-
-                    
 
                     # Draw background rectangle (blue color)
 
                     cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
 
-                    
-
                     # Draw country text
 
-                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                    cv2.putText(annotated_frame, country_label, (x1, label_y),
 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-
 
         # Add timestamp overlay
 
         current_time = datetime.now().strftime('%H:%M:%S')
 
         current_date = datetime.now().strftime('%d/%m/%Y')
-
-        
 
         # Create semi-transparent background for timestamp
 
@@ -12220,35 +10159,27 @@ def predict_image(
 
         cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
 
-        
-
         # Add time and date
 
-        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-        
 
         if plates:
 
-            cv2.putText(annotated_frame, f"Plates: {len(plates)}", (10, 75), 
+            cv2.putText(annotated_frame, f"Plates: {len(plates)}", (10, 75),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-
-
 
         # Convert BGR to RGB for PIL
 
         annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
 
         result_image = Image.fromarray(annotated_rgb)
-
-
 
         # Build info text
 
@@ -12257,8 +10188,6 @@ def predict_image(
         info_lines.append(f" Date: {current_date}")
 
         info_lines.append(f"Time: {current_time}")
-
-        
 
         if plates:
 
@@ -12270,21 +10199,17 @@ def predict_image(
 
                 info_lines.append(f" Plate: {plate['text']}{country_str}")
 
-                info_lines.append(f"   Detection: {plate['detection_confidence']:.2%}")
+                info_lines.append(f"  Detection: {plate['detection_confidence']:.2%}")
 
                 if plate['ocr_confidence'] > 0:
 
-                    info_lines.append(f"   OCR: {plate['ocr_confidence']:.2%}")
+                    info_lines.append(f"  OCR: {plate['ocr_confidence']:.2%}")
 
         else:
 
             info_lines.append(" No license plates detected")
 
-        
-
         info_text = "\n".join(info_lines)
-
-
 
         # Build JSON output
 
@@ -12299,8 +10224,6 @@ def predict_image(
             "plates": plates
 
         }, indent=2, ensure_ascii=False)
-
-
 
         # Build summary
 
@@ -12326,19 +10249,13 @@ def predict_image(
 
         #     summary_lines.append("No license plates detected in the image.")
 
-        
-
         # summary = "\n".join(summary_lines)
 
         summary = ""
 
-        
-
         # Add raw JSON to summary
 
         # summary = f"{summary}\n\n **Raw JSON Data:**\n```json\n{json_output}\n```"
-
-
 
         # Create simple HTML side panel
 
@@ -12359,8 +10276,6 @@ def predict_image(
             </div>
 
         """
-
-        
 
         if plates:
 
@@ -12384,15 +10299,9 @@ def predict_image(
 
             side_panel_html += "<div style='color: #888; font-size: 12px;'>No plates detected</div>"
 
-        
-
         side_panel_html += "</div>"
 
-
-
         return result_image, info_text
-
-
 
     except Exception as e:
 
@@ -12403,8 +10312,6 @@ def predict_image(
         import traceback
 
         traceback.print_exc()
-
-        
 
         # Return original image on error
 
@@ -12429,10 +10336,6 @@ def predict_image(
         except Exception as e2:
 
             return None, f" Critical Error\n\n{str(e2)}"
-
-
-
-
 
 def predict_video(
 
@@ -12476,8 +10379,6 @@ def predict_video(
 
         print(f"[INFO]  Starting VIDEO PROCESSING with ALPR")
 
-        
-
         # Always use ALPR-based processing (same as image detection)
 
         result_path = _predict_video_original(
@@ -12490,8 +10391,6 @@ def predict_video(
 
         )
 
-        
-
         # Create summary
 
         if result_path:
@@ -12502,21 +10401,13 @@ def predict_video(
 
             summary = " Video processing failed"
 
-        
-
         return result_path, summary
-
-        
 
     except Exception as e:
 
         print(f"[ERROR] Video processing failed: {e}")
 
         return None, None
-
-
-
-
 
 def _predict_video_original(
 
@@ -12552,11 +10443,11 @@ def _predict_video_original(
 
         print(f"[DEBUG] Starting predict_video function with ALPR")
 
-        print(f"[DEBUG] Input video_path: {video_path}")
+        print(f"[DEBUG] Input video_path type: {type(video_path)}, value: {video_path}")
 
-        
+        video_path, trim_start, trim_end = _extract_video_path(video_path)
 
-        video_path = _extract_video_path(video_path)
+        print(f"[DEBUG] Extracted: path={video_path}, trim_start={trim_start}, trim_end={trim_end}")
 
         if video_path is None:
 
@@ -12564,11 +10455,35 @@ def _predict_video_original(
 
             return None
 
-
-
         print(f"[DEBUG] Extracted video_path: {video_path}")
 
-
+        # Trim video if scissors were used in Gradio
+        if trim_start is not None or trim_end is not None:
+            print(f"[INFO] Video trim requested: start={trim_start}s, end={trim_end}s")
+            ffmpeg_path = _get_ffmpeg_exe()
+            if ffmpeg_path:
+                trimmed_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
+                # Fast trim: -ss before -i for fast seek, -c copy for no re-encode
+                trim_cmd = [ffmpeg_path, "-y", "-ss", str(trim_start or 0)]
+                trim_cmd += ["-i", video_path]
+                if trim_end is not None:
+                    trim_cmd += ["-t", str(float(trim_end) - float(trim_start or 0))]
+                trim_cmd += ["-c", "copy", trimmed_path]
+                try:
+                    trim_result = subprocess.run(trim_cmd, capture_output=True, timeout=30)
+                    if trim_result.returncode == 0 and os.path.exists(trimmed_path) and os.path.getsize(trimmed_path) > 0:
+                        print(f"[INFO] Video trimmed successfully (fast copy)")
+                        video_path = trimmed_path
+                    else:
+                        print(f"[WARNING] Video trim failed, using full video")
+                        if os.path.exists(trimmed_path):
+                            os.unlink(trimmed_path)
+                except Exception as e:
+                    print(f"[WARNING] Video trim error: {e}")
+                    if os.path.exists(trimmed_path):
+                        os.unlink(trimmed_path)
+            else:
+                print("[WARNING] ffmpeg not found, cannot trim video")
 
         # Validate video file exists and is readable
 
@@ -12577,8 +10492,6 @@ def _predict_video_original(
             print(f"[ERROR] Video file does not exist: {video_path}")
 
             return None
-
-        
 
         # Check file size (prevent processing very large files that might cause issues)
 
@@ -12590,11 +10503,7 @@ def _predict_video_original(
 
             return None
 
-        
-
         print(f"[INFO] Processing video: {video_path} ({file_size / (1024*1024):.1f} MB)")
-
-
 
         # Check if ALPR is available
 
@@ -12608,11 +10517,7 @@ def _predict_video_original(
 
             return video_path
 
-
-
         print("[INFO] Using fast_alpr for license plate detection in video")
-
-
 
         # Open the video with error handling
 
@@ -12636,11 +10541,7 @@ def _predict_video_original(
 
                 return None
 
-
-
         print("[DEBUG] Video file opened successfully")
-
-
 
         # Get video properties with validation
 
@@ -12652,11 +10553,7 @@ def _predict_video_original(
 
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        
-
         print(f"[DEBUG] Video properties - FPS: {fps}, Width: {width}, Height: {height}, Frames: {frame_count}")
-
-        
 
         if width <= 0 or height <= 0:
 
@@ -12666,19 +10563,13 @@ def _predict_video_original(
 
             return None
 
-        
-
         if fps <= 0:
 
             fps = 30  # Default FPS if not detected
 
             print(f"[WARNING] Could not detect FPS, using default: {fps}")
 
-        
-
         print(f"[INFO] Video: {width}x{height} @ {fps} FPS, {frame_count} frames")
-
-
 
         # Create temporary output file with proper extension
 
@@ -12687,8 +10578,6 @@ def _predict_video_original(
         output_path = temp_output.name
 
         temp_output.close()
-
-
 
         # Initialize video writer with more compatible codec
 
@@ -12700,23 +10589,19 @@ def _predict_video_original(
 
             codecs_to_try = [
 
-                ("mp4v", ".mp4"),    # Most compatible on Windows
+                ("mp4v", ".mp4"),  # Most compatible on Windows
 
-                ("XVID", ".avi"),    # Good fallback
+                ("XVID", ".avi"),  # Good fallback
 
-                ("DIVX", ".avi"),    # Another fallback
+                ("DIVX", ".avi"),  # Another fallback
 
-                ("MJPG", ".avi"),    # Motion JPEG
+                ("MJPG", ".avi"),  # Motion JPEG
 
             ]
-
-            
 
             out = None
 
             output_path = None
-
-            
 
             for fourcc_name, ext in codecs_to_try:
 
@@ -12732,13 +10617,9 @@ def _predict_video_original(
 
                     temp_output.close()
 
-                    
-
                     fourcc = cv2.VideoWriter_fourcc(*fourcc_name)
 
                     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
-
-                    
 
                     if out.isOpened():
 
@@ -12762,8 +10643,6 @@ def _predict_video_original(
 
                         out = None
 
-                        
-
                 except Exception as codec_error:
 
                     print(f"[DEBUG] {fourcc_name} codec error: {codec_error}")
@@ -12780,8 +10659,6 @@ def _predict_video_original(
 
                     output_path = None
 
-            
-
             if out is None:
 
                 print("[ERROR] Failed to initialize any video codec")
@@ -12789,8 +10666,6 @@ def _predict_video_original(
                 cap.release()
 
                 return None
-
-                
 
         except Exception as e:
 
@@ -12804,11 +10679,7 @@ def _predict_video_original(
 
             return None
 
-
-
         print("[DEBUG] Video writer initialized successfully")
-
-
 
         processed_frames = 0
 
@@ -12818,17 +10689,11 @@ def _predict_video_original(
 
         unique_plates = set()  # Track unique plates across video
 
-        
-
         print("[DEBUG] Starting frame processing loop with ALPR...")
-
-        
 
         # Process every Nth frame for ALPR to save time (e.g., every 5th frame)
 
         alpr_frame_interval = 5
-
-        
 
         while True:
 
@@ -12840,15 +10705,11 @@ def _predict_video_original(
 
                 break
 
-
-
             processed_frames += 1
 
             if processed_frames % 30 == 0:  # Progress update every 30 frames
 
                 print(f"[INFO] Processing frame {processed_frames}/{frame_count}...")
-
-
 
             try:
 
@@ -12857,8 +10718,6 @@ def _predict_video_original(
                 if processed_frames == 1:
 
                     print(f"[DEBUG] First frame shape: {frame.shape}, dtype: {frame.dtype}")
-
-
 
                 # Run ALPR detection on every Nth frame for performance
 
@@ -12873,8 +10732,6 @@ def _predict_video_original(
                         annotated_frame = drawn.image
 
                         results = drawn.results
-
-                        
 
                         # Initialize country recognizer for video (reuse if possible)
 
@@ -12892,8 +10749,6 @@ def _predict_video_original(
 
                                 pass
 
-                        
-
                         # Process detected plates
 
                         frame_plates = []
@@ -12901,8 +10756,6 @@ def _predict_video_original(
                         for i, result in enumerate(results, 1):
 
                             plate_text = result.ocr.text if result.ocr else 'N/A'
-
-                            
 
                             # Detect country for this plate
 
@@ -12921,8 +10774,6 @@ def _predict_video_original(
                                 except Exception:
 
                                     pass
-
-                            
 
                             plate_info = {
 
@@ -12956,13 +10807,9 @@ def _predict_video_original(
 
                             plate_detection_count += 1
 
-                            
-
                             if processed_frames % 30 == 0 or processed_frames <= 5:
 
                                 print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
-
-                        
 
                         # Add country labels on video frames (blue background)
 
@@ -12976,35 +10823,25 @@ def _predict_video_original(
 
                                 label_y = y1 - 35 if y1 > 35 else y1 + 20
 
-                                
-
                                 # Get text size
 
                                 (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-
-                                
 
                                 # Draw blue background
 
                                 cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
 
-                                
-
                                 # Draw white text
 
-                                cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                                cv2.putText(annotated_frame, country_label, (x1, label_y),
 
                                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-                        
 
                         # Add timestamp and plate count overlay
 
                         current_time = datetime.now().strftime('%H:%M:%S')
 
                         current_date = datetime.now().strftime('%d/%m/%Y')
-
-                        
 
                         # Create semi-transparent background for timestamp
 
@@ -13014,23 +10851,19 @@ def _predict_video_original(
 
                         cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
 
-                        
-
                         # Add time, date, and plate count
 
-                        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+                        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                        cv2.putText(annotated_frame, f"Plates: {len(unique_plates)} | Frame: {len(frame_plates)}", (10, 75), 
+                        cv2.putText(annotated_frame, f"Plates: {len(unique_plates)} | Frame: {len(frame_plates)}", (10, 75),
 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-
-                        
 
                         # Add recent plate text overlay at bottom
 
@@ -13038,11 +10871,9 @@ def _predict_video_original(
 
                             recent_plate = frame_plates[-1]['text']
 
-                            cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, height - 20), 
+                            cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, height - 20),
 
                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
-                        
 
                     except Exception as alpr_error:
 
@@ -13058,15 +10889,13 @@ def _predict_video_original(
 
                     current_time = datetime.now().strftime('%H:%M:%S')
 
-                    cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+                    cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                    cv2.putText(annotated_frame, f"Plates: {len(unique_plates)}", (10, 50), 
+                    cv2.putText(annotated_frame, f"Plates: {len(unique_plates)}", (10, 50),
 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-
-                
 
                 # Ensure the annotated frame has correct dimensions
 
@@ -13078,15 +10907,11 @@ def _predict_video_original(
 
                     annotated_frame = cv2.resize(annotated_frame, (width, height))
 
-                
-
                 # Write frame to output
 
                 out.write(annotated_frame)
 
                 success_count += 1
-
-                
 
             except Exception as e:
 
@@ -13108,15 +10933,11 @@ def _predict_video_original(
 
                 success_count += 1
 
-
-
         print(f"[DEBUG] Finished processing {processed_frames} frames")
 
         cap.release()
 
         out.release()
-
-        
 
         # Verify output file was created successfully
 
@@ -13125,8 +10946,6 @@ def _predict_video_original(
             print("[ERROR] Output video file was not created")
 
             return None
-
-        
 
         output_size = os.path.getsize(output_path)
 
@@ -13138,8 +10957,6 @@ def _predict_video_original(
 
             return None
 
-        
-
         print(f"[INFO] Output video created successfully: {output_size / (1024*1024):.1f} MB")
 
         print(f"[INFO] Total plate detections: {plate_detection_count}")
@@ -13149,8 +10966,6 @@ def _predict_video_original(
         print(f"[INFO] Unique plate list: {list(unique_plates)}")
 
         print(f"[INFO] Video processing complete. Processed {success_count}/{processed_frames} frames successfully.")
-
-        
 
         # Final verification - try to open the output video
 
@@ -13180,11 +10995,52 @@ def _predict_video_original(
 
             print(f"[WARNING] Output verification failed: {e}")
 
-        
+        # Re-encode to H.264 for browser compatibility
+        # OpenCV mp4v codec is not supported by browsers, need H.264
+        browser_output = output_path
+        try:
+            ffmpeg_path = None
+            if imageio_ffmpeg is not None:
+                try:
+                    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+                except Exception:
+                    pass
+            if not ffmpeg_path:
+                import shutil as _shutil
+                ffmpeg_path = _shutil.which("ffmpeg")
 
-        return output_path
+            if ffmpeg_path:
+                h264_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
+                print(f"[INFO] Re-encoding video to H.264 for browser playback...")
+                reencode_cmd = [
+                    ffmpeg_path, "-y",
+                    "-i", output_path,
+                    "-c:v", "libx264",
+                    "-preset", "fast",
+                    "-crf", "23",
+                    "-pix_fmt", "yuv420p",
+                    "-movflags", "+faststart",
+                    h264_path
+                ]
+                result = subprocess.run(reencode_cmd, capture_output=True, timeout=120)
+                if result.returncode == 0 and os.path.exists(h264_path) and os.path.getsize(h264_path) > 0:
+                    # Replace original with H.264 version
+                    os.unlink(output_path)
+                    os.rename(h264_path, output_path)
+                    print(f"[INFO] H.264 re-encoding successful: {os.path.getsize(output_path) / (1024*1024):.1f} MB")
+                    browser_output = output_path
+                else:
+                    print(f"[WARNING] H.264 re-encoding failed, using original codec")
+                    if os.path.exists(h264_path):
+                        os.unlink(h264_path)
+                    if result.stderr:
+                        print(f"[DEBUG] ffmpeg stderr: {result.stderr[:200]}")
+            else:
+                print("[WARNING] ffmpeg not found, video may not play in browser")
+        except Exception as e:
+            print(f"[WARNING] H.264 re-encoding error: {e}")
 
-        
+        return browser_output
 
     except Exception as e:
 
@@ -13228,15 +11084,9 @@ def _predict_video_original(
 
         return None
 
-
-
-
-
 # Cache model for streaming performance
 
 _model_cache = {}
-
-
 
 # Cache ResNet for classification
 
@@ -13244,25 +11094,17 @@ _resnet_cache = {"model": None, "weights": None, "device": None, "transforms": N
 
 _resnet_stream_state = {"frame_idx": 0, "labels": {}}
 
-
-
 # Cache EasyOCR
 
 _ocr_cache = {"reader": None, "device": None}
 
 _ocr_stream_state = {"frame_idx": 0, "texts": {}}
 
-
-
 # Cache gender classifier and face detector
 
 _gender_cache = {"pipeline": None, "model_id": "dima806/fairface_gender_image_detection"}
 
 _face_cache = {"cascade": None}
-
-
-
-
 
 def _get_face_cascade():
 
@@ -13290,10 +11132,6 @@ def _get_face_cascade():
 
         return None
 
-
-
-
-
 def _get_gender_pipeline():
 
     if _gender_cache["pipeline"] is not None:
@@ -13303,8 +11141,6 @@ def _get_gender_pipeline():
     try:
 
         from transformers import pipeline as hf_pipeline
-
-
 
         device = _get_device()
 
@@ -13329,10 +11165,6 @@ def _get_gender_pipeline():
         _gender_cache["pipeline"] = None
 
         return None
-
-
-
-
 
 def _find_largest_face_bbox(face_cascade, img_bgr: np.ndarray):
 
@@ -13372,17 +11204,11 @@ def _find_largest_face_bbox(face_cascade, img_bgr: np.ndarray):
 
         return None
 
-
-
-
-
 def _predict_boy_girl_from_person_crop(person_crop_bgr: np.ndarray) -> str | None:
 
     if person_crop_bgr is None or not isinstance(person_crop_bgr, np.ndarray) or person_crop_bgr.size == 0:
 
         return None
-
-
 
     face_cascade = _get_face_cascade()
 
@@ -13391,8 +11217,6 @@ def _predict_boy_girl_from_person_crop(person_crop_bgr: np.ndarray) -> str | Non
     if face_box is None:
 
         return None
-
-
 
     x, y, w, h = face_box
 
@@ -13410,23 +11234,17 @@ def _predict_boy_girl_from_person_crop(person_crop_bgr: np.ndarray) -> str | Non
 
         return None
 
-
-
     face_bgr = person_crop_bgr[y1:y2, x1:x2]
 
     if face_bgr.size == 0:
 
         return None
 
-
-
     pipe = _get_gender_pipeline()
 
     if pipe is None:
 
         return None
-
-
 
     try:
 
@@ -13458,10 +11276,6 @@ def _predict_boy_girl_from_person_crop(person_crop_bgr: np.ndarray) -> str | Non
 
         return None
 
-
-
-
-
 def get_model(model_name):
 
     """Get or create a cached model instance with CUDA support."""
@@ -13473,8 +11287,6 @@ def get_model(model_name):
         parts = [p.strip() for p in str(model_name).split("+") if p.strip()]
 
         return [get_model(p) for p in parts]
-
-
 
     if model_name not in _model_cache:
 
@@ -13488,21 +11300,15 @@ def get_model(model_name):
 
             model_path = f"models/{model_name}"
 
-            
-
         print(f"[INFO] Loading model: {model_path}")
 
         model = YOLO(model_path)
-
-        
 
         # Print model info to verify it loaded correctly
 
         print(f"[INFO] Model loaded: {type(model)}")
 
         print(f"[INFO] Model names: {model.names}")
-
-        
 
         # Move model to CUDA device if available
 
@@ -13513,8 +11319,6 @@ def get_model(model_name):
             model.to(device)
 
             print(f"[INFO] Model moved to CUDA device: {device}")
-
-            
 
             # GPU Memory Optimization
 
@@ -13528,19 +11332,11 @@ def get_model(model_name):
 
                 print(f"[INFO] GPU memory optimized - Available: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f}GB")
 
-        
-
         _model_cache[model_name] = model
 
         print(f"[INFO] Model {model_name} loaded and cached successfully")
 
-    
-
     return _model_cache[model_name]
-
-
-
-
 
 def _get_resnet18_classifier():
 
@@ -13548,23 +11344,17 @@ def _get_resnet18_classifier():
 
         return _resnet_cache
 
-
-
     weights = ResNet18_Weights.DEFAULT
 
     model = resnet18(weights=weights)
 
     model.eval()
 
-
-
     device = _get_device()
 
     if device != "cpu":
 
         model.to(device)
-
-
 
     _resnet_cache["model"] = model
 
@@ -13577,10 +11367,6 @@ def _get_resnet18_classifier():
     _resnet_cache["categories"] = list(weights.meta.get("categories", []))
 
     return _resnet_cache
-
-
-
-
 
 def _get_ocr_reader():
 
@@ -13612,15 +11398,9 @@ def _get_ocr_reader():
 
         return None
 
-
-
-
-
 def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
     print(f"[DEBUG] OCR called on crop size: {crop_bgr.shape if crop_bgr is not None else 'None'}")
-
-    
 
     if crop_bgr is None or not isinstance(crop_bgr, np.ndarray) or crop_bgr.size == 0:
 
@@ -13635,8 +11415,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
         print(f"[DEBUG] OCR failed: Crop too small ({h}x{w})")
 
         return ""
-
-
 
     # Try LightOnOCR first if available
 
@@ -13664,8 +11442,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
             print(f"[DEBUG] LightOnOCR failed: {e}, falling back to Tesseract")
 
-    
-
     # Fallback to enhanced Tesseract with Indian license plate optimization
 
     if not TESSERACT_AVAILABLE:
@@ -13673,8 +11449,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
         print("[DEBUG] OCR failed: No OCR available")
 
         return ""
-
-
 
     # Check if Tesseract is available
 
@@ -13684,35 +11458,25 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         return ""
 
-
-
     try:
 
         # Enhanced preprocessing specifically for Indian license plates
 
         results = []
 
-        
-
         # Method 1: Grayscale with advanced preprocessing
 
         gray = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2GRAY)
 
-        
-
         # Apply bilateral filter to reduce noise while preserving edges
 
         denoised = cv2.bilateralFilter(gray, 9, 75, 75)
-
-        
 
         # Enhance contrast using CLAHE
 
         clahe = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(8,8))
 
         enhanced = clahe.apply(denoised)
-
-        
 
         # Multiple thresholding methods for license plates
 
@@ -13722,8 +11486,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         _, thresh3 = cv2.threshold(enhanced, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
-        
-
         # Method 2: Inverted images (for dark plates with light text)
 
         thresh1_inv = cv2.bitwise_not(thresh1)
@@ -13732,23 +11494,17 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         thresh3_inv = cv2.bitwise_not(thresh3)
 
-        
-
         # Method 3: Morphological operations for better text separation
 
         kernel_small = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
 
         kernel_medium = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 1))
 
-        
-
         morph1 = cv2.morphologyEx(thresh1, cv2.MORPH_CLOSE, kernel_small)
 
         morph2 = cv2.morphologyEx(thresh1, cv2.MORPH_OPEN, kernel_small)
 
         morph3 = cv2.morphologyEx(thresh1, cv2.MORPH_CLOSE, kernel_medium)
-
-        
 
         # Method 4: Upscaling for small license plates
 
@@ -13770,8 +11526,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
             thresh_up = None
 
-        
-
         # All preprocessing methods to try
 
         preprocess_methods = [
@@ -13784,13 +11538,9 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         ]
 
-        
-
         if thresh_up is not None:
 
             preprocess_methods.append(thresh_up)
-
-        
 
         # Specialized OCR configs for Indian license plates
 
@@ -13828,8 +11578,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         ]
 
-        
-
         # Try each preprocessing method with each config
 
         for i, thresh in enumerate(preprocess_methods, 1):
@@ -13852,8 +11600,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
                     continue
 
-        
-
         # Method 5: Try original image with different preprocessing
 
         try:
@@ -13869,8 +11615,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
             hsv_enhanced = cv2.merge([h, s_enhanced, v])
 
             enhanced_bgr = cv2.cvtColor(hsv_enhanced, cv2.COLOR_HSV2BGR)
-
-            
 
             for config in configs[:6]:  # Try most effective configs
 
@@ -13894,11 +11638,7 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
             pass
 
-        
-
         print(f"[DEBUG] OCR total raw results: {results}")
-
-        
 
         # Enhanced filtering for Indian license plates
 
@@ -13909,8 +11649,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
             if _is_valid_indian_license_plate(result):
 
                 filtered.append(result)
-
-        
 
         # Remove duplicates while preserving order
 
@@ -13926,8 +11664,6 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
                 unique_filtered.append(result)
 
-        
-
         # Select best result based on Indian license plate patterns
 
         final_result = _select_best_indian_plate_result(unique_filtered)
@@ -13936,17 +11672,11 @@ def _extract_text_ocr(crop_bgr: np.ndarray) -> str:
 
         return final_result
 
-        
-
     except Exception as e:
 
         print(f"[DEBUG] OCR error: {e}")
 
     return ""
-
-
-
-
 
 def _is_valid_indian_license_plate(text: str) -> bool:
 
@@ -13956,19 +11686,13 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
         return False
 
-    
-
     # Remove any non-alphanumeric characters
 
     alnum_text = ''.join(c for c in text if c.isalnum())
 
-    
-
     if len(alnum_text) < 6:
 
         return False
-
-    
 
     # Check for minimum alphanumeric content
 
@@ -13978,8 +11702,6 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
         return False
 
-    
-
     # Indian license plate patterns:
 
     # Pattern 1: 2 letters (state) + 2 numbers (district) + 2 letters (series) + 4 numbers (unique)
@@ -13988,13 +11710,9 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
     # Pattern 2: Variations with spaces: MH 20 EE 7602
 
-    
-
     has_letter = any(c.isalpha() for c in alnum_text)
 
     has_number = any(c.isdigit() for c in alnum_text)
-
-    
 
     # Must have both letters and numbers
 
@@ -14002,15 +11720,11 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
         return False
 
-    
-
     # Check for Indian state code pattern (first 2 characters are letters)
 
     if len(alnum_text) >= 2 and alnum_text[:2].isalpha():
 
         return True
-
-    
 
     # Check for typical Indian plate length (8-10 characters)
 
@@ -14018,15 +11732,11 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
         return True
 
-    
-
     # Check if it has the pattern letters-numbers-letters-numbers
 
     letter_count = sum(c.isalpha() for c in alnum_text)
 
     number_count = sum(c.isdigit() for c in alnum_text)
-
-    
 
     # Indian plates typically have 4-6 letters and 4-6 numbers
 
@@ -14034,13 +11744,7 @@ def _is_valid_indian_license_plate(text: str) -> bool:
 
         return True
 
-    
-
     return False
-
-
-
-
 
 def _select_best_indian_plate_result(results: list) -> str:
 
@@ -14050,13 +11754,9 @@ def _select_best_indian_plate_result(results: list) -> str:
 
         return ""
 
-    
-
     if len(results) == 1:
 
         return results[0]
-
-    
 
     # Score each result based on Indian license plate characteristics
 
@@ -14065,8 +11765,6 @@ def _select_best_indian_plate_result(results: list) -> str:
     for result in results:
 
         score = 0
-
-        
 
         # Length preference (8-10 characters is typical for Indian plates)
 
@@ -14078,8 +11776,6 @@ def _select_best_indian_plate_result(results: list) -> str:
 
             score += 2
 
-        
-
         # Has both letters and numbers
 
         has_letter = any(c.isalpha() for c in result)
@@ -14090,8 +11786,6 @@ def _select_best_indian_plate_result(results: list) -> str:
 
             score += 3
 
-        
-
         # Indian state code pattern (2 letters at start)
 
         if len(result) >= 2 and result[:2].isalpha():
@@ -14100,9 +11794,9 @@ def _select_best_indian_plate_result(results: list) -> str:
 
             # Check if it's a valid Indian state code
 
-            state_codes = ['AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ', 
+            state_codes = ['AN', 'AP', 'AR', 'AS', 'BR', 'CG', 'CH', 'DD', 'DL', 'DN', 'GA', 'GJ',
 
-                          'HP', 'HR', 'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP', 
+                          'HP', 'HR', 'JH', 'JK', 'KA', 'KL', 'LA', 'LD', 'MH', 'ML', 'MN', 'MP',
 
                           'MZ', 'NL', 'OD', 'PB', 'PY', 'RJ', 'SK', 'TN', 'TR', 'TS', 'UK', 'UP', 'WB']
 
@@ -14110,15 +11804,13 @@ def _select_best_indian_plate_result(results: list) -> str:
 
                 score += 2
 
-        
-
         # Check for typical Indian plate pattern: XX00XX0000
 
         if len(result) >= 8:
 
             # Pattern: 2 letters + 2 numbers + 2 letters + 4 numbers
 
-            if (result[:2].isalpha() and len(result) >= 8 and 
+            if (result[:2].isalpha() and len(result) >= 8 and
 
                 result[2:4].isdigit() and len(result) >= 6 and
 
@@ -14130,7 +11822,7 @@ def _select_best_indian_plate_result(results: list) -> str:
 
             # More flexible pattern checking
 
-            elif (result[:2].isalpha() and 
+            elif (result[:2].isalpha() and
 
                   any(result[i].isdigit() for i in range(2, min(6, len(result)))) and
 
@@ -14138,21 +11830,13 @@ def _select_best_indian_plate_result(results: list) -> str:
 
                 score += 3
 
-        
-
         scored_results.append((score, result))
-
-    
 
     # Sort by score and return the best
 
     scored_results.sort(key=lambda x: x[0], reverse=True)
 
     return scored_results[0][1]
-
-
-
-
 
 def _clean_general_text(text: str) -> str:
 
@@ -14162,21 +11846,15 @@ def _clean_general_text(text: str) -> str:
 
         return ""
 
-    
-
     # Remove excessive whitespace and convert to proper case
 
     cleaned = text.strip()
-
-    
 
     # Replace multiple spaces with single space
 
     import re
 
     cleaned = re.sub(r'\s+', ' ', cleaned)
-
-    
 
     # Remove common OCR artifacts but keep more characters for general text
 
@@ -14190,17 +11868,11 @@ def _clean_general_text(text: str) -> str:
 
             valid_chars.append(char)
 
-    
-
     result = ''.join(valid_chars)
-
-    
 
     # Clean up any multiple spaces again
 
     result = re.sub(r'\s+', ' ', result).strip()
-
-    
 
     # Return in proper case (first letter capitalized, rest as-is)
 
@@ -14208,13 +11880,7 @@ def _clean_general_text(text: str) -> str:
 
         result = result[0].upper() + result[1:] if len(result) > 1 else result.upper()
 
-    
-
     return result
-
-
-
-
 
 def _clean_license_plate_text(text: str) -> str:
 
@@ -14224,19 +11890,13 @@ def _clean_license_plate_text(text: str) -> str:
 
         return ""
 
-    
-
     # Remove ALL question marks first (from anywhere in the text)
 
     text = text.replace('?', '').replace('??', '').replace('???', '').replace('????', '')
 
-    
-
     # Remove whitespace and convert to uppercase
 
     cleaned = text.strip().upper()
-
-    
 
     # Common brand names to immediately reject
 
@@ -14254,8 +11914,6 @@ def _clean_license_plate_text(text: str) -> str:
 
     }
 
-    
-
     # Check if it's a brand name (immediate rejection)
 
     if cleaned in brand_names:
@@ -14264,8 +11922,6 @@ def _clean_license_plate_text(text: str) -> str:
 
         return ""
 
-    
-
     # Check if it's just letters without numbers (likely a brand name)
 
     if cleaned.isalpha() and len(cleaned) >= 3:
@@ -14273,8 +11929,6 @@ def _clean_license_plate_text(text: str) -> str:
         print(f"[DEBUG]  Rejected letters-only text: {cleaned}")
 
         return ""
-
-    
 
     # Replace common OCR confusions (more conservative for license plates)
 
@@ -14292,21 +11946,19 @@ def _clean_license_plate_text(text: str) -> str:
 
         'Z': '2',  # Letter Z to two
 
-        '-': '',   # Remove hyphens
+        '-': '',  # Remove hyphens
 
-        '.': '',   # Remove periods
+        '.': '',  # Remove periods
 
-        ',': '',   # Remove commas
+        ',': '',  # Remove commas
 
-        '|': '',   # Remove pipes
+        '|': '',  # Remove pipes
 
-        '/': '',   # Remove slashes
+        '/': '',  # Remove slashes
 
         '\\': '',  # Remove backslashes
 
     }
-
-    
 
     # Apply replacements but keep spaces for now (for validation)
 
@@ -14322,13 +11974,9 @@ def _clean_license_plate_text(text: str) -> str:
 
             result += char
 
-    
-
     # Remove extra spaces
 
     result = re.sub(r'\s+', ' ', result).strip()
-
-    
 
     # Final validation - must have both letters and numbers for license plates
 
@@ -14336,15 +11984,11 @@ def _clean_license_plate_text(text: str) -> str:
 
     has_numbers = bool(re.search(r'\d', result))
 
-    
-
     if not (has_letters and has_numbers):
 
         print(f"[DEBUG]  Rejected text without letters+numbers: {result}")
 
         return ""
-
-    
 
     # Must be reasonable length (4-8 characters for most plates)
 
@@ -14354,15 +11998,9 @@ def _clean_license_plate_text(text: str) -> str:
 
         return ""
 
-    
-
     print(f"[DEBUG]  Valid license plate text: {result}")
 
     return result
-
-
-
-
 
 def _is_valid_license_plate(text: str) -> bool:
 
@@ -14372,19 +12010,13 @@ def _is_valid_license_plate(text: str) -> bool:
 
         return False
 
-    
-
     # Remove any non-alphanumeric characters
 
     alnum_text = ''.join(c for c in text if c.isalnum())
 
-    
-
     if len(alnum_text) < 4:
 
         return False
-
-    
 
     # Check for minimum alphanumeric content
 
@@ -14393,8 +12025,6 @@ def _is_valid_license_plate(text: str) -> bool:
     if alnum_ratio < 0.7:
 
         return False
-
-    
 
     # Common license plate patterns
 
@@ -14406,13 +12036,9 @@ def _is_valid_license_plate(text: str) -> bool:
 
     # Pattern 4: All letters
 
-    
-
     has_letter = any(c.isalpha() for c in alnum_text)
 
     has_number = any(c.isdigit() for c in alnum_text)
-
-    
 
     # Valid if it has both letters and numbers, or is sufficiently long
 
@@ -14420,13 +12046,7 @@ def _is_valid_license_plate(text: str) -> bool:
 
         return True
 
-    
-
     return False
-
-
-
-
 
 def _select_best_plate_result(results: list) -> str:
 
@@ -14436,13 +12056,9 @@ def _select_best_plate_result(results: list) -> str:
 
         return ""
 
-    
-
     if len(results) == 1:
 
         return results[0]
-
-    
 
     # Score each result based on license plate characteristics
 
@@ -14451,8 +12067,6 @@ def _select_best_plate_result(results: list) -> str:
     for result in results:
 
         score = 0
-
-        
 
         # Length preference (not too short, not too long)
 
@@ -14464,8 +12078,6 @@ def _select_best_plate_result(results: list) -> str:
 
             score += 1
 
-        
-
         # Has both letters and numbers
 
         has_letter = any(c.isalpha() for c in result)
@@ -14475,8 +12087,6 @@ def _select_best_plate_result(results: list) -> str:
         if has_letter and has_number:
 
             score += 2
-
-        
 
         # Common Indian license plate pattern (e.g., MH20EE7602)
 
@@ -14494,21 +12104,13 @@ def _select_best_plate_result(results: list) -> str:
 
                 score += 1
 
-        
-
         scored_results.append((score, result))
-
-    
 
     # Sort by score and return the best
 
     scored_results.sort(key=lambda x: x[0], reverse=True)
 
     return scored_results[0][1]
-
-
-
-
 
 @torch.inference_mode()
 
@@ -14524,8 +12126,6 @@ def _classify_object_resnet18(crop_bgr: np.ndarray) -> str:
 
         return "unknown"
 
-
-
     cache = _get_resnet18_classifier()
 
     model = cache["model"]
@@ -14535,8 +12135,6 @@ def _classify_object_resnet18(crop_bgr: np.ndarray) -> str:
     tfm = cache["transforms"]
 
     categories = cache["categories"]
-
-
 
     crop_rgb = cv2.cvtColor(crop_bgr, cv2.COLOR_BGR2RGB)
 
@@ -14548,8 +12146,6 @@ def _classify_object_resnet18(crop_bgr: np.ndarray) -> str:
 
         x = x.to(device)
 
-
-
     logits = model(x)
 
     idx = int(torch.argmax(logits, dim=1).item())
@@ -14559,10 +12155,6 @@ def _classify_object_resnet18(crop_bgr: np.ndarray) -> str:
         return str(categories[idx])
 
     return str(idx)
-
-
-
-
 
 def _annotate_webcam_fast_with_detections(
 
@@ -14592,8 +12184,6 @@ def _annotate_webcam_fast_with_detections(
 
         return frame_bgr
 
-
-
     try:
 
         # Try to use professional annotator first
@@ -14610,11 +12200,7 @@ def _annotate_webcam_fast_with_detections(
 
             sys.path.insert(0, project_root)
 
-        
-
         from src.processors.professional_annotator import professional_annotator
-
-        
 
         # Convert detections to professional format
 
@@ -14628,8 +12214,6 @@ def _annotate_webcam_fast_with_detections(
 
             confidence = det.get("confidence", 0.0)
 
-            
-
             # Clamp to frame bounds
 
             ih, iw = frame_bgr.shape[:2]
@@ -14642,13 +12226,9 @@ def _annotate_webcam_fast_with_detections(
 
             y2 = int(max(0, min(ih - 1, y2)))
 
-            
-
             if x2 <= x1 or y2 <= y1:
 
                 continue
-
-            
 
             detection = {
 
@@ -14661,8 +12241,6 @@ def _annotate_webcam_fast_with_detections(
                 'class_id': det.get('class_id', 0)
 
             }
-
-            
 
             # Add color detection if enabled
 
@@ -14679,8 +12257,6 @@ def _annotate_webcam_fast_with_detections(
                         avg_color = np.average(avg_color_per_row, axis=0)
 
                         b, g, r = map(int, avg_color)
-
-                        
 
                         # Simple color classification
 
@@ -14720,15 +12296,11 @@ def _annotate_webcam_fast_with_detections(
 
                             color = "gray"
 
-                        
-
                         detection['color'] = color
 
                 except Exception:
 
                     detection['color'] = 'unknown'
-
-            
 
             # Add OCR text if available
 
@@ -14740,11 +12312,7 @@ def _annotate_webcam_fast_with_detections(
 
                     detection['license_plate'] = ocr_text.strip()
 
-            
-
             professional_detections.append(detection)
-
-        
 
         # Use professional annotator
 
@@ -14762,8 +12330,6 @@ def _annotate_webcam_fast_with_detections(
 
             )
 
-            
-
             # Add time and date timestamp with small box
 
             try:
@@ -14771,8 +12337,6 @@ def _annotate_webcam_fast_with_detections(
                 current_time = datetime.now().strftime('%H:%M:%S')
 
                 current_date = datetime.now().strftime('%d/%m/%Y')
-
-                
 
                 # Create semi-transparent background for timestamp
 
@@ -14782,45 +12346,33 @@ def _annotate_webcam_fast_with_detections(
 
                 cv2.addWeighted(overlay, 0.7, annotated, 0.3, 0, annotated)
 
-                
-
                 # Add time with smaller font
 
-                cv2.putText(annotated, f"Time: {current_time}", (10, 25), 
+                cv2.putText(annotated, f"Time: {current_time}", (10, 25),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                
+                # Add date with smaller font
 
-                # Add date with smaller font  
-
-                cv2.putText(annotated, f"Date: {current_date}", (10, 50), 
+                cv2.putText(annotated, f"Date: {current_date}", (10, 50),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-                
 
                 # Add webcam info
 
-                cv2.putText(annotated, "Mode: Live", (10, 75), 
+                cv2.putText(annotated, "Mode: Live", (10, 75),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 1)
-
-                
 
             except Exception as time_error:
 
                 print(f"[WARNING] Failed to add timestamp to webcam: {time_error}")
-
-            
 
             return annotated
 
         else:
 
             return frame_bgr
-
-            
 
     except ImportError:
 
@@ -14834,21 +12386,15 @@ def _annotate_webcam_fast_with_detections(
 
         pass
 
-
-
     # Fallback to original annotation method
 
     annotated = frame_bgr.copy()
 
     ih, iw = annotated.shape[:2]
 
-
-
     total = len(detections)
 
     take = min(int(max(1, max_boxes)), total)
-
-
 
     for i in range(take):
 
@@ -14870,19 +12416,13 @@ def _annotate_webcam_fast_with_detections(
 
             continue
 
-
-
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-
 
         if show_labels:
 
             class_name = str(det.get("class_name", "unknown"))
 
             display_name = class_name
-
-
 
             color_name = None
 
@@ -14904,15 +12444,11 @@ def _annotate_webcam_fast_with_detections(
 
                     color_name = None
 
-
-
             parts = [display_name]
 
             if color_name:
 
                 parts.append(str(color_name))
-
-
 
             ocr_t = ""
 
@@ -14930,13 +12466,9 @@ def _annotate_webcam_fast_with_detections(
 
                 parts.append(ocr_t[:28])
 
-
-
             # Format as "object | colour | text"
 
             text = " | ".join(parts)
-
-
 
             font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -14952,8 +12484,6 @@ def _annotate_webcam_fast_with_detections(
 
                 ty = y1 + th + baseline + 8
 
-
-
             bg_x1 = x1
 
             bg_y1 = max(0, ty - th - baseline)
@@ -14966,13 +12496,7 @@ def _annotate_webcam_fast_with_detections(
 
             cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-
-
     return annotated
-
-
-
-
 
 def _annotate_webcam_fast(
 
@@ -15000,8 +12524,6 @@ def _annotate_webcam_fast(
 
         return frame_bgr
 
-
-
     boxes = result.boxes
 
     # Fix MockBoxes error
@@ -15010,15 +12532,11 @@ def _annotate_webcam_fast(
 
         return frame_bgr
 
-
-
     names = getattr(result, "names", None)
 
     if names is None and hasattr(result, "model") and hasattr(result.model, "names"):
 
         names = result.model.names
-
-
 
     xyxy = boxes.xyxy.cpu().numpy() if hasattr(boxes.xyxy, "cpu") else np.asarray(boxes.xyxy)
 
@@ -15026,19 +12544,13 @@ def _annotate_webcam_fast(
 
     conf = boxes.conf.cpu().numpy() if hasattr(boxes.conf, "cpu") else np.asarray(boxes.conf)
 
-
-
     annotated = frame_bgr.copy()
 
     ih, iw = annotated.shape[:2]
 
-
-
     total = len(xyxy)
 
     take = min(int(max(1, max_boxes)), total)
-
-
 
     for i in range(take):
 
@@ -15056,11 +12568,7 @@ def _annotate_webcam_fast(
 
             continue
 
-
-
         cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-
-
 
         if show_labels:
 
@@ -15076,11 +12584,7 @@ def _annotate_webcam_fast(
 
                 class_name = names[class_id]
 
-
-
             display_name = class_name
-
-
 
             color_name = None
 
@@ -15102,8 +12606,6 @@ def _annotate_webcam_fast(
 
                     color_name = None
 
-
-
             if show_conf and i < len(conf):
 
                 text = f"{display_name}"
@@ -15111,8 +12613,6 @@ def _annotate_webcam_fast(
             else:
 
                 text = str(display_name)
-
-
 
             # Conditional display:
 
@@ -15127,8 +12627,6 @@ def _annotate_webcam_fast(
             if color_name:
 
                 parts.append(str(color_name))
-
-
 
             ocr_t = ""
 
@@ -15146,13 +12644,9 @@ def _annotate_webcam_fast(
 
                 parts.append(ocr_t[:28])
 
-
-
             # Format as "object | colour | text"
 
             text = " | ".join(parts)
-
-
 
             font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -15168,8 +12662,6 @@ def _annotate_webcam_fast(
 
                 ty = y1 + th + baseline + 8
 
-
-
             bg_x1 = x1
 
             bg_y1 = max(0, ty - th - baseline)
@@ -15182,13 +12674,7 @@ def _annotate_webcam_fast(
 
             cv2.putText(annotated, text, (x1 + 3, ty), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-
-
     return annotated
-
-
-
-
 
 def predict_webcam(
 
@@ -15232,8 +12718,6 @@ def predict_webcam(
 
         return None, " **Error:** No frame received"
 
-
-
     global _webcam_stream_state
 
     try:
@@ -15256,8 +12740,6 @@ def predict_webcam(
 
         }
 
-
-
     # Ensure keys exist
 
     if "history" not in _webcam_stream_state:
@@ -15272,13 +12754,9 @@ def predict_webcam(
 
         _webcam_stream_state["last_plates"] = set()
 
-
-
     try:
 
         _webcam_stream_state["frame_idx"] += 1
-
-
 
         # Validate frame dimensions
 
@@ -15286,19 +12764,13 @@ def predict_webcam(
 
             return frame, " **Status:** Live Detection Active"
 
-        
-
         if frame.size == 0:
 
             return frame, " **Status:** Live Detection Active"
 
-
-
         if len(frame.shape) != 3 or frame.shape[2] != 3:
 
             return frame, " **Status:** Live Detection Active"
-
-
 
         # Check if ALPR is available
 
@@ -15308,15 +12780,11 @@ def predict_webcam(
 
             return frame, " ALPR not available\n\nPlease install fast_alpr to use license plate detection."
 
-
-
         # Gradio webcam sends RGB, convert to BGR for OpenCV
 
         frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         orig_h, orig_w = frame_bgr.shape[:2]
-
-
 
         # Run ALPR detection (every frame for webcam)
 
@@ -15327,8 +12795,6 @@ def predict_webcam(
             annotated_frame = drawn.image
 
             results = drawn.results
-
-            
 
             # Initialize country recognizer
 
@@ -15346,8 +12812,6 @@ def predict_webcam(
 
                     pass
 
-            
-
             # Process detected plates
 
             frame_plates = []
@@ -15355,8 +12819,6 @@ def predict_webcam(
             for i, result in enumerate(results, 1):
 
                 plate_text = result.ocr.text if result.ocr else 'N/A'
-
-                
 
                 # Detect country for this plate
 
@@ -15375,8 +12837,6 @@ def predict_webcam(
                     except Exception:
 
                         pass
-
-                
 
                 plate_info = {
 
@@ -15406,15 +12866,11 @@ def predict_webcam(
 
                 _webcam_stream_state["last_plates"].add(f"{plate_text} [{country}]")
 
-                
-
                 # Log every 30 frames
 
                 if _webcam_stream_state["frame_idx"] % 30 == 0:
 
                     print(f"[INFO] Webcam Frame {_webcam_stream_state['frame_idx']}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
-
-            
 
             # Add country labels on webcam frames (blue background)
 
@@ -15428,35 +12884,25 @@ def predict_webcam(
 
                     label_y = y1 - 35 if y1 > 35 else y1 + 20
 
-                    
-
                     # Get text size
 
                     (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-
-                    
 
                     # Draw blue background
 
                     cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
 
-                    
-
                     # Draw white text
 
-                    cv2.putText(annotated_frame, country_label, (x1, label_y), 
+                    cv2.putText(annotated_frame, country_label, (x1, label_y),
 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-            
 
             # Add timestamp and plate count overlay
 
             current_time = datetime.now().strftime('%H:%M:%S')
 
             current_date = datetime.now().strftime('%d/%m/%Y')
-
-            
 
             # Create semi-transparent background for timestamp
 
@@ -15466,23 +12912,19 @@ def predict_webcam(
 
             cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
 
-            
-
             # Add time, date, and plate count
 
-            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-            cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50), 
+            cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-            cv2.putText(annotated_frame, f"Plates: {len(_webcam_stream_state['last_plates'])} | Frame: {len(frame_plates)}", (10, 75), 
+            cv2.putText(annotated_frame, f"Plates: {len(_webcam_stream_state['last_plates'])} | Frame: {len(frame_plates)}", (10, 75),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-
-            
 
             # Add recent plate text overlay at bottom
 
@@ -15490,11 +12932,9 @@ def predict_webcam(
 
                 recent_plate = frame_plates[-1]['text']
 
-                cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, orig_h - 20), 
+                cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, orig_h - 20),
 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
-            
 
         except Exception as alpr_error:
 
@@ -15506,19 +12946,15 @@ def predict_webcam(
 
             current_time = datetime.now().strftime('%H:%M:%S')
 
-            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25), 
+            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-        
 
         # Convert BGR back to RGB for Gradio
 
         out_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
 
         _webcam_stream_state["last_rgb"] = out_rgb
-
-        
 
         # Build status message
 
@@ -15530,21 +12966,15 @@ def predict_webcam(
 
         status_lines.append(f" Unique Plates: {len(_webcam_stream_state['last_plates'])}")
 
-        
-
         if frame_plates:
 
             status_lines.append(f" Current Frame Plates: {len(frame_plates)}")
 
             for plate in frame_plates:
 
-                status_lines.append(f"   - {plate['text']} ({plate['detection_confidence']:.0%})")
-
-        
+                status_lines.append(f"  - {plate['text']} ({plate['detection_confidence']:.0%})")
 
         status_text = "\n".join(status_lines)
-
-        
 
         # Append to history
 
@@ -15562,8 +12992,6 @@ def predict_webcam(
 
         _webcam_stream_state["history"].append(event)
 
-
-
         # Cap history
 
         max_hist = int(_webcam_stream_state.get("history_max", 1000))
@@ -15572,11 +13000,7 @@ def predict_webcam(
 
             _webcam_stream_state["history"] = _webcam_stream_state["history"][(-max_hist):]
 
-        
-
         return out_rgb, status_text
-
-
 
     except Exception as e:
 
@@ -15588,15 +13012,9 @@ def predict_webcam(
 
         return frame, f" **Error:** {str(e)}"
 
-
-
-
-
 # Global parking detector instance to avoid repeated initialization - Commented out as requested
 
 # _global_parking_detector = None
-
-
 
 # def get_parking_detector():
 
@@ -15612,8 +13030,6 @@ def predict_webcam(
 
 #     return _global_parking_detector
 
-
-
 # def reset_parking_detector():
 
 #     """Reset the global parking detector to reload configuration"""
@@ -15623,8 +13039,6 @@ def predict_webcam(
 #     _global_parking_detector = None
 
 #     print("[INFO] Parking detector reset - will reload on next use")
-
-
 
 # ==================== PARKING DETECTION FUNCTION ====================  # Commented out as requested
 
@@ -15642,19 +13056,19 @@ def predict_webcam(
 
 #             return image, " **Parking Detection Not Available**\n\nPlease ensure the parking detection modules are properly installed."
 
-#         
+#
 
 #         if image is None:
 
 #             return None, " **Please upload an image**\n\nUpload an image to start parking detection analysis."
 
-#         
+#
 
 #         # Use global detector instance
 
 #         detector = get_parking_detector()
 
-#         
+#
 
 #         # Convert PIL to numpy if needed
 
@@ -15666,7 +13080,7 @@ def predict_webcam(
 
 #             image_array = image
 
-#             
+#
 
 #         # Convert BGR to RGB for processing
 
@@ -15680,19 +13094,19 @@ def predict_webcam(
 
 #             frame_bgr = image_array
 
-#             
+#
 
 #         # Create mock camera input for single frame processing
 
 #         frames = {'parking_cam': frame_bgr}
 
-#         
+#
 
 #         # Process parking detection with comprehensive car detection
 
 #         results = {}
 
-#         
+#
 
 #         # Use comprehensive detection to find ALL spots (both occupied and empty) in the parking lot
 
@@ -15702,13 +13116,13 @@ def predict_webcam(
 
 #             all_detections = []
 
-#             
+#
 
 #             # First try with "all" to get all zones
 
 #             all_detections = detector.process_all_detections(frame_bgr, "main", "all")
 
-#             
+#
 
 #             # If no detections, try individual zones
 
@@ -15738,7 +13152,7 @@ def predict_webcam(
 
 #                         break
 
-#             
+#
 
 #             # Create a mock zone result for all detections
 
@@ -15748,13 +13162,13 @@ def predict_webcam(
 
 #                 from datetime import datetime
 
-#                 
+#
 
 #                 occupied_count = len([s for s in all_detections if s.status == "OCCUPIED"])
 
 #                 empty_count = len([s for s in all_detections if s.status == "EMPTY"])
 
-#                 
+#
 
 #                 zone_result = ZoneResult(
 
@@ -15780,7 +13194,7 @@ def predict_webcam(
 
 #                 print(f"[INFO] Detection complete: {occupied_count} occupied, {empty_count} empty spots")
 
-#                 
+#
 
 #         except Exception as e:
 
@@ -15790,13 +13204,13 @@ def predict_webcam(
 
 #             traceback.print_exc()
 
-#         
+#
 
 #         # Draw parking detection results on frame
 
 #         output_frame = frame_bgr.copy()
 
-#         
+#
 
 #         # Draw zone information
 
@@ -15808,13 +13222,13 @@ def predict_webcam(
 
 #             zone_text = f"Zone {zone_id}: {zone_result.occupied_spots}/{zone_result.total_spots} occupied ({zone_result.occupancy_rate:.1f}%)"
 
-#             cv2.putText(output_frame, zone_text, (10, y_offset), 
+#             cv2.putText(output_frame, zone_text, (10, y_offset),
 
 #                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
 #             y_offset += 30
 
-#             
+#
 
 #             # Draw individual parking spots
 
@@ -15824,7 +13238,7 @@ def predict_webcam(
 
 #                     x1, y1, x2, y2 = spot.bounding_box
 
-#                     
+#
 
 #                     # Color based on status (FIXED: Red for occupied, Green for empty)
 
@@ -15840,7 +13254,7 @@ def predict_webcam(
 
 #                         text_color = (0, 255, 0)  # Green text for empty
 
-#                     
+#
 
 #                     # For occupied spots, draw bounding box around the car/vehicle
 
@@ -15850,7 +13264,7 @@ def predict_webcam(
 
 #                         cv2.rectangle(output_frame, (x1, y1), (x2, y2), box_color, 4)
 
-#                         
+#
 
 #                         # Draw "OCCUPIED" label directly on top of the car in RED
 
@@ -15862,7 +13276,7 @@ def predict_webcam(
 
 #                         label_size = cv2.getTextSize(occupied_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
 
-#                         
+#
 
 #                         # Position label directly on top of the car
 
@@ -15874,27 +13288,27 @@ def predict_webcam(
 
 #                             label_y = y1 + label_size[1] + 10
 
-#                         
+#
 
 #                         # Draw red background for occupied label
 
-#                         cv2.rectangle(output_frame, 
+#                         cv2.rectangle(output_frame,
 
-#                                      (label_x - 2, label_y - label_size[1] - 2), 
+#                                      (label_x - 2, label_y - label_size[1] - 2),
 
-#                                      (label_x + label_size[0] + 2, label_y + 2), 
+#                                      (label_x + label_size[0] + 2, label_y + 2),
 
 #                                      box_color, -1)
 
-#                         
+#
 
 #                         # Draw red "OCCUPIED" text on car
 
-#                         cv2.putText(output_frame, occupied_label, (label_x, label_y), 
+#                         cv2.putText(output_frame, occupied_label, (label_x, label_y),
 
 #                                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
 
-#                         
+#
 
 #                         # Also draw spot ID in smaller text
 
@@ -15904,7 +13318,7 @@ def predict_webcam(
 
 #                             spot_label += f" ({spot.vehicle_type})"
 
-#                         
+#
 
 #                         small_font = 0.6
 
@@ -15916,13 +13330,13 @@ def predict_webcam(
 
 #                             spot_label_y = y2 - 20
 
-#                         
+#
 
-#                         cv2.putText(output_frame, spot_label, (x1 + 5, spot_label_y), 
+#                         cv2.putText(output_frame, spot_label, (x1 + 5, spot_label_y),
 
 #                                    cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
 
-#                                
+#
 
 #                     else:
 
@@ -15938,13 +13352,13 @@ def predict_webcam(
 
 #                         y2_padded = min(output_frame.shape[0], y2 + box_padding)
 
-#                             
+#
 
 #                         # Draw thick green bounding box for empty parking spot
 
 #                         cv2.rectangle(output_frame, (x1_padded, y1_padded), (x2_padded, y2_padded), box_color, 8)
 
-#                         
+#
 
 #                         # Draw prominent "EMPTY" label for empty spots (similar to occupied)
 
@@ -15956,7 +13370,7 @@ def predict_webcam(
 
 #                         label_size = cv2.getTextSize(empty_label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)[0]
 
-#                         
+#
 
 #                         # Position label at the top of the empty spot (similar to occupied positioning)
 
@@ -15968,27 +13382,27 @@ def predict_webcam(
 
 #                             label_y = y1_padded + label_size[1] + 10
 
-#                         
+#
 
 #                         # Draw prominent green background for empty label
 
-#                         cv2.rectangle(output_frame, 
+#                         cv2.rectangle(output_frame,
 
-#                                      (label_x - 3, label_y - label_size[1] - 3), 
+#                                      (label_x - 3, label_y - label_size[1] - 3),
 
-#                                      (label_x + label_size[0] + 3, label_y + 3), 
+#                                      (label_x + label_size[0] + 3, label_y + 3),
 
 #                                      box_color, -1)
 
-#                         
+#
 
 #                         # Draw green "EMPTY" text with white color for contrast
 
-#                         cv2.putText(output_frame, empty_label, (label_x, label_y), 
+#                         cv2.putText(output_frame, empty_label, (label_x, label_y),
 
 #                                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), thickness)
 
-#                         
+#
 
 #                         # Also draw spot ID below the EMPTY label
 
@@ -15998,7 +13412,7 @@ def predict_webcam(
 
 #                             spot_label += f" ({spot.confidence:.2f})"
 
-#                         
+#
 
 #                         small_font = 0.7
 
@@ -16010,15 +13424,15 @@ def predict_webcam(
 
 #                             spot_label_y = y2_padded - 20
 
-#                         
+#
 
 #                         # Draw spot ID in green
 
-#                         cv2.putText(output_frame, spot_label, (x1_padded + 5, spot_label_y), 
+#                         cv2.putText(output_frame, spot_label, (x1_padded + 5, spot_label_y),
 
 #                                    cv2.FONT_HERSHEY_SIMPLEX, small_font, text_color, 2)
 
-#                         
+#
 
 #                         # Add "UNOCCUPIED" text at the bottom for extra clarity
 
@@ -16030,13 +13444,13 @@ def predict_webcam(
 
 #                         unocc_y = y2_padded - 10
 
-#                         
+#
 
-#                         cv2.putText(output_frame, unocc_label, (unocc_x, unocc_y), 
+#                         cv2.putText(output_frame, unocc_label, (unocc_x, unocc_y),
 
 #                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 2)
 
-#         
+#
 
 #         # Convert back to RGB for display
 
@@ -16048,7 +13462,7 @@ def predict_webcam(
 
 #             output_rgb = output_frame
 
-#         
+#
 
 #         # Generate summary information
 
@@ -16060,29 +13474,29 @@ def predict_webcam(
 
 #         overall_occupancy = (occupied_spots / total_spots * 100) if total_spots > 0 else 0
 
-#         
+#
 
 #         summary = f"""##  Parking Detection Results
 
-# 
+#
 
 # ###  Overall Status
 
 # - **Total Spots:** {total_spots}
 
-# - **Occupied:** {occupied_spots} 
+# - **Occupied:** {occupied_spots}
 
 # - **Empty:** {empty_spots}
 
 # - **Occupancy Rate:** {overall_occupancy:.1f}%
 
-# 
+#
 
 # ###  Zone Details
 
 # """
 
-#         
+#
 
 #         for zone_id, zone_result in results.items():
 
@@ -16096,13 +13510,13 @@ def predict_webcam(
 
 # """
 
-#         
+#
 
 #         # Generate JSON output for slot counting
 
 #         json_output = detector.get_json_output(results)
 
-#         
+#
 
 #         summary += f"""
 
@@ -16114,7 +13528,7 @@ def predict_webcam(
 
 # - **Processing Time:** Real-time
 
-# 
+#
 
 # ###  JSON Output
 
@@ -16124,17 +13538,17 @@ def predict_webcam(
 
 # ```
 
-# 
+#
 
 #  **Detection completed successfully!**
 
 # """
 
-#         
+#
 
 #         return output_rgb, summary
 
-#         
+#
 
 #     except Exception as e:
 
@@ -16142,13 +13556,7 @@ def predict_webcam(
 
 #         return image, f" **Error:** {str(e)}\n\nPlease check the image and try again."
 
-
-
-
-
 # Parking detection functions commented out as requested - Creating stub functions to prevent errors
-
-
 
 def process_parking_detection(image, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True):
 
@@ -16158,11 +13566,7 @@ def process_parking_detection(image, confidence_threshold=0.85, model_name="yolo
 
         return None, " **Please upload an image**\n\nUpload an image to start analysis."
 
-    
-
     return image, " **Parking Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
-
-
 
 def process_parking_video(video, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
 
@@ -16172,11 +13576,7 @@ def process_parking_video(video, confidence_threshold=0.85, model_name="yolov8n"
 
         return None, None, " **Please upload a video**\n\nUpload a video to start analysis."
 
-    
-
     return None, None, " **Parking Video Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
-
-
 
 def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
 
@@ -16186,17 +13586,9 @@ def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n
 
         return None, " **Status:** Waiting for camera feed...\n\nPoint your camera to start detection."
 
-    
-
     return frame, " **Parking Webcam Detection Disabled**\n\nParking detection has been commented out as requested. Please use other detection features."
 
-
-
-
-
 # ==================== PPE DETECTION FUNCTIONS ====================
-
-
 
 def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
@@ -16206,8 +13598,6 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
     NEVER returns None - always provides a working detector
 
-    
-
     Args:
 
         model_name: YOLO model to use
@@ -16216,7 +13606,6 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
         force_new: Always create fresh detector to prevent state leakage (default: True)
 
-    
     Args:
         model_name: YOLO model to use
         debug: Enable debug output
@@ -16255,10 +13644,6 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
             return None, False
 
-
-
-
-
 def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True):
 
     """
@@ -16275,11 +13660,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             return None, " **Upload an image to start PPE detection**"
 
-        
-
         print(f"[INFO] Starting PPE detection on image...")
-
-        
 
         # Reset detector to ensure new settings are applied
 
@@ -16287,13 +13668,9 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         reset_ppe_detector()
 
-        
-
         # Get PPE detector with fallback - ENABLE DEBUG to see details
 
         detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
-
-        
 
         # Force enable debug mode on the detector
 
@@ -16303,8 +13680,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             print(f"[DEBUG] PPE Detector debug mode: {detector.debug}")
 
-        
-
         if detector is None:
 
             # Ultimate fallback - return original image with message
@@ -16312,8 +13687,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
             print("[PPE-CRITICAL] All PPE detection methods failed")
 
             return image, " **PPE Detection in Fallback Mode**\n\nSystem is running in limited mode. Please check model installation."
-
-        
 
         # Convert PIL to numpy if needed
 
@@ -16331,19 +13704,13 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             image_np = image
 
-        
-
         # Perform detection with the robust detector - ENABLE DEBUG to see details
 
         result = detector.detect(image_np, debug=True)
 
-        
-
         # Create annotated image
 
         annotated_image = detector.visualize(image_np, result, show_labels=show_labels, show_head_region=False)
-
-        
 
         # Convert back to RGB for display
 
@@ -16351,15 +13718,11 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         output_image = Image.fromarray(annotated_rgb)
 
-        
-
         # Generate summary with system status
 
         status_emoji = "" if result.model_loaded else ""
 
         fallback_notice = "\n\n **Note:** Using fallback detection mode" if result.fallback_used else ""
-
-        
 
         summary_lines = [
 
@@ -16377,8 +13740,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         ]
 
-        
-
         # Count vehicle types to show relevant summary
 
         two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
@@ -16386,8 +13747,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         four_wheelers = sum(1 for p in result.persons if p.vehicle_type == "4-wheeler")
 
         unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
-
-        
 
         summary_lines.extend([
 
@@ -16405,8 +13764,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         ])
 
-        
-
         # Show relevant PPE counts based on vehicle types detected
 
         if two_wheelers > 0:
@@ -16423,8 +13780,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             ])
 
-        
-
         if four_wheelers > 0:
 
             summary_lines.extend([
@@ -16439,8 +13794,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             ])
 
-        
-
         if unknown_vehicles > 0:
 
             summary_lines.extend([
@@ -16453,8 +13806,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             ])
 
-        
-
         summary_lines.extend([
 
             f"**Processing:**",
@@ -16466,8 +13817,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
             "**Person Details:**",
 
         ])
-
-        
 
         for person in result.persons:
 
@@ -16485,13 +13834,9 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
                 status_emoji = "🟩" if (person.helmet.present or person.seatbelt.present) else "🟥"
 
-            
-
             summary_lines.append(f"\n**Person {person.person_id}** {status_emoji}")
 
             summary_lines.append(f"  - Vehicle Type: **{person.vehicle_type.upper()}**")
-
-            
 
             # Show only relevant PPE information based on vehicle type
 
@@ -16535,8 +13880,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
                     summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
 
-                
-
                 if person.seatbelt.present:
 
                     summary_lines.append(f"  -  Seatbelt: ** Present** (conf: {person.seatbelt.confidence:.2f})")
@@ -16544,8 +13887,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
                 else:
 
                     summary_lines.append(f"  -  Seatbelt: ** Missing** (conf: {person.seatbelt.confidence:.2f})")
-
-            
 
             # Show which one matters for compliance
 
@@ -16561,41 +13902,27 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
                 summary_lines.append(f"  -  **Compliance based on: EITHER**")
 
-            
-
             # Add detection methods
 
             summary_lines.append(f"  -  Helmet Method: `{person.helmet.detection_method}`")
 
             summary_lines.append(f"  -  Seatbelt Method: `{person.seatbelt.detection_method}`")
 
-            
-
             if person.vest.present:
 
                 summary_lines.append(f"  - Vest:  ({person.vest.confidence:.2f})")
-
-        
 
         if result.error_message:
 
             summary_lines.append(f"\n **Warning:** {result.error_message}")
 
-        
-
         summary_lines.append(fallback_notice)
 
-        
-
         summary = "\n".join(summary_lines)
-
-        
 
         # Generate PPE side panel HTML
 
         side_panel_html = create_ppe_side_panel(result)
-
-        
 
         print(f"[INFO] PPE detection completed: {result.total_persons} persons ({two_wheelers} 2-wheelers, {four_wheelers} 4-wheelers, {unknown_vehicles} unknown)")
 
@@ -16607,11 +13934,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             print(f"[INFO] 4-Wheeler safety: {result.seatbelt_detected} seatbelts, {result.no_seatbelt} no seatbelts")
 
-        
-
         return output_image, summary, side_panel_html
-
-        
 
     except Exception as e:
 
@@ -16625,23 +13948,15 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         return image, f" **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image.", ""
 
-
-
-
-
 def create_ppe_side_panel(result):
 
     """
 
     Create ANPR-style side panel HTML for PPE detection results.
 
-    
-
     Args:
 
         result: PPEResult object with detection information
-
-        
 
     Returns:
 
@@ -16653,8 +13968,6 @@ def create_ppe_side_panel(result):
 
     current_date = datetime.now().strftime('%d/%m/%Y')
 
-    
-
     # Count vehicle types
 
     two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
@@ -16663,21 +13976,17 @@ def create_ppe_side_panel(result):
 
     unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
 
-    
-
     # Calculate compliance
 
     compliant_count = sum(1 for p in result.persons if p.status == 'compliant')
 
     violation_count = len(result.persons) - compliant_count
 
-    
-
     # Main detection info section
 
     main_html = f"""
 
-    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); 
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
 
                 padding: 15px; border-radius: 10px; margin-bottom: 15px; color: white;">
 
@@ -16727,8 +14036,6 @@ def create_ppe_side_panel(result):
 
     """
 
-    
-
     # Safety equipment section
 
     safety_html = ""
@@ -16737,21 +14044,19 @@ def create_ppe_side_panel(result):
 
         safety_items = ""
 
-        
-
         # Helmets info
 
         if two_wheelers > 0 or result.helmet_detected > 0:
 
             safety_items += f"""
 
-            <div style="display: flex; align-items: center; padding: 8px; 
+            <div style="display: flex; align-items: center; padding: 8px;
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #10b981; border-radius: 5px; 
+                <div style="width: 40px; height: 40px; background: #10b981; border-radius: 5px;
 
-                            display: flex; align-items: center; justify-content: center; 
+                            display: flex; align-items: center; justify-content: center;
 
                             margin-right: 10px; font-size: 18px;"></div>
 
@@ -16767,21 +14072,19 @@ def create_ppe_side_panel(result):
 
             """
 
-        
-
         # Seatbelts info
 
         if four_wheelers > 0 or result.seatbelt_detected > 0:
 
             safety_items += f"""
 
-            <div style="display: flex; align-items: center; padding: 8px; 
+            <div style="display: flex; align-items: center; padding: 8px;
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px; 
+                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px;
 
-                            display: flex; align-items: center; justify-content: center; 
+                            display: flex; align-items: center; justify-content: center;
 
                             margin-right: 10px; font-size: 18px;"></div>
 
@@ -16797,13 +14100,11 @@ def create_ppe_side_panel(result):
 
             """
 
-        
-
         if safety_items:
 
             safety_html = f"""
 
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 
                         padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
 
@@ -16815,8 +14116,6 @@ def create_ppe_side_panel(result):
 
             """
 
-    
-
     # Vehicle types section
 
     vehicle_html = ""
@@ -16825,19 +14124,17 @@ def create_ppe_side_panel(result):
 
         vehicle_items = ""
 
-        
-
         if two_wheelers > 0:
 
             vehicle_items += f"""
 
-            <div style="display: flex; align-items: center; padding: 8px; 
+            <div style="display: flex; align-items: center; padding: 8px;
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 5px; 
+                <div style="width: 40px; height: 40px; background: #f59e0b; border-radius: 5px;
 
-                            display: flex; align-items: center; justify-content: center; 
+                            display: flex; align-items: center; justify-content: center;
 
                             margin-right: 10px; font-size: 18px;"></div>
 
@@ -16853,19 +14150,17 @@ def create_ppe_side_panel(result):
 
             """
 
-        
-
         if four_wheelers > 0:
 
             vehicle_items += f"""
 
-            <div style="display: flex; align-items: center; padding: 8px; 
+            <div style="display: flex; align-items: center; padding: 8px;
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #8b5cf6; border-radius: 5px; 
+                <div style="width: 40px; height: 40px; background: #8b5cf6; border-radius: 5px;
 
-                            display: flex; align-items: center; justify-content: center; 
+                            display: flex; align-items: center; justify-content: center;
 
                             margin-right: 10px; font-size: 18px;"></div>
 
@@ -16881,13 +14176,11 @@ def create_ppe_side_panel(result):
 
             """
 
-        
-
         if vehicle_items:
 
             vehicle_html = f"""
 
-            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); 
+            <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 
                         padding: 15px; border-radius: 10px; color: white; margin-bottom: 15px;">
 
@@ -16899,13 +14192,11 @@ def create_ppe_side_panel(result):
 
             """
 
-    
-
     # Stats section
 
     stats_html = f"""
 
-    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%); 
+    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
 
                 padding: 12px; border-radius: 10px; color: white;">
 
@@ -16941,8 +14232,6 @@ def create_ppe_side_panel(result):
 
     """
 
-    
-
     # Combine all sections
 
     full_html = f"""
@@ -16961,13 +14250,7 @@ def create_ppe_side_panel(result):
 
     """
 
-    
-
     return full_html
-
-
-
-
 
 def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
 
@@ -16979,15 +14262,11 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             return None, None, " **Upload a video to start PPE detection**"
 
-        
-
-        video_path = _extract_video_path(video)
+        video_path, trim_start, trim_end = _extract_video_path(video)
 
         if not video_path or not os.path.exists(video_path):
 
             return None, None, " **Error:** Could not process video file"
-
-        
 
         # Wait for file to be fully released by upload process
 
@@ -17019,23 +14298,15 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                 waited += wait_interval
 
-        
-
         print(f"[INFO] Starting PPE video processing: {video_path}")
-
-        
 
         # Get PPE detector with fallback
 
         detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
 
-        
-
         if detector is None:
 
             return None, None, " **PPE Detection Unavailable**\n\nSystem could not initialize PPE detector. Please check model files."
-
-        
 
         # Open video
 
@@ -17045,8 +14316,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             return None, None, " **Error:** Cannot open video file"
 
-        
-
         fps = cap.get(cv2.CAP_PROP_FPS)
 
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -17054,8 +14323,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        
 
         # Setup output
 
@@ -17065,13 +14332,16 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         os.makedirs("ppe_outputs", exist_ok=True)
 
-        
-
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
+        # Try H.264 first (browser compatible), fallback to XVID
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')
         out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
 
-        
+        if not out.isOpened():
+            # Fallback to XVID codec with AVI container
+            output_path = output_path.replace('.mp4', '.avi')
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
+            print(f"[INFO] Using fallback XVID codec: {output_path}")
 
         frame_count = 0
 
@@ -17085,8 +14355,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         total_no_seatbelts = 0
 
-        
-
         while True:
 
             ret, frame = cap.read()
@@ -17095,15 +14363,11 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                 break
 
-            
-
             frame_count += 1
 
             if frame_count % every_n != 0:
 
                 continue
-
-            
 
             # Detect PPE
 
@@ -17117,8 +14381,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             total_no_seatbelts += result.no_seatbelt
 
-            
-
             # Annotate
 
             annotated = detector.visualize(frame, result, show_labels=show_labels)
@@ -17127,13 +14389,73 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             processed_count += 1
 
-        
-
         cap.release()
 
         out.release()
 
-        
+        # Convert to browser-compatible format using ffmpeg if available
+
+        try:
+
+            import subprocess
+
+            # Check if output file was created and has content
+
+            if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+
+                print(f"[ERROR] Output video file is empty or not created: {output_path}")
+
+                return None, " **Error:** Video processing failed - output file not created", ""
+
+            # Convert to browser-compatible MP4 using ffmpeg
+
+            final_output = output_path.replace('.avi', '_converted.mp4').replace('.mp4', '_final.mp4')
+
+            cmd = [
+
+                'ffmpeg', '-y', '-i', output_path,
+
+                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+
+                '-c:a', 'aac', '-b:a', '128k',
+
+                '-movflags', '+faststart',
+
+                final_output
+
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+            if result.returncode == 0 and os.path.exists(final_output):
+
+                print(f"[INFO] Video converted to browser-compatible format: {final_output}")
+
+                output_path = final_output
+
+            else:
+
+                print(f"[WARNING] FFmpeg conversion failed, using original: {result.stderr}")
+
+                # Try to use original file
+
+                if output_path.endswith('.avi'):
+
+                    # AVI files often don't play in browsers, return None with error
+
+                    return None, " **Error:** Video encoded in AVI format which is not browser-compatible. Please install ffmpeg for automatic conversion.", ""
+
+        except FileNotFoundError:
+
+            print("[WARNING] ffmpeg not found, skipping conversion")
+
+            if output_path.endswith('.avi'):
+
+                return None, " **Error:** AVI format requires ffmpeg for browser playback. Please install ffmpeg.", ""
+
+        except Exception as e:
+
+            print(f"[WARNING] Video conversion failed: {e}")
 
         # Calculate compliance rate
 
@@ -17145,21 +14467,15 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         compliance_rate = (total_ppe / total_detected * 100) if total_detected > 0 else 0
 
-        
-
         # Priority-based summary
 
         summary_md = f"""##  PPE Video Analysis Results
-
-
 
 **System Status:**
 
 - Model Loaded: **{'Yes' if result.model_loaded else 'Fallback Mode'}**
 
 - Fallback Used: **{'Yes' if result.fallback_used else 'No'}**
-
-
 
 **Priority-Based Detection Summary:**
 
@@ -17171,8 +14487,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
 -  No PPE: **{total_no_helmets + total_no_seatbelts}**
 
-
-
 **Video Info:**
 
 - Resolution: {width}x{height}
@@ -17182,8 +14496,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 - Processed Every: {every_n} frames
 
 """
-
-        
 
         # Create dashboard HTML for video
 
@@ -17201,8 +14513,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             </div>
 
-            
-
             <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
 
                 <div style="color: #7d8590; font-size: 11px; text-transform: uppercase; margin-bottom: 4px;">Video Status</div>
@@ -17210,8 +14520,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
                 <div style="color: #10b981; font-size: 14px; font-weight: 600;"> Analysis Complete</div>
 
             </div>
-
-            
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
 
@@ -17236,8 +14544,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
                 </div>
 
             </div>
-
-            
 
             <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
 
@@ -17269,8 +14575,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             </div>
 
-            
-
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
 
                 <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
@@ -17291,8 +14595,6 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             </div>
 
-            
-
             <div style="background: {'#238636' if compliance_rate >= 80 else '#f59e0b' if compliance_rate >= 50 else '#dc2626'}; color: #fff; text-align: center; padding: 8px; border-radius: 6px; font-size: 12px; font-weight: 600;">
 
                 {' SAFE - High Compliance' if compliance_rate >= 80 else ' WARNING - Review Needed' if compliance_rate >= 50 else ' CRITICAL - Violations Detected'}
@@ -17303,21 +14605,17 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         """
 
-        
+        # Return None for video since ffmpeg is not available for browser-compatible conversion
 
-        return output_path, summary_md, dashboard_html
+        # Video file is saved at: output_path (but not displayed due to codec issues)
 
-        
+        return None, summary_md, dashboard_html
 
     except Exception as e:
 
         print(f"[ERROR] PPE video processing failed: {e}")
 
         return None, f" **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
-
-
-
-
 
 def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
 
@@ -17329,13 +14627,9 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             return frame, " **Status:** Waiting for camera feed...\n\nPoint your camera at workers to start PPE detection."
 
-        
-
         # Get PPE detector with fallback
 
         detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
-
-        
 
         if detector is None:
 
@@ -17349,8 +14643,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             return error_frame, " **PPE Detector Initializing**\n\nPlease wait while the system loads..."
 
-        
-
         # Convert RGB to BGR if needed (Gradio provides RGB)
 
         if len(frame.shape) == 3 and frame.shape[2] == 3:
@@ -17361,25 +14653,17 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             frame_bgr = frame
 
-        
-
         # Detect PPE
 
         result = detector.detect(frame_bgr, debug=False)
-
-        
 
         # Create annotated frame
 
         annotated_frame = detector.visualize(frame_bgr, result, show_labels=show_labels)
 
-        
-
         # Convert back to RGB for display
 
         annotated_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-
-        
 
         # Generate info text
 
@@ -17387,15 +14671,11 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         fallback_note = " (FB)" if result.fallback_used else ""
 
-        
-
         two_wheelers = sum(1 for p in result.persons if p.vehicle_type == "2-wheeler")
 
         four_wheelers = sum(1 for p in result.persons if p.vehicle_type == "4-wheeler")
 
         unknown_vehicles = sum(1 for p in result.persons if p.vehicle_type == "unknown")
-
-        
 
         info_lines = [
 
@@ -17405,27 +14685,19 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         ]
 
-        
-
         # Show relevant PPE counts based on vehicle types detected
 
         if two_wheelers > 0:
 
             info_lines.append(f" Helmets: {result.helmet_detected}")
 
-        
-
         if four_wheelers > 0:
 
             info_lines.append(f" Seatbelts: {result.seatbelt_detected}")
 
-        
-
         if unknown_vehicles > 0:
 
             info_lines.append(f" Any Safety: {result.helmet_detected + result.seatbelt_detected}")
-
-        
 
         info_lines.extend([
 
@@ -17437,8 +14709,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         ])
 
-        
-
         # Add person details with strict priority-based single label
 
         for person in result.persons:
@@ -17446,8 +14716,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
             status = "" if person.status == 'compliant' else ""
 
             vehicle = person.vehicle_type.upper()[:3] if person.vehicle_type != "unknown" else "???"
-
-            
 
             # STRICT PRIORITY: Only ONE label - Helmet > Seatbelt > None
 
@@ -17463,25 +14731,15 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
                 ppe_label = "NO PPE"
 
-            
-
             info_lines.append(f"  P{person.person_id[1:]} [{vehicle}]: {status} [{ppe_label}]")
-
-        
 
         if result.error_message:
 
             info_lines.append(f" {result.error_message[:50]}")
 
-        
-
         info_text = "\n".join(info_lines)
 
-        
-
         return annotated_rgb, info_text
-
-        
 
     except Exception as e:
 
@@ -17496,10 +14754,6 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
         return error_frame, f" **PPE Detection Issue**\n\nError: {str(e)[:80]}...\n\nSystem will retry automatically."
-
-
-
-
 
 # Create simplified Gradio app
 
@@ -17525,8 +14779,6 @@ theme = gr.themes.Soft(primary_hue="cyan").set(
 
 )
 
-
-
 demo = gr.Blocks(
 
     title="Canberra Vision",
@@ -17547,8 +14799,6 @@ footer { display: none !important; }
 
 )
 
-
-
 with demo:
 
     # Header
@@ -17557,9 +14807,9 @@ with demo:
 
     <div style="text-align: left; margin-bottom: 8px;">
 
-        <span style="font-size: 48px; font-weight: 800; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Canberra </span>
+        <span style="font-size: 48px; font-weight: 760; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Canberra </span>
 
-        <span style="font-size: 48px; font-weight: 800; background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase;">Vision AI</span>
+        <span style="font-size: 48px; font-weight: 760; background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase;">Vision AI</span>
 
     </div>
 
@@ -17570,8 +14820,6 @@ with demo:
     </div>
 
     """)
-
-
 
     # Sidebar Navigation
 
@@ -17585,19 +14833,13 @@ with demo:
 
         ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
 
-
-
         gr.HTML("<hr>")
-
-
 
         gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
 
         <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Selection</span></span>""")
 
         img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
-
-
 
     # Vehicle Detection Section
 
@@ -17625,8 +14867,6 @@ with demo:
 
                         img_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
 
-
-
             with gr.TabItem("Video"):
 
                 with gr.Row():
@@ -17647,8 +14887,6 @@ with demo:
 
                         vid_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
 
-
-
             with gr.TabItem("Webcam"):
 
                 with gr.Row():
@@ -17666,8 +14904,6 @@ with demo:
                     with gr.Column(scale=2):
 
                         webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Allow camera access.")
-
-
 
     # PPE Detection Section
 
@@ -17695,8 +14931,6 @@ with demo:
 
                         ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-
-
             with gr.TabItem("Video"):
 
                 with gr.Row():
@@ -17717,8 +14951,6 @@ with demo:
 
                         ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-
-
             with gr.TabItem("Webcam"):
 
                 with gr.Row():
@@ -17737,8 +14969,6 @@ with demo:
 
                         ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
 
-
-
     # Navigation Button Handlers
 
     vehicle_btn.click(
@@ -17751,8 +14981,6 @@ with demo:
 
     )
 
-
-
     ppe_btn.click(
 
         lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary")),
@@ -17762,8 +14990,6 @@ with demo:
         outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn]
 
     )
-
-
 
     # Vehicle Detection Event Handlers (simplified - only model parameter)
 
@@ -17777,19 +15003,15 @@ with demo:
 
     )
 
-
-
     vid_btn.click(
 
-        lambda vid, model: predict_video(vid, 0.35, 0.5, model, True, True, 640, True, 5, True, 5, "ultra_fast"),
+        lambda vid, model: predict_video(vid, 0.35, 0.5, model, True, True, 640, True, 10, 5, True, 5, "ultra_fast"),
 
         inputs=[vid_input, img_model],
 
         outputs=[vid_output, vid_info]
 
     )
-
-
 
     webcam_input.stream(
 
@@ -17803,8 +15025,6 @@ with demo:
 
     )
 
-
-
     # PPE Detection Event Handlers (simplified - only model parameter)
 
     ppe_btn_img.click(
@@ -17817,19 +15037,15 @@ with demo:
 
     )
 
-
-
     ppe_btn_vid.click(
 
-        lambda vid, model: process_ppe_video(vid, model_name=model)[:2],
+        lambda vid, model: process_ppe_video(vid, model_name=model, every_n=10)[:2],
 
         inputs=[ppe_input_vid, img_model],
 
         outputs=[ppe_video_output, ppe_summary_vid],
 
     )
-
-
 
     ppe_webcam_input.stream(
 
@@ -17842,8 +15058,6 @@ with demo:
         show_progress=False,
 
     )
-
-
 
     # JavaScript for Button Styling
 
@@ -17860,8 +15074,6 @@ with demo:
             removeFooter();
 
             setTimeout(removeFooter, 1000);
-
-
 
             const setBtnStyle = (btnId, isActive) => {
 
@@ -17881,8 +15093,6 @@ with demo:
 
             };
 
-
-
             const setupHandlers = () => {
 
                 const vBtn = document.querySelector('#vehicle_btn button');
@@ -17890,8 +15100,6 @@ with demo:
                 const pBtn = document.querySelector('#ppe_btn button');
 
                 if (!vBtn || !pBtn) return false;
-
-
 
                 vBtn.addEventListener('click', () => {
 
@@ -17901,8 +15109,6 @@ with demo:
 
                 });
 
-
-
                 pBtn.addEventListener('click', () => {
 
                     setBtnStyle('ppe_btn', true);
@@ -17911,8 +15117,6 @@ with demo:
 
                 });
 
-
-
                 setBtnStyle('vehicle_btn', true);
 
                 setBtnStyle('ppe_btn', false);
@@ -17920,8 +15124,6 @@ with demo:
                 return true;
 
             };
-
-
 
             if (!setupHandlers()) {
 
@@ -17934,10 +15136,6 @@ with demo:
         }
 
     """)
-
-
-
-
 
 def cleanup_temp_directory(signum=None, frame=None):
 
@@ -17959,10 +15157,6 @@ def cleanup_temp_directory(signum=None, frame=None):
 
     sys.exit(0)
 
-
-
-
-
 if __name__ == "__main__":
 
     print("[INFO] Starting application...")
@@ -17970,8 +15164,6 @@ if __name__ == "__main__":
     print(f"[INFO] Python version: {sys.version}")
 
     print(f"[INFO] Gradio version: {gr.__version__}")
-
-    
 
     # Print all environment variables for debugging
 
@@ -17983,8 +15175,6 @@ if __name__ == "__main__":
 
     print(f"  GRADIO_SERVER_NAME: {os.environ.get('GRADIO_SERVER_NAME', 'not set')}")
 
-    
-
     # Check if CUDA is available for GPU operations
 
     if torch.cuda.is_available():
@@ -17995,8 +15185,6 @@ if __name__ == "__main__":
 
         print("[INFO] CUDA not available, using CPU")
 
-    
-
     _gradio_port_env = os.environ.get("GRADIO_SERVER_PORT")
 
     _server_port = 7862
@@ -18005,11 +15193,7 @@ if __name__ == "__main__":
 
         _server_port = int(_gradio_port_env)
 
-    
-
     print(f"[INFO] Server will run on port: 7862")
-
-
 
     # Create custom temp directory with proper permissions
 
@@ -18019,13 +15203,9 @@ if __name__ == "__main__":
 
     print(f"[INFO] Using custom temp directory: {custom_temp}")
 
-    
-
     # Set environment variable to use custom temp directory
 
     os.environ["GRADIO_TEMP_DIR"] = custom_temp
-
-    
 
     # Cleanup old temp files on startup
 
@@ -18051,21 +15231,15 @@ if __name__ == "__main__":
 
         print(f"[WARNING] Could not cleanup temp directory: {cleanup_error}")
 
-    
-
     # Detect if running inside Docker container
 
     _is_docker = os.path.exists('/.dockerenv') or IS_PRODUCTION
-
-    
 
     # Use production configuration if already set
 
     if '_gradio_server_name' not in globals():
 
         _gradio_server_name = os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0" if _is_docker else "localhost")
-
-    
 
     _server_host = _gradio_server_name
 
@@ -18077,8 +15251,6 @@ if __name__ == "__main__":
 
     print(f"[INFO] Server host: {_server_host}:{_server_port}, Open browser: {_open_browser}")
 
-    
-
     try:
 
         # Register signal handlers for graceful shutdown
@@ -18086,8 +15258,6 @@ if __name__ == "__main__":
         signal.signal(signal.SIGINT, cleanup_temp_directory)
 
         signal.signal(signal.SIGTERM, cleanup_temp_directory)
-
-        
 
         print(f"[INFO] Starting Gradio server on {_gradio_server_name}:{_server_port}")
 
@@ -18097,15 +15267,11 @@ if __name__ == "__main__":
 
         print(f"[INFO] Waiting for server to initialize...")
 
-        
-
         # Validate demo before launching
 
         if not demo:
 
             raise ValueError("Demo object is None or not properly initialized")
-
-        
 
         # Test API info generation before launch
 
@@ -18123,8 +15289,6 @@ if __name__ == "__main__":
 
             print("[INFO] Continuing with launch anyway...")
 
-        
-
         try:
 
             print("[INFO] Launching Gradio server...")
@@ -18141,9 +15305,9 @@ if __name__ == "__main__":
 
                 server_name=_gradio_server_name,
 
-                server_port=7863,  # Changed to 7863 since 7860-7862 are in use
+                server_port=7865,  # Changed to 7865 since 7860-7863 are in use
 
-                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
+                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs"],
 
                 prevent_thread_lock=False
 
@@ -18152,8 +15316,6 @@ if __name__ == "__main__":
             print(f"[SUCCESS] Gradio server is running on http://{_gradio_server_name}:{_server_port}")
 
             print("[SUCCESS] Application is ready to accept requests!")
-
-            
 
         except Exception as launch_error:
 
@@ -18167,8 +15329,6 @@ if __name__ == "__main__":
 
             raise launch_error
 
-        
-
     except KeyboardInterrupt:
 
         print("\n[INFO] Application interrupted by user. Shutting down gracefully...")
@@ -18177,41 +15337,7 @@ if __name__ == "__main__":
 
         print(f"[ERROR] Failed to launch application: {e}")
 
-        print("[INFO] Trying alternative launch configuration...")
-
-        try:
-
-            print(f"[INFO] Starting alternative server on {_gradio_server_name}:{_server_port + 1}")
-
-            demo.launch(
-
-                share=False,
-
-                show_error=True,
-
-                quiet=False,
-
-                inbrowser=False,
-
-                server_name=_gradio_server_name,
-
-                server_port=7863 if _server_port is None else _server_port + 1,
-
-                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir()],
-
-                prevent_thread_lock=False,
-
-                show_header=False
-
-            )
-
-            print(f"[SUCCESS] Alternative server is running on http://{_gradio_server_name}:{_server_port + 1}")
-
-        except Exception as e2:
-
-            print(f"[ERROR] Alternative launch also failed: {e2}")
-
-            sys.exit(1)
+        sys.exit(1)
 
     finally:
 

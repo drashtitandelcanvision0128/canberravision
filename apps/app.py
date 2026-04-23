@@ -14793,6 +14793,31 @@ demo = gr.Blocks(
 
 footer { display: none !important; }
 
+/* Cyan scrollbar styling */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #0f172a;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%);
+    border-radius: 5px;
+    border: 2px solid #0f172a;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #90E0EF 0%, #48CAE4 100%);
+}
+
+::-webkit-scrollbar-corner {
+    background: #0f172a;
+}
+
 </style>
 
 """,
@@ -14805,11 +14830,17 @@ with demo:
 
     gr.HTML("""
 
-    <div style="text-align: left; margin-bottom: 8px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
 
-        <span style="font-size: 48px; font-weight: 760; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Canberra </span>
+        <div>
 
-        <span style="font-size: 48px; font-weight: 760; background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase;">Vision AI</span>
+            <span style="font-size: 48px; font-weight: 760; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">Canberra </span>
+
+            <span style="font-size: 48px; font-weight: 760; background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-family: 'Exo 2', sans-serif; letter-spacing: -1px; text-transform: uppercase;">Vision AI</span>
+
+        </div>
+
+        <a href="https://canberravision.com/" target="_blank" style="font-size: 14px; font-family: 'Exo 2', sans-serif; color: #48CAE4; text-decoration: none; padding: 8px 16px; border: 1px solid #48CAE4; border-radius: 6px; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='#48CAE4';this.style.color='#0f172a';" onmouseout="this.style.backgroundColor='transparent';this.style.color='#48CAE4';"> ← Back to home</a>
 
     </div>
 
@@ -14819,7 +14850,7 @@ with demo:
 
     </div>
 
-    """)
+""")
 
     # Sidebar Navigation
 
@@ -14832,8 +14863,6 @@ with demo:
         vehicle_btn = gr.Button("Vehicle Detection", elem_id="vehicle_btn", variant="primary")
 
         ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
-
-        gr.HTML("<hr>")
 
         gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
 

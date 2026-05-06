@@ -58,15 +58,27 @@ processed_videos/
 parking_detections/
 extracted_colors/
 uploads/
+inputs/
+outputs/
+ppe_outputs/
 *.log
 *.tmp
 
-# Large files and models (if any)
-*.pt
+# Training data (61k+ files - DO NOT include in Docker!)
+dataset/
+runs/
+
+# Database (not needed in Docker image)
+database/*.db
+*.sqlite
+*.sqlite3
+
+# Large model files (downloaded at runtime, not in image)
 *.pth
 *.onnx
 *.engine
 *.weights
+# NOTE: *.pt NOT ignored - models/ folder needed for inference
 
 # Documentation
 docs/
@@ -75,15 +87,26 @@ docs/
 
 # Test files
 tests/
-test_*
 *_test.py
 
-# Batch files (Windows specific)
+# Batch files (Windows specific, not needed in Linux container)
 *.bat
 *.cmd
+
+# Archive/old code
+archive/
 
 # Cache and temporary files
 .cache/
 cache/
 tmp/
 temp/
+
+# Docker files (no recursion)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Coolify deployment
+coolify-deployment.yml
+nginx.conf

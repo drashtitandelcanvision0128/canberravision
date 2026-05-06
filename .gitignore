@@ -25,7 +25,7 @@ videos/
 video_files/
 
 # Large image datasets
-datasets/
+dataset/
 data/
 images/
 test_images/
@@ -73,11 +73,12 @@ processed_*.mp4
 
 # Large data files
 *.csv
-*.json
 *.pkl
 *.pickle
 *.h5
 *.hdf5
+# JSON only in data folders, not config files
+data/*.json
 
 # Configuration with sensitive data
 config.json
@@ -88,6 +89,7 @@ secrets.json
 # Gradio temporary files
 gradio_cached/
 tmp_gradio/
+temp_gradio/
 
 # OCR and processing cache
 ocr_cache/
@@ -108,10 +110,21 @@ statistics/
 *.backup
 *_backup
 
-# Development and testing
-test_*
-debug_*
-sample_*
+# Development and testing (specific patterns only)
+test_images/
+sample_images/
+*.test.*
+
+# Training runs and outputs
+runs/
+
+# PPE output videos
+ppe_outputs/
+
+# Database files (only in root/data, not in tracked folders)
+/*.db
+*.sqlite
+*.sqlite3
 
 # Virtual environments
 .venv/

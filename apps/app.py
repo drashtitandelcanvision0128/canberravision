@@ -184,47 +184,6 @@ if ALPR_AVAILABLE:
 
             traceback.print_exc()
 
-# Import fast_alpr for license plate detection
-try:
-    from fast_alpr import ALPR
-    ALPR_AVAILABLE = True
-    print("[INFO] fast_alpr loaded successfully")
-except ImportError as e:
-    ALPR_AVAILABLE = False
-    print(f"[WARNING] fast_alpr import failed: {e}")
-    import traceback
-    traceback.print_exc()
-except Exception as e:
-    ALPR_AVAILABLE = False
-    print(f"[ERROR] Unexpected error importing fast_alpr: {e}")
-    import traceback
-    traceback.print_exc()
-
-# Initialize ALPR globally if available
-alpr = None
-if ALPR_AVAILABLE:
-    try:
-        # Try with specific models first
-        print("[INFO] Initializing ALPR with specific models...")
-        alpr = ALPR(
-            detector_model="yolo-v9-t-384-license-plate-end2end",
-            ocr_model="cct-xs-v2-global-model",
-        )
-        print("[INFO] ALPR initialized successfully with custom models")
-    except Exception as e:
-        print(f"[WARNING] Failed to initialize ALPR with custom models: {e}")
-        import traceback
-        traceback.print_exc()
-        # Try with default models as fallback
-        try:
-            print("[INFO] Trying ALPR with default models...")
-            alpr = ALPR()
-            print("[INFO] ALPR initialized successfully with default models")
-        except Exception as e2:
-            print(f"[ERROR] Failed to initialize ALPR with default models: {e2}")
-            import traceback
-            traceback.print_exc()
-
 # Force GPU usage if available
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -2095,7 +2054,7 @@ CUSTOM_CSS = """
 
     background: var(--obsidian-card) !important;
 
-    border: 2px dashed var(--obsidian-border) !important;
+    border: none !important;
 
     border-radius: 12px !important;
 
@@ -2108,8 +2067,6 @@ CUSTOM_CSS = """
 }
 
 .obsidian-upload:hover {
-
-    border-color: var(--obsidian-accent) !important;
 
     background: var(--obsidian-surface) !important;
 
@@ -2451,44 +2408,14 @@ CUSTOM_CSS = """
 
 /* ===== HIDE GRADIO DEFAULTS ===== */
 
-/* Ensure body is always visible - prevents black screen issues */
-
-body,
-
-.gradio-container,
-
-#gradio-app {
-
-    display: block !important;
-
-    visibility: visible !important;
-
-    opacity: 1 !important;
-
-}
-
-/* Ensure body is always visible - prevents black screen issues */
-body,
-.gradio-container,
-#gradio-app {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
 .gradio-container .footer,
-
 .gradio-container .gr-footer,
-
 footer {
-
     display: none !important;
-
 }
 
 /* Hide Gradio 6.x header navigation - top bar with API, Gradio branding, Settings */
 
-header,
 
 .gradio-container > div:first-of-type > div:first-of-type,
 
@@ -2511,36 +2438,54 @@ header,
 /* ===== SCROLLBAR ===== */
 
 ::-webkit-scrollbar {
-
-    width: 8px;
-
-    height: 8px;
-
+    width: 12px !important;
 }
 
 ::-webkit-scrollbar-track {
-
-    background: var(--obsidian-surface);
-
+    background: #0a0a1a !important;
+    border-radius: 10px !important;
 }
 
 ::-webkit-scrollbar-thumb {
-
-    background: var(--obsidian-border);
-
-    border-radius: 4px;
-
+    background: #48CAE4 !important;
+    border-radius: 10px !important;
 }
 
 ::-webkit-scrollbar-thumb:hover {
+    background: #90E0EF !important;
+}
 
-    background: var(--obsidian-text-muted);
-
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin !important;
+    scrollbar-color: #48CAE4 #0a0a1a !important;
 }
 
 /* ===== GRADIO COMPONENT OVERRIDES ===== */
 
-.gradio-container .gr-slider {
+        .gradio-container .gr-slider {
+
+            background: var(--obsidian-card) !important;
+
+        }
+
+        .gradio-container .gr-slider input[type="range"] {
+
+            background: var(--obsidian-accent) !important;
+
+        }
+
+        .gradio-container .gr-checkbox,
+
+        .gradio-container .gr-radio {
+
+            color: var(--obsidian-text) !important;
+
+        }
+
+        .gradio-container .gr-textbox,
+
+        .gradio-container .gr-number {
 
     background: var(--obsidian-card) !important;
 
@@ -3577,6 +3522,8 @@ if sys.platform.startswith("win"):
 MODEL_CHOICES = [
 
     "yolo26n",
+
+    "yolov8n",
 
     # "yolo26s",
 
@@ -10395,10 +10342,15 @@ def predict_video(
 
         if result_path:
 
+            print(f"[DEBUG] Video result path: {result_path}")
+            print(f"[DEBUG] File exists: {os.path.exists(result_path) if result_path else 'N/A'}")
+            if result_path and os.path.exists(result_path):
+                print(f"[DEBUG] File size: {os.path.getsize(result_path) / (1024*1024):.2f} MB")
             summary = f" Video processed with ALPR\n Output: {result_path}"
 
         else:
 
+            print(f"[DEBUG] Video result path is None!")
             summary = " Video processing failed"
 
         return result_path, summary
@@ -11003,11 +10955,15 @@ def _predict_video_original(
             if imageio_ffmpeg is not None:
                 try:
                     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-                except Exception:
+                    print(f"[INFO] Found ffmpeg via imageio_ffmpeg: {ffmpeg_path}")
+                except Exception as e:
+                    print(f"[DEBUG] imageio_ffmpeg failed: {e}")
                     pass
             if not ffmpeg_path:
                 import shutil as _shutil
                 ffmpeg_path = _shutil.which("ffmpeg")
+                if ffmpeg_path:
+                    print(f"[INFO] Found ffmpeg via PATH: {ffmpeg_path}")
 
             if ffmpeg_path:
                 h264_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
@@ -11022,7 +10978,9 @@ def _predict_video_original(
                     "-movflags", "+faststart",
                     h264_path
                 ]
+                print(f"[DEBUG] ffmpeg command: {' '.join(reencode_cmd)}")
                 result = subprocess.run(reencode_cmd, capture_output=True, timeout=120)
+                print(f"[DEBUG] ffmpeg return code: {result.returncode}")
                 if result.returncode == 0 and os.path.exists(h264_path) and os.path.getsize(h264_path) > 0:
                     # Replace original with H.264 version
                     os.unlink(output_path)
@@ -11030,15 +10988,38 @@ def _predict_video_original(
                     print(f"[INFO] H.264 re-encoding successful: {os.path.getsize(output_path) / (1024*1024):.1f} MB")
                     browser_output = output_path
                 else:
-                    print(f"[WARNING] H.264 re-encoding failed, using original codec")
+                    print(f"[WARNING] H.264 re-encoding failed (code {result.returncode}), using original codec")
                     if os.path.exists(h264_path):
                         os.unlink(h264_path)
                     if result.stderr:
-                        print(f"[DEBUG] ffmpeg stderr: {result.stderr[:200]}")
+                        print(f"[DEBUG] ffmpeg stderr: {result.stderr[:500]}")
+                    if result.stdout:
+                        print(f"[DEBUG] ffmpeg stdout: {result.stdout[:500]}")
             else:
                 print("[WARNING] ffmpeg not found, video may not play in browser")
+                print("[INFO] To fix: install ffmpeg or 'pip install imageio-ffmpeg'")
         except Exception as e:
             print(f"[WARNING] H.264 re-encoding error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # Copy to outputs folder for Gradio access
+        try:
+            outputs_dir = os.path.join(os.getcwd(), "outputs")
+            os.makedirs(outputs_dir, exist_ok=True)
+            final_output = os.path.join(outputs_dir, f"processed_video_{int(time.time())}.mp4")
+            shutil.copy2(browser_output, final_output)
+            print(f"[INFO] Video copied to outputs folder: {final_output}")
+            browser_output = final_output
+        except Exception as e:
+            print(f"[WARNING] Could not copy to outputs folder: {e}")
+            import traceback
+            traceback.print_exc()
+
+        print(f"[DEBUG] Returning video path: {browser_output}")
+        print(f"[DEBUG] File exists: {os.path.exists(browser_output)}")
+        if os.path.exists(browser_output):
+            print(f"[DEBUG] File size: {os.path.getsize(browser_output) / (1024*1024):.2f} MB")
 
         return browser_output
 
@@ -13780,19 +13761,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             ])
 
-        if four_wheelers > 0:
-
-            summary_lines.extend([
-
-                f"**4-Wheeler Safety:**",
-
-                f"- Seatbelts Detected: **{result.seatbelt_detected}**",
-
-                f"- No Seatbelts: **{result.no_seatbelt}**",
-
-                "",
-
-            ])
 
         if unknown_vehicles > 0:
 
@@ -13800,7 +13768,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
                 f"**Unknown Vehicle Safety:**",
 
-                f"- Any Safety Equipment: **{result.helmet_detected + result.seatbelt_detected}**",
+                f"- Any Safety Equipment: **{result.helmet_detected + result.vest_detected}**",
 
                 "",
 
@@ -13824,15 +13792,11 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             if person.vehicle_type == "2-wheeler":
 
-                status_emoji = "🟩" if person.helmet.present else "🟥"
-
-            elif person.vehicle_type == "4-wheeler":
-
-                status_emoji = "🟩" if person.seatbelt.present else "🟥"
+                status_emoji = "\U0001f7e9" if person.helmet.present else "\U0001f534"
 
             else:
 
-                status_emoji = "🟩" if (person.helmet.present or person.seatbelt.present) else "🟥"
+                status_emoji = "\U0001f7e9" if (person.helmet.present or person.vest.present) else "\U0001f534"
 
             summary_lines.append(f"\n**Person {person.person_id}** {status_emoji}")
 
@@ -13840,77 +13804,39 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             # Show only relevant PPE information based on vehicle type
 
-            if person.vehicle_type == "2-wheeler":
+            # Show PPE information - Helmet, Vest, Mask only
 
-                # Only show helmet for 2-wheelers
+            if person.helmet.present:
 
-                if person.helmet.present:
-
-                    summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
-
-                else:
-
-                    summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
-
-                summary_lines.append(f"  -  Seatbelt: **Not Applicable (2-wheeler)**")
-
-            elif person.vehicle_type == "4-wheeler":
-
-                # Only show seatbelt for 4-wheelers
-
-                if person.seatbelt.present:
-
-                    summary_lines.append(f"  -  Seatbelt: ** Present** (conf: {person.seatbelt.confidence:.2f})")
-
-                else:
-
-                    summary_lines.append(f"  -  Seatbelt: ** Missing** (conf: {person.seatbelt.confidence:.2f})")
-
-                summary_lines.append(f"  -  Helmet: **Not Applicable (4-wheeler)**")
+                summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
 
             else:
 
-                # Unknown vehicle type - show both
+                summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
 
-                if person.helmet.present:
+            if person.vest.present:
 
-                    summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
-
-                else:
-
-                    summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
-
-                if person.seatbelt.present:
-
-                    summary_lines.append(f"  -  Seatbelt: ** Present** (conf: {person.seatbelt.confidence:.2f})")
-
-                else:
-
-                    summary_lines.append(f"  -  Seatbelt: ** Missing** (conf: {person.seatbelt.confidence:.2f})")
-
-            # Show which one matters for compliance
-
-            if person.vehicle_type == "2-wheeler":
-
-                summary_lines.append(f"  -  **Compliance based on: HELMET**")
-
-            elif person.vehicle_type == "4-wheeler":
-
-                summary_lines.append(f"  -  **Compliance based on: SEATBELT**")
+                summary_lines.append(f"  -  Vest: ** Present** (conf: {person.vest.confidence:.2f})")
 
             else:
 
-                summary_lines.append(f"  -  **Compliance based on: EITHER**")
+                summary_lines.append(f"  -  Vest: ** Missing** (conf: {person.vest.confidence:.2f})")
+
+            if person.mask.present:
+
+                summary_lines.append(f"  -  Mask: ** Present** (conf: {person.mask.confidence:.2f})")
+
+            else:
+
+                summary_lines.append(f"  -  Mask: ** Missing** (conf: {person.mask.confidence:.2f})")
+
+            # Show compliance basis
+
+            summary_lines.append(f"  -  **Compliance based on: PPE (Helmet/Vest/Mask)**")
 
             # Add detection methods
 
             summary_lines.append(f"  -  Helmet Method: `{person.helmet.detection_method}`")
-
-            summary_lines.append(f"  -  Seatbelt Method: `{person.seatbelt.detection_method}`")
-
-            if person.vest.present:
-
-                summary_lines.append(f"  - Vest:  ({person.vest.confidence:.2f})")
 
         if result.error_message:
 
@@ -13930,9 +13856,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             print(f"[INFO] 2-Wheeler safety: {result.helmet_detected} helmets, {result.no_helmet} no helmets")
 
-        if four_wheelers > 0:
-
-            print(f"[INFO] 4-Wheeler safety: {result.seatbelt_detected} seatbelts, {result.no_seatbelt} no seatbelts")
 
         return output_image, summary, side_panel_html
 
@@ -14072,9 +13995,9 @@ def create_ppe_side_panel(result):
 
             """
 
-        # Seatbelts info
+        # Vests info
 
-        if four_wheelers > 0 or result.seatbelt_detected > 0:
+        if result.vest_detected > 0 or result.no_vest > 0:
 
             safety_items += f"""
 
@@ -14082,7 +14005,7 @@ def create_ppe_side_panel(result):
 
                         background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
 
-                <div style="width: 40px; height: 40px; background: #3b82f6; border-radius: 5px;
+                <div style="width: 40px; height: 40px; background: #f97316; border-radius: 5px;
 
                             display: flex; align-items: center; justify-content: center;
 
@@ -14090,9 +14013,37 @@ def create_ppe_side_panel(result):
 
                 <div style="flex: 1;">
 
-                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Seatbelts: {result.seatbelt_detected}/{four_wheelers}</div>
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Vests: {result.vest_detected}/{result.vest_detected + result.no_vest}</div>
 
-                    <div style="font-size: 11px; color: #94a3b8;">4-Wheeler Safety</div>
+                    <div style="font-size: 11px; color: #94a3b8;">Body Protection</div>
+
+                </div>
+
+            </div>
+
+            """
+
+        # Mask info
+
+        if result.mask_detected > 0 or result.no_mask > 0:
+
+            safety_items += f"""
+
+            <div style="display: flex; align-items: center; padding: 8px;
+
+                        background: rgba(255,255,255,0.05); border-radius: 5px; margin-bottom: 5px;">
+
+                <div style="width: 40px; height: 40px; background: #06b6d4; border-radius: 5px;
+
+                            display: flex; align-items: center; justify-content: center;
+
+                            margin-right: 10px; font-size: 18px;"></div>
+
+                <div style="flex: 1;">
+
+                    <div style="font-size: 14px; font-weight: bold; color: #e2e8f0;">Masks: {result.mask_detected}/{result.mask_detected + result.no_mask}</div>
+
+                    <div style="font-size: 11px; color: #94a3b8;">Face Protection</div>
 
                 </div>
 
@@ -14197,37 +14148,25 @@ def create_ppe_side_panel(result):
     stats_html = f"""
 
     <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
-
                 padding: 12px; border-radius: 10px; color: white;">
-
         <div style="display: flex; justify-content: space-around; text-align: center;">
-
             <div>
-
                 <div style="font-size: 20px; font-weight: bold;">{result.total_persons}</div>
-
                 <div style="font-size: 10px; color: #a7f3d0;">Persons</div>
-
             </div>
-
             <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
-
                 <div style="font-size: 20px; font-weight: bold;">{result.helmet_detected}</div>
-
                 <div style="font-size: 10px; color: #a7f3d0;">Helmets</div>
-
             </div>
-
             <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
-
-                <div style="font-size: 20px; font-weight: bold;">{result.seatbelt_detected}</div>
-
-                <div style="font-size: 10px; color: #a7f3d0;">Seatbelts</div>
-
+                <div style="font-size: 20px; font-weight: bold;">{result.vest_detected}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Vests</div>
             </div>
-
         </div>
-
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3); text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: {'#a7f3d0' if result.accuracy_score >= 60 else '#fbbf24' if result.accuracy_score >= 30 else '#f87171'};">{result.accuracy_score:.1f}%</div>
+            <div style="font-size: 10px; color: #a7f3d0;">Accuracy Score</div>
+        </div>
     </div>
 
     """
@@ -14302,7 +14241,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         # Get PPE detector with fallback
 
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
 
         if detector is None:
 
@@ -14351,9 +14290,13 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         total_no_helmets = 0
 
-        total_seatbelts = 0
+        total_vests = 0
 
-        total_no_seatbelts = 0
+        total_no_vests = 0
+
+        total_masks = 0
+
+        total_no_masks = 0
 
         while True:
 
@@ -14371,15 +14314,19 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             # Detect PPE
 
-            result = detector.detect(frame, debug=False)
+            result = detector.detect(frame, debug=True)
 
             total_helmets += result.helmet_detected
 
             total_no_helmets += result.no_helmet
 
-            total_seatbelts += result.seatbelt_detected
+            total_vests += result.vest_detected
 
-            total_no_seatbelts += result.no_seatbelt
+            total_no_vests += result.no_vest
+
+            total_masks += result.mask_detected
+
+            total_no_masks += result.no_mask
 
             # Annotate
 
@@ -14407,43 +14354,50 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                 return None, " **Error:** Video processing failed - output file not created", ""
 
-            # Convert to browser-compatible MP4 using ffmpeg
+            # Find ffmpeg
+            ffmpeg_path = None
+            if imageio_ffmpeg is not None:
+                try:
+                    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+                    print(f"[INFO] Found ffmpeg via imageio_ffmpeg: {ffmpeg_path}")
+                except Exception:
+                    pass
+            if not ffmpeg_path:
+                ffmpeg_path = shutil.which("ffmpeg")
 
-            final_output = output_path.replace('.avi', '_converted.mp4').replace('.mp4', '_final.mp4')
+            if ffmpeg_path:
+                # Convert to browser-compatible MP4 using ffmpeg
+                final_output = output_path.replace('.avi', '_converted.mp4').replace('.mp4', '_final.mp4')
 
-            cmd = [
+                cmd = [
+                    ffmpeg_path, '-y', '-i', output_path,
+                    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                    '-pix_fmt', 'yuv420p',
+                    '-movflags', '+faststart',
+                    final_output
+                ]
 
-                'ffmpeg', '-y', '-i', output_path,
+                print(f"[INFO] Converting PPE video to H.264 for browser playback...")
+                conversion_result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
 
-                '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+                if conversion_result.returncode == 0 and os.path.exists(final_output) and os.path.getsize(final_output) > 0:
 
-                '-c:a', 'aac', '-b:a', '128k',
+                    print(f"[INFO] Video converted to browser-compatible format: {final_output}")
 
-                '-movflags', '+faststart',
+                    # Remove original, keep converted
+                    os.unlink(output_path)
+                    output_path = final_output
 
-                final_output
+                else:
 
-            ]
+                    print(f"[WARNING] FFmpeg conversion failed: {conversion_result.stderr[:300]}")
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-
-            if result.returncode == 0 and os.path.exists(final_output):
-
-                print(f"[INFO] Video converted to browser-compatible format: {final_output}")
-
-                output_path = final_output
-
+                    if output_path.endswith('.avi'):
+                        return None, " **Error:** Video encoded in AVI format which is not browser-compatible. Please install ffmpeg for automatic conversion.", ""
             else:
-
-                print(f"[WARNING] FFmpeg conversion failed, using original: {result.stderr}")
-
-                # Try to use original file
-
+                print("[WARNING] ffmpeg not found, video may not play in browser")
                 if output_path.endswith('.avi'):
-
-                    # AVI files often don't play in browsers, return None with error
-
-                    return None, " **Error:** Video encoded in AVI format which is not browser-compatible. Please install ffmpeg for automatic conversion.", ""
+                    return None, " **Error:** AVI format requires ffmpeg for browser playback. Please install ffmpeg.", ""
 
         except FileNotFoundError:
 
@@ -14459,9 +14413,9 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         # Calculate compliance rate
 
-        total_ppe = total_helmets + total_seatbelts
+        total_ppe = total_helmets + total_vests + total_masks
 
-        total_violations = total_no_helmets + total_no_seatbelts
+        total_violations = total_no_helmets + total_no_vests + total_no_masks
 
         total_detected = total_ppe + total_violations
 
@@ -14481,11 +14435,13 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
 - Total Frames Processed: **{processed_count}**
 
--  Helmets Detected: **{total_helmets}** (Priority: Highest)
+-  Helmets Detected: **{total_helmets}**
 
--  Seatbelts Detected: **{total_seatbelts}** (Only if no helmet in 4-wheeler)
+-  Vests Detected: **{total_vests}**
 
--  No PPE: **{total_no_helmets + total_no_seatbelts}**
+-  Masks Detected: **{total_masks}**
+
+-  No PPE: **{total_no_helmets + total_no_vests + total_no_masks}**
 
 **Video Info:**
 
@@ -14537,9 +14493,19 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                     <div style="font-size: 24px;"></div>
 
-                    <div style="color: #7d8590; font-size: 10px;">SEATBELTS</div>
+                    <div style="color: #7d8590; font-size: 10px;">VESTS</div>
 
-                    <div style="color: #3b82f6; font-size: 18px; font-weight: 700;">{total_seatbelts}</div>
+                    <div style="color: #f97316; font-size: 18px; font-weight: 700;">{total_vests}</div>
+
+                </div>
+
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+
+                    <div style="font-size: 24px;"></div>
+
+                    <div style="color: #7d8590; font-size: 10px;">MASKS</div>
+
+                    <div style="color: #06b6d4; font-size: 18px; font-weight: 700;">{total_masks}</div>
 
                 </div>
 
@@ -14587,9 +14553,17 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                 <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
 
-                    <div style="color: #7d8590; font-size: 10px;">NO SEATBELTS</div>
+                    <div style="color: #7d8590; font-size: 10px;">NO VESTS</div>
 
-                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_seatbelts}</div>
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_vests}</div>
+
+                </div>
+
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+
+                    <div style="color: #7d8590; font-size: 10px;">NO MASKS</div>
+
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_masks}</div>
 
                 </div>
 
@@ -14605,11 +14579,13 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         """
 
-        # Return None for video since ffmpeg is not available for browser-compatible conversion
+        # Return video path for Gradio display
+        print(f"[DEBUG] PPE video output path: {output_path}")
+        print(f"[DEBUG] File exists: {os.path.exists(output_path)}")
+        if os.path.exists(output_path):
+            print(f"[DEBUG] File size: {os.path.getsize(output_path) / (1024*1024):.2f} MB")
 
-        # Video file is saved at: output_path (but not displayed due to codec issues)
-
-        return None, summary_md, dashboard_html
+        return output_path, summary_md, dashboard_html
 
     except Exception as e:
 
@@ -14691,13 +14667,13 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             info_lines.append(f" Helmets: {result.helmet_detected}")
 
-        if four_wheelers > 0:
+        if unknown_vehicles > 0:
 
-            info_lines.append(f" Seatbelts: {result.seatbelt_detected}")
+            info_lines.append(f" Masks: {result.mask_detected}")
 
         if unknown_vehicles > 0:
 
-            info_lines.append(f" Any Safety: {result.helmet_detected + result.seatbelt_detected}")
+            info_lines.append(f" Vests: {result.vest_detected}")
 
         info_lines.extend([
 
@@ -14793,29 +14769,40 @@ demo = gr.Blocks(
 
 footer { display: none !important; }
 
-/* Cyan scrollbar styling */
+
+/* In your globals.css or main stylesheet */
+.svelte-1uj8rng {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
 ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 14px !important;
 }
 
 ::-webkit-scrollbar-track {
-    background: #0f172a;
-    border-radius: 5px;
+    background: #0a0a1a !important;
+    border-radius: 10px !important;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%);
-    border-radius: 5px;
-    border: 2px solid #0f172a;
+    background: #48CAE4  !important;
+    border-radius: 10px !important;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #90E0EF 0%, #48CAE4 100%);
+    background: #90E0EF !important;
 }
 
 ::-webkit-scrollbar-corner {
-    background: #0f172a;
+    background: #0a0a1a !important;
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin !important;
+    scrollbar-color: #48CAE4 #0a0a1a !important;
 }
 
 </style>
@@ -14864,7 +14851,7 @@ with demo:
 
         ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
 
-        gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
+        gr.HTML("""<div style=\"border-top: 3px solid #48CAE4; margin: 15px 0;\"></div><span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
 
         <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Selection</span></span>""")
 
@@ -14934,6 +14921,9 @@ with demo:
 
                         webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Allow camera access.")
 
+
+                
+
     # PPE Detection Section
 
     with gr.Column(visible=False) as ppe_detection_section:
@@ -15002,21 +14992,21 @@ with demo:
 
     vehicle_btn.click(
 
-        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(variant="primary"), gr.update(variant="secondary")),
+        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(variant="primary"), gr.update(variant="secondary"), gr.update(value="yolo26n")),
 
         inputs=[],
 
-        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn]
+        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn, img_model],
 
     )
 
     ppe_btn.click(
 
-        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary")),
+        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary"), gr.update(value="yolov8n")),
 
         inputs=[],
 
-        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn]
+        outputs=[vehicle_detection_section, ppe_detection_section, vehicle_btn, ppe_btn, img_model],
 
     )
 
@@ -15038,7 +15028,7 @@ with demo:
 
         inputs=[vid_input, img_model],
 
-        outputs=[vid_output, vid_info]
+        outputs=[vid_output, vid_info],
 
     )
 
@@ -15049,8 +15039,6 @@ with demo:
         inputs=[webcam_input, img_model],
 
         outputs=[webcam_output, webcam_info],
-
-        show_progress=False,
 
     )
 
@@ -15088,7 +15076,7 @@ with demo:
 
     )
 
-    # JavaScript for Button Styling
+    # JavaScript for Button Styling & Status Tracker Removal
 
     demo.load(None, None, None, js="""
 
@@ -15099,10 +15087,6 @@ with demo:
                 document.querySelectorAll('footer, .built-with-gradio').forEach(f => f.remove());
 
             };
-
-            removeFooter();
-
-            setTimeout(removeFooter, 1000);
 
             const setBtnStyle = (btnId, isActive) => {
 
@@ -15153,6 +15137,12 @@ with demo:
                 return true;
 
             };
+
+            removeFooter();
+
+            setTimeout(removeFooter, 1000);
+
+            removeStatusTracker();
 
             if (!setupHandlers()) {
 
@@ -15336,7 +15326,9 @@ if __name__ == "__main__":
 
                 server_port=7865,  # Changed to 7865 since 7860-7863 are in use
 
-                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs"],
+                favicon_path=r"c:\Users\Sensepart\canberravision\apps\favicon.svg",
+
+                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs", "outputs", r"c:\Users\Sensepart\canberravision\apps"],
 
                 prevent_thread_lock=False
 

@@ -13643,12 +13643,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         print(f"[INFO] Starting PPE detection on image...")
 
-        # Reset detector to ensure new settings are applied
-
-        from modules.ppe_detection import reset_ppe_detector
-
-        reset_ppe_detector()
-
         # Get PPE detector with fallback - ENABLE DEBUG to see details
 
         detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
@@ -13828,7 +13822,8 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             else:
 
-                summary_lines.append(f"  -  Mask: ** Missing** (conf: {person.mask.confidence:.2f})")
+                # Mask not present - show NO MASK regardless of whether no_mask class was detected
+                summary_lines.append(f"  -  Mask: ** NO MASK** (conf: {person.mask.confidence:.2f})")
 
             # Show compliance basis
 

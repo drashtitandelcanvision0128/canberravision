@@ -228,13 +228,15 @@ class PPEDetector:
 
     }
 
-    def __init__(self, model_path=None, device=None, debug=False, auto_recovery=True):
+    def __init__(self, model_path=None, device=None, debug=False, auto_recovery=True, detection_mode="all"):
 
         # Use PPE dataset model path if not provided or if using standard YOLO models
 
         # For PPE detection, always prefer trained PPE model
 
-        print(f"[PPE] Initializing with model_path: {repr(model_path)}")
+        # detection_mode: "all" (default), "helmet_vest" (only helmet & vest), "mask" (only mask)
+        self.detection_mode = detection_mode
+        print(f"[PPE] Initializing with model_path: {repr(model_path)}, detection_mode: {detection_mode}")
 
         # Normalize model_path for comparison
 
@@ -2849,6 +2851,9 @@ class PPEDetector:
         person_w = px2 - px1
         person_h = py2 - py1
 
+        # Skip mask detection if mode is "helmet_vest" only
+        include_mask = self.detection_mode != "helmet_vest"
+
         result = {
             'helmet_detected': False, 'helmet_conf': 0.0, 'helmet_class': '',
             'helmet_bbox': None, 'no_hardhat': False, 'no_hardhat_conf': 0.0,
@@ -2872,6 +2877,8 @@ class PPEDetector:
             conf = det['confidence']
             class_name = det['class']
             class_lower = class_name.lower().replace('-', '').replace(' ', '').replace('_', '')
+            if not include_mask and class_lower in ['mask', 'nomask']:
+                continue
 
             det_cx = (dx1 + dx2) / 2
             det_cy = (dy1 + dy2) / 2
@@ -3252,6 +3259,19 @@ class PPEDetector:
                         except Exception as me:
                             if self.debug:
                                 print(f"[PPE-DEBUG] Mask-only inference failed: {me}")
+
+                    if self.detection_mode == "helmet_vest":
+                        ppe_detections = [
+                            det for det in ppe_detections
+                            if det.get("class", "").lower().replace('-', '').replace(' ', '').replace('_', '')
+                            in ['hardhat', 'helmet', 'nohardhat', 'nohelmet', 'safetyvest', 'vest', 'nosafetyvest', 'novest']
+                        ]
+                    elif self.detection_mode == "mask":
+                        ppe_detections = [
+                            det for det in ppe_detections
+                            if det.get("class", "").lower().replace('-', '').replace(' ', '').replace('_', '')
+                            in ['mask', 'nomask', 'no_mask']
+                        ]
 
                     self._last_ppe_detections = ppe_detections
 
@@ -4072,6 +4092,8 @@ class PPEDetector:
                 vest_present, vest_conf = False, 0.0
 
                 mask_present, mask_conf, mask_bbox = False, 0.0, None
+                head_bbox = None
+                vest_bbox = None
 
                 # Helmet + Vest + Mask detection for all
 
@@ -4094,7 +4116,13 @@ class PPEDetector:
                     print(f"[PPE-DEBUG] PPE items near person: vest_detected={ppe_items_near_person.get('vest_detected')}, vest_conf={ppe_items_near_person.get('vest_conf', 0):.3f}")
                     print(f"[PPE-DEBUG] PPE items near person: mask_detected={ppe_items_near_person.get('mask_detected')}, mask_conf={ppe_items_near_person.get('mask_conf', 0):.3f}, no_mask={ppe_items_near_person.get('no_mask')}")
 
-                if ppe_items_near_person.get('helmet_detected'):
+                # Skip helmet detection if mode is "mask" only
+                if self.detection_mode == "mask":
+                    helmet_present = False
+                    helmet_conf = 0.0
+                    helmet_method = "not_applicable"
+
+                elif ppe_items_near_person.get('helmet_detected'):
 
                     # Trained model detected Hardhat near this person (min 20% confidence)
 
@@ -4167,7 +4195,12 @@ class PPEDetector:
 
                         self._current_person_bbox = None  # Clean up after validation
 
-                if ppe_items_near_person.get('vest_detected') and ppe_items_near_person['vest_conf'] >= 0.30:
+                if self.detection_mode == "mask":
+                    vest_present = False
+                    vest_conf = 0.0
+                    vest_bbox = None
+
+                elif ppe_items_near_person.get('vest_detected') and ppe_items_near_person['vest_conf'] >= 0.30:
 
                     # Trained model detected Safety Vest near this person (min 30% confidence)
 
@@ -4210,86 +4243,77 @@ class PPEDetector:
                 else:
 
                     # Fallback to color-based vest detection
+                    # Skip vest detection if mode is "mask" only
+                    if self.detection_mode != "mask":
+                        vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
 
-                    vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
+                        # Always try color-based detection as backup, even with PPE model
 
-                    # Always try color-based detection as backup, even with PPE model
-
-                    vest_present, vest_conf = self._detect_vest(frame, person_bbox)
+                        vest_present, vest_conf = self._detect_vest(frame, person_bbox)
 
                     if self.debug:
 
                         print(f"[PPE-DEBUG] Color-based vest detection: {vest_present} (conf: {vest_conf:.3f})")
 
                 # Check for Mask from PPE model first, then fallback to color-based detection
+                # Skip mask detection if mode is "helmet_vest" only
+                if self.detection_mode != "helmet_vest":
+                    mask_present = ppe_items_near_person.get('mask_detected', False)
 
-                mask_present = ppe_items_near_person.get('mask_detected', False)
+                    mask_conf = ppe_items_near_person.get('mask_conf', 0.0)
 
-                mask_conf = ppe_items_near_person.get('mask_conf', 0.0)
+                    mask_bbox = ppe_items_near_person.get('mask_bbox')
 
-                mask_bbox = ppe_items_near_person.get('mask_bbox')
-
-                # If no_mask detected, always store its bbox for drawing
-                # (draw as "NO MASK" even if mask also detected, unless no_mask is very confident)
-                if ppe_items_near_person.get('no_mask'):
-                    no_mask_conf_val = ppe_items_near_person.get('no_mask_conf', 0.0)
-                    no_mask_bbox_val = ppe_items_near_person.get('no_mask_bbox')
-                    
-                    # Always use no_mask bbox for drawing (will show as NO MASK box)
-                    # Don't override mask_present unless no_mask is very confident (>0.5)
-                    if not mask_present:
-                        # No mask detected, use no_mask values
-                        mask_conf = no_mask_conf_val
-                        mask_bbox = no_mask_bbox_val
-                    elif no_mask_conf_val > mask_conf * 3.0 and no_mask_conf_val > 0.80:
-                        # Both detected, but no_mask is SIGNIFICANTLY more confident (2.5x) - override
-                        mask_present = False
-                        mask_conf = no_mask_conf_val
-                        mask_bbox = no_mask_bbox_val
-                        if self.debug:
-                            print(f"[PPE-DEBUG] NO-MASK overriding mask (significantly more confident): no_mask_conf={no_mask_conf_val:.2f} > mask_conf*3.0={mask_conf*3.0:.2f}")
-                    else:
-                        # Both detected, mask is more confident, but still draw no_mask bbox too
-                        # Keep existing mask values, no_mask bbox will be used for secondary box
-                        if self.debug:
-                            print(f"[PPE-DEBUG] Both mask and no_mask detected, keeping mask (conf={mask_conf:.2f} vs no_mask={no_mask_conf_val:.2f})")
-
-                # Fallback: Color-based mask detection when model doesn't detect mask
-                if not mask_present and not ppe_items_near_person.get('no_mask') and frame is not None:
-                    # First, try to use any mask detection from model as reference for face position
-                    # Even if mask is not "present", the detection tells us where face is
-                    model_mask_bbox = ppe_items_near_person.get('mask_bbox')
-                    model_no_mask_bbox = ppe_items_near_person.get('no_mask_bbox')
-                    
-                    # Use model's detected mask/no_mask position if available
-                    if model_mask_bbox:
-                        # Model detected mask somewhere - use that position for face
-                        mask_bbox = model_mask_bbox
-                        if self.debug:
-                            print(f"[PPE-DEBUG] Using model mask position for NO MASK bbox: {mask_bbox}")
-                    elif model_no_mask_bbox:
-                        # Model detected no_mask - use that position
-                        mask_bbox = model_no_mask_bbox
-                        if self.debug:
-                            print(f"[PPE-DEBUG] Using model no_mask position for bbox: {mask_bbox}")
-                    else:
-                        # No model detection - use position between helmet and vest for mask bbox
-                        # This ensures mask bbox is between helmet (above) and vest (below)
-                        mask_bbox = self.get_mask_region_between_helmet_vest(person_bbox, head_bbox, vest_bbox)
-                        if self.debug:
-                            print(f"[PPE-DEBUG] Using position between helmet & vest for NO MASK bbox: {mask_bbox}")
+                    # If no_mask detected, store its bbox for drawing in mask-capable modes.
+                    if ppe_items_near_person.get('no_mask'):
+                        no_mask_conf_val = ppe_items_near_person.get('no_mask_conf', 0.0)
+                        no_mask_bbox_val = ppe_items_near_person.get('no_mask_bbox')
                         
-                        # Also try color detection on this region
-                        if mask_bbox:
-                            mx1, my1, mx2, my2 = mask_bbox
-                            face_roi = frame[max(0,my1):my2, max(0,mx1):mx2]
-                            if face_roi.size > 0:
-                                mask_found, mask_color_conf, mask_color = self.detect_mask_by_color(face_roi, threshold=0.20)
-                                if mask_found:
-                                    mask_present = True
-                                    mask_conf = mask_color_conf
-                                    if self.debug:
-                                        print(f"[PPE-DEBUG] Mask DETECTED via color fallback: color={mask_color}, conf={mask_color_conf:.2f}")
+                        if not mask_present:
+                            mask_conf = no_mask_conf_val
+                            mask_bbox = no_mask_bbox_val
+                        elif no_mask_conf_val > mask_conf * 3.0 and no_mask_conf_val > 0.80:
+                            mask_present = False
+                            mask_conf = no_mask_conf_val
+                            mask_bbox = no_mask_bbox_val
+                            if self.debug:
+                                print(f"[PPE-DEBUG] NO-MASK overriding mask (significantly more confident): no_mask_conf={no_mask_conf_val:.2f} > mask_conf*3.0={mask_conf*3.0:.2f}")
+                        else:
+                            if self.debug:
+                                print(f"[PPE-DEBUG] Both mask and no_mask detected, keeping mask (conf={mask_conf:.2f} vs no_mask={no_mask_conf_val:.2f})")
+
+                    # Fallback: Color-based mask detection when model doesn't detect mask.
+                    if not mask_present and not ppe_items_near_person.get('no_mask') and frame is not None:
+                        model_mask_bbox = ppe_items_near_person.get('mask_bbox')
+                        model_no_mask_bbox = ppe_items_near_person.get('no_mask_bbox')
+                        
+                        if model_mask_bbox:
+                            mask_bbox = model_mask_bbox
+                            if self.debug:
+                                print(f"[PPE-DEBUG] Using model mask position for NO MASK bbox: {mask_bbox}")
+                        elif model_no_mask_bbox:
+                            mask_bbox = model_no_mask_bbox
+                            if self.debug:
+                                print(f"[PPE-DEBUG] Using model no_mask position for bbox: {mask_bbox}")
+                        else:
+                            mask_bbox = self.get_mask_region_between_helmet_vest(person_bbox, head_bbox, vest_bbox)
+                            if self.debug:
+                                print(f"[PPE-DEBUG] Using position between helmet & vest for NO MASK bbox: {mask_bbox}")
+                            
+                            if mask_bbox:
+                                mx1, my1, mx2, my2 = mask_bbox
+                                face_roi = frame[max(0,my1):my2, max(0,mx1):mx2]
+                                if face_roi.size > 0:
+                                    mask_found, mask_color_conf, mask_color = self.detect_mask_by_color(face_roi, threshold=0.20)
+                                    if mask_found:
+                                        mask_present = True
+                                        mask_conf = mask_color_conf
+                                        if self.debug:
+                                            print(f"[PPE-DEBUG] Mask DETECTED via color fallback: color={mask_color}, conf={mask_color_conf:.2f}")
+                else:
+                    mask_present = False
+                    mask_conf = 0.0
+                    mask_bbox = None
 
                 if self.debug:
 
@@ -4301,7 +4325,7 @@ class PPEDetector:
 
                 # STEP 4: Update counts
 
-                if helmet_present:
+                if self.detection_mode != "mask" and helmet_present:
 
                     helmet_count += 1
 
@@ -4309,7 +4333,7 @@ class PPEDetector:
 
                         print(f"[PPE-DEBUG] Helmet count incremented to {helmet_count}")
 
-                else:
+                elif self.detection_mode != "mask":
 
                     no_helmet_count += 1
 
@@ -4317,19 +4341,19 @@ class PPEDetector:
 
                         print(f"[PPE-DEBUG] No helmet count incremented to {no_helmet_count}")
 
-                if vest_present:
+                if self.detection_mode != "mask" and vest_present:
 
                     vest_count += 1
 
-                else:
+                elif self.detection_mode != "mask":
 
                     no_vest_count += 1
 
-                if mask_present:
+                if self.detection_mode != "helmet_vest" and mask_present:
 
                     mask_count += 1
 
-                else:
+                elif self.detection_mode != "helmet_vest":
 
                     no_mask_count += 1
 
@@ -4338,11 +4362,11 @@ class PPEDetector:
                 # Build label with mask status included
 
                 ppe_items = []
-                if helmet_present:
+                if self.detection_mode != "mask" and helmet_present:
                     ppe_items.append("Helmet")
-                if vest_present:
+                if self.detection_mode != "mask" and vest_present:
                     ppe_items.append("Vest")
-                if mask_present:
+                if self.detection_mode != "helmet_vest" and mask_present:
                     ppe_items.append("Mask")
 
                 if ppe_items:
@@ -4353,11 +4377,11 @@ class PPEDetector:
                     status = "violation"
                     compliance_reason = "no_ppe_detected"
                     no_ppe_items = []
-                    if not helmet_present:
+                    if self.detection_mode != "mask" and not helmet_present:
                         no_ppe_items.append("No Helmet")
-                    if not vest_present:
+                    if self.detection_mode != "mask" and not vest_present:
                         no_ppe_items.append("No Vest")
-                    if not mask_present:
+                    if self.detection_mode != "helmet_vest" and not mask_present:
                         no_ppe_items.append("No Mask")
                     output_label = " & ".join(no_ppe_items)
 
@@ -4434,21 +4458,25 @@ class PPEDetector:
                     v_votes = sum(1 for x in self._ppe_history[person_id] if x['vest'])
                     m_votes = sum(1 for x in self._ppe_history[person_id] if x['mask'])
                     
-                    smoothed_h = h_votes > len(self._ppe_history[person_id]) / 2
-                    smoothed_v = v_votes > len(self._ppe_history[person_id]) / 2
-                    smoothed_m = m_votes > len(self._ppe_history[person_id]) / 2
+                    smoothed_h = self.detection_mode != "mask" and h_votes > len(self._ppe_history[person_id]) / 2
+                    smoothed_v = self.detection_mode != "mask" and v_votes > len(self._ppe_history[person_id]) / 2
+                    smoothed_m = self.detection_mode != "helmet_vest" and m_votes > len(self._ppe_history[person_id]) / 2
                     
                     # Update status if smoothed result differs (only for more stability)
-                    if smoothed_h != helmet_present or smoothed_v != vest_present:
+                    if (
+                        smoothed_h != helmet_present
+                        or smoothed_v != vest_present
+                        or (self.detection_mode != "helmet_vest" and smoothed_m != mask_present)
+                    ):
                         helmet_present = smoothed_h
                         vest_present = smoothed_v
                         mask_present = smoothed_m
                         
                         # Re-calculate status and label
                         ppe_items = []
-                        if helmet_present: ppe_items.append("Helmet")
-                        if vest_present: ppe_items.append("Vest")
-                        if mask_present: ppe_items.append("Mask")
+                        if self.detection_mode != "mask" and helmet_present: ppe_items.append("Helmet")
+                        if self.detection_mode != "mask" and vest_present: ppe_items.append("Vest")
+                        if self.detection_mode != "helmet_vest" and mask_present: ppe_items.append("Mask")
                         
                         if ppe_items:
                             status = "compliant"
@@ -4456,9 +4484,9 @@ class PPEDetector:
                         else:
                             status = "violation"
                             no_ppe_items = []
-                            if not helmet_present: no_ppe_items.append("No Helmet")
-                            if not vest_present: no_ppe_items.append("No Vest")
-                            if not mask_present: no_ppe_items.append("No Mask")
+                            if self.detection_mode != "mask" and not helmet_present: no_ppe_items.append("No Helmet")
+                            if self.detection_mode != "mask" and not vest_present: no_ppe_items.append("No Vest")
+                            if self.detection_mode != "helmet_vest" and not mask_present: no_ppe_items.append("No Mask")
                             output_label = " & ".join(no_ppe_items)
                         
                         # Update the object
@@ -4618,7 +4646,11 @@ class PPEDetector:
 
             # COLOR LOGIC based on vehicle type
 
-            if person.vehicle_type == "4-wheeler":
+            if self.detection_mode == "mask":
+
+                is_compliant = person.mask.present
+
+            elif person.vehicle_type == "4-wheeler":
 
                 # 4-WHEELER: Green if helmet or vest, Red if none
 
@@ -4644,7 +4676,11 @@ class PPEDetector:
 
             # Create status text - Helmet, Vest, Mask only
 
-            if person.helmet.present and person.vest.present:
+            if self.detection_mode == "mask":
+
+                safety_text = "Mask Detected" if person.mask.present else "No Mask"
+
+            elif person.helmet.present and person.vest.present:
 
                 safety_text = "Helmet & Vest Detected"
 
@@ -4658,8 +4694,9 @@ class PPEDetector:
 
             else:
 
-                # Include NO MASK in the status text
-                if person.mask.present:
+                if self.detection_mode == "helmet_vest":
+                    safety_text = "No Helmet & No Vest"
+                elif person.mask.present:
                     safety_text = "No Helmet & No Vest"
                 else:
                     safety_text = "No Helmet & No Vest & No Mask"
@@ -4674,13 +4711,18 @@ class PPEDetector:
 
             # Draw helmet/vest/mask bounding boxes ONLY if at least one PPE is present
             # If no helmet, no vest, no mask - only show red person bbox
-            any_ppe_present = person.helmet.present or person.vest.present or person.mask.present
+            any_ppe_present = (
+                (self.detection_mode != "mask" and person.helmet.present)
+                or (self.detection_mode != "mask" and person.vest.present)
+                or (self.detection_mode != "helmet_vest" and person.mask.present)
+                or (self.detection_mode == "mask" and person.mask_bbox is not None)
+            )
 
             if any_ppe_present:
 
                 # Draw vest bounding box
 
-                if person.vest_bbox:
+                if self.detection_mode != "mask" and person.vest_bbox:
 
                     clamped_vest_bbox = _clamp_bbox(person.vest_bbox)
                     if clamped_vest_bbox:
@@ -4707,7 +4749,7 @@ class PPEDetector:
 
                 # Draw helmet bounding box
 
-                if person.head_bbox:
+                if self.detection_mode != "mask" and person.head_bbox:
 
                     clamped_head_bbox = _clamp_bbox(person.head_bbox)
                     if clamped_head_bbox:
@@ -4725,7 +4767,7 @@ class PPEDetector:
 
                 # Draw mask bounding box
 
-                if person.mask_bbox:
+                if self.detection_mode != "helmet_vest" and person.mask_bbox:
                     if self.debug:
                         print(f"[PPE-DEBUG] Drawing mask bbox: {person.mask_bbox}, present={person.mask.present}")
                     clamped_mask_bbox = _clamp_bbox(person.mask_bbox)
@@ -4760,15 +4802,15 @@ class PPEDetector:
 
                 # Add confidence scores
 
-                if person.helmet.present:
+                if self.detection_mode != "mask" and person.helmet.present:
 
                     label += f" H:{person.helmet.confidence:.2f}"
 
-                if person.vest.present:
+                if self.detection_mode != "mask" and person.vest.present:
 
                     label += f" V:{person.vest.confidence:.2f}"
 
-                if person.mask.present:
+                if self.detection_mode != "helmet_vest" and person.mask.present:
 
                     label += f" M:{person.mask.confidence:.2f}"
 
@@ -4794,7 +4836,12 @@ class PPEDetector:
 
         # Summary with all counts
 
-        summary = f"Persons: {result.total_persons} | Helmets: {result.helmet_detected} | Vests: {result.vest_detected} | Masks: {result.mask_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
+        if self.detection_mode == "helmet_vest":
+            summary = f"Persons: {result.total_persons} | Helmets: {result.helmet_detected} | Vests: {result.vest_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
+        elif self.detection_mode == "mask":
+            summary = f"Persons: {result.total_persons} | Masks: {result.mask_detected} | No Masks: {result.no_mask} | Model: {'OK' if result.model_loaded else 'FB'}"
+        else:
+            summary = f"Persons: {result.total_persons} | Helmets: {result.helmet_detected} | Vests: {result.vest_detected} | Masks: {result.mask_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
 
         cv2.rectangle(img, (10, 5), (1100, 35), (0, 0, 0), -1)  # Increased width for more columns
 
@@ -5137,7 +5184,7 @@ class PPEDetector:
                 # Majority vote (more than half)
                 curr['helmet'] = helmet_votes > len(history) / 2
                 curr['vest'] = vest_votes > len(history) / 2
-                curr['mask'] = mask_votes > len(history) / 2
+                curr['mask'] = self.detection_mode != "helmet_vest" and mask_votes > len(history) / 2
                 
                 # Average confidence
                 if curr['helmet']:
@@ -5163,7 +5210,7 @@ class PPEDetector:
                 ppe_items.append("Helmet")
             if person.vest.present:
                 ppe_items.append("Vest")
-            if person.mask.present:
+            if self.detection_mode != "helmet_vest" and person.mask.present:
                 ppe_items.append("Mask")
             person.status = "compliant" if ppe_items else "violation"
         
@@ -5184,8 +5231,30 @@ class PPEDetector:
         result.no_helmet = sum(1 for p in result.persons if not p.helmet.present)
         result.vest_detected = sum(1 for p in result.persons if p.vest.present)
         result.no_vest = sum(1 for p in result.persons if not p.vest.present)
-        result.mask_detected = sum(1 for p in result.persons if p.mask.present)
-        result.no_mask = sum(1 for p in result.persons if not p.mask.present)
+        if self.detection_mode == "mask":
+            for person in result.persons:
+                person.helmet.present = False
+                person.helmet.confidence = 0.0
+                person.head_bbox = None
+                person.vest.present = False
+                person.vest.confidence = 0.0
+                person.vest_bbox = None
+            result.helmet_detected = 0
+            result.no_helmet = 0
+            result.vest_detected = 0
+            result.no_vest = 0
+            result.mask_detected = sum(1 for p in result.persons if p.mask.present)
+            result.no_mask = sum(1 for p in result.persons if not p.mask.present)
+        elif self.detection_mode == "helmet_vest":
+            for person in result.persons:
+                person.mask.present = False
+                person.mask.confidence = 0.0
+                person.mask_bbox = None
+            result.mask_detected = 0
+            result.no_mask = 0
+        else:
+            result.mask_detected = sum(1 for p in result.persons if p.mask.present)
+            result.no_mask = sum(1 for p in result.persons if not p.mask.present)
         result.processing_time = time.time() - start
         
         return result
@@ -5227,7 +5296,7 @@ _ppe_detector = None
 
 _lock = threading.Lock()
 
-def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True, force_new=False):
+def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True, force_new=False, detection_mode="all"):
 
     """Get or create PPE detector with auto-recovery"""
 
@@ -5235,9 +5304,18 @@ def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True, f
 
     with _lock:
 
-        if _ppe_detector is None or force_new:
+        detector_mode = getattr(_ppe_detector, 'detection_mode', None) if _ppe_detector is not None else None
+        detector_model_path = getattr(_ppe_detector, 'model_path', None) if _ppe_detector is not None else None
+        requested_model_path = model_path
+        mode_changed = detector_mode != detection_mode
+        model_changed = detector_model_path is not None and requested_model_path is not None and str(detector_model_path) != str(requested_model_path)
 
-            _ppe_detector = PPEDetector(model_path, debug=debug, auto_recovery=auto_recovery)
+        if _ppe_detector is None or force_new or mode_changed or model_changed:
+
+            _ppe_detector = PPEDetector(model_path, debug=debug, auto_recovery=auto_recovery, detection_mode=detection_mode)
+        else:
+            _ppe_detector.debug = debug
+            _ppe_detector.detection_mode = detection_mode
 
         return _ppe_detector
 

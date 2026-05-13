@@ -101,6 +101,8 @@ import PIL.Image as Image
 import torch
 
 import torchvision
+import torch.nn as nn
+import torchvision.transforms as transforms
 
 from torchvision.models import resnet18, ResNet18_Weights
 
@@ -139,6 +141,7 @@ except Exception as e:
 # Initialize ALPR globally if available
 
 alpr = None
+_webcam_stream_state = None
 
 if ALPR_AVAILABLE:
 
@@ -3523,13 +3526,13 @@ MODEL_CHOICES = [
 
     "yolo26n",
 
-    "yolov8n",
+    # "yolov8n",
+
+    "yolov8s",
 
     # "yolo26s",
 
     # "yolo26m",
-
-    # "yolov8s",
 
 ]
 
@@ -12700,12 +12703,7 @@ def predict_webcam(
         return None, " **Error:** No frame received"
 
     global _webcam_stream_state
-
-    try:
-
-        _webcam_stream_state
-
-    except NameError:
+    if _webcam_stream_state is None:
 
         _webcam_stream_state = {
 
@@ -13581,25 +13579,26 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
     Args:
 
-        model_name: YOLO model to use
+        model_name: YOLO model to use (IGNORED - always uses trained PPE model)
 
         debug: Enable debug output
 
         force_new: Always create fresh detector to prevent state leakage (default: True)
 
     Args:
-        model_name: YOLO model to use
+        model_name: YOLO model to use (IGNORED - always uses trained PPE model)
         debug: Enable debug output
         force_new: Always create fresh detector to prevent state leakage (default: True)
     """
 
     try:
 
-        # Try to get the PPE detector with auto-recovery enabled
+        # Always use trained PPE model (best_new.pt) for PPE detection
+        # Ignore the model_name parameter - PPE detection requires the trained model
+        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
 
-        # force_new=True ensures fresh detector for each image to prevent state leakage
-
-        detector = get_ppe_detector(model_path=model_name, debug=debug, auto_recovery=True, force_new=force_new)
+        # Use best_new.pt for PPE detection
+        detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new)
 
         return detector, True
 
@@ -13615,7 +13614,7 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
             from modules.ppe_detection import PPEDetector
 
-            emergency_detector = PPEDetector(model_path=model_name, debug=debug, auto_recovery=True)
+            emergency_detector = PPEDetector(model_path=ppe_model_path, debug=debug, auto_recovery=True)
 
             return emergency_detector, False
 
@@ -13642,12 +13641,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
             return None, " **Upload an image to start PPE detection**"
 
         print(f"[INFO] Starting PPE detection on image...")
-
-        # Reset detector to ensure new settings are applied
-
-        from modules.ppe_detection import reset_ppe_detector
-
-        reset_ppe_detector()
 
         # Get PPE detector with fallback - ENABLE DEBUG to see details
 
@@ -13828,7 +13821,8 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             else:
 
-                summary_lines.append(f"  -  Mask: ** Missing** (conf: {person.mask.confidence:.2f})")
+                # Mask not present - show NO MASK regardless of whether no_mask class was detected
+                summary_lines.append(f"  -  Mask: ** NO MASK** (conf: {person.mask.confidence:.2f})")
 
             # Show compliance basis
 
@@ -14239,13 +14233,18 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         print(f"[INFO] Starting PPE video processing: {video_path}")
 
-        # Get PPE detector with fallback
-
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
+        # Get PPE detector with fallback - reuse detector for video frames
+        # Enable debug to see helmet detection details
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, force_new=False)
 
         if detector is None:
 
             return None, None, " **PPE Detection Unavailable**\n\nSystem could not initialize PPE detector. Please check model files."
+
+        # Reset video tracker for new video
+        if hasattr(detector, 'reset_video_tracker'):
+            detector.reset_video_tracker()
+            print("[INFO] Video tracker reset for new video")
 
         # Open video
 
@@ -14271,16 +14270,22 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         os.makedirs("ppe_outputs", exist_ok=True)
 
-        # Try H.264 first (browser compatible), fallback to XVID
-        fourcc = cv2.VideoWriter_fourcc(*'avc1')
-        out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
+        # VideoWriter codec handling (Windows-friendly): prefer mp4v, then fallback to XVID
+        # Note: H.264/avc1 often fails on Windows without the right codecs.
+        out_fps = fps / every_n if fps and fps > 0 else 10
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
 
         if not out.isOpened():
             # Fallback to XVID codec with AVI container
             output_path = output_path.replace('.mp4', '.avi')
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            out = cv2.VideoWriter(output_path, fourcc, fps / every_n, (width, height))
+            out = cv2.VideoWriter(output_path, fourcc, out_fps, (width, height))
             print(f"[INFO] Using fallback XVID codec: {output_path}")
+
+        if not out.isOpened():
+            cap.release()
+            return None, None, " **Error:** Failed to initialize VideoWriter (codec not available). Try installing FFmpeg or use AVI output."
 
         frame_count = 0
 
@@ -14298,6 +14303,8 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         total_no_masks = 0
 
+        total_no_ppe = 0
+
         while True:
 
             ret, frame = cap.read()
@@ -14312,9 +14319,14 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
                 continue
 
-            # Detect PPE
-
-            result = detector.detect(frame, debug=True)
+            # Enable debug for first few frames to understand helmet detection
+            enable_debug = processed_count < 3
+            
+            # Use video-optimized detection with temporal smoothing + tracking
+            if hasattr(detector, 'detect_video'):
+                result = detector.detect_video(frame, frame_number=frame_count, debug=enable_debug)
+            else:
+                result = detector.detect(frame, debug=enable_debug)
 
             total_helmets += result.helmet_detected
 
@@ -14327,6 +14339,9 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
             total_masks += result.mask_detected
 
             total_no_masks += result.no_mask
+
+            # Count persons with NO PPE at all (no helmet AND no vest AND no mask)
+            total_no_ppe += sum(1 for p in result.persons if not p.helmet.present and not p.vest.present and not p.mask.present)
 
             # Annotate
 
@@ -14441,7 +14456,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
 -  Masks Detected: **{total_masks}**
 
--  No PPE: **{total_no_helmets + total_no_vests + total_no_masks}**
+-  No PPE: **{total_no_ppe}**
 
 **Video Info:**
 
@@ -14605,7 +14620,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         # Get PPE detector with fallback
 
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=False)
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=False, force_new=False)
 
         if detector is None:
 
@@ -14629,9 +14644,17 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             frame_bgr = frame
 
-        # Detect PPE
+        # Detect PPE - use video-optimized detection for webcam too
+        if not hasattr(detector, '_webcam_frame_count'):
+            detector._webcam_frame_count = 0
+            if hasattr(detector, 'reset_video_tracker'):
+                detector.reset_video_tracker()
+        detector._webcam_frame_count += 1
 
-        result = detector.detect(frame_bgr, debug=False)
+        if hasattr(detector, 'detect_video'):
+            result = detector.detect_video(frame_bgr, frame_number=detector._webcam_frame_count, debug=False)
+        else:
+            result = detector.detect(frame_bgr, debug=False)
 
         # Create annotated frame
 
@@ -15002,7 +15025,7 @@ with demo:
 
     ppe_btn.click(
 
-        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary"), gr.update(value="yolov8n")),
+        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary"), gr.update(value="yolov8s")),
 
         inputs=[],
 
@@ -15214,16 +15237,12 @@ if __name__ == "__main__":
 
     print(f"[INFO] Server will run on port: 7862")
 
-    # Create custom temp directory with proper permissions
-
-    custom_temp = os.path.join(os.getcwd(), "temp_gradio")
-
+    # Use system temp directory to avoid file path issues
+    import tempfile
+    custom_temp = tempfile.gettempdir()
     os.makedirs(custom_temp, exist_ok=True)
-
-    print(f"[INFO] Using custom temp directory: {custom_temp}")
-
-    # Set environment variable to use custom temp directory
-
+    print(f"[INFO] Using system temp directory: {custom_temp}")
+    # Set environment variable to use system temp directory
     os.environ["GRADIO_TEMP_DIR"] = custom_temp
 
     # Cleanup old temp files on startup

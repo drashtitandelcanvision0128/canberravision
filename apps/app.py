@@ -13625,7 +13625,7 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, de
 
             return None, False
 
-def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, detection_mode="all"):
+def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, detection_mode="all"):
 
     """
 
@@ -13738,12 +13738,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
                 f"- No Masks: **{result.no_mask}**",
                 "",
             ])
-        else:
-            summary_lines.extend([
-                f"- Unknown: **{unknown_vehicles}**",
-                "",
-            ])
-
         # Show relevant PPE counts based on vehicle types detected
 
         if detection_mode != "mask" and two_wheelers > 0:
@@ -13755,19 +13749,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
                 f"- Helmets Detected: **{result.helmet_detected}**",
 
                 f"- No Helmets: **{result.no_helmet}**",
-
-                "",
-
-            ])
-
-
-        if detection_mode not in ("mask",) and unknown_vehicles > 0:
-
-            summary_lines.extend([
-
-                f"**Unknown Vehicle Safety:**",
-
-                f"- Any Safety Equipment: **{result.helmet_detected + result.vest_detected}**",
 
                 "",
 
@@ -13803,9 +13784,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             summary_lines.append(f"\n**Person {person.person_id}** {status_emoji}")
 
-            if detection_mode != "mask":
-                summary_lines.append(f"  - Vehicle Type: **{person.vehicle_type.upper()}**")
-
             # Show only relevant PPE information based on vehicle type
 
             # Show PPE information - Helmet, Vest, Mask only
@@ -13834,21 +13812,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
                 # Mask not present - show NO MASK regardless of whether no_mask class was detected
                 summary_lines.append(f"  -  Mask: ** NO MASK** (conf: {person.mask.confidence:.2f})")
-
-            # Show compliance basis
-
-            if detection_mode == "mask":
-                compliance_basis = "Mask/No Mask"
-            elif detection_mode == "helmet_vest":
-                compliance_basis = "Helmet/Vest"
-            else:
-                compliance_basis = "Helmet/Vest/Mask"
-            summary_lines.append(f"  -  **Compliance based on: PPE ({compliance_basis})**")
-
-            # Add detection methods
-
-            if detection_mode != "mask":
-                summary_lines.append(f"  -  Helmet Method: `{person.helmet.detection_method}`")
 
         if result.error_message:
 
@@ -14226,7 +14189,7 @@ def create_ppe_side_panel(result, detection_mode="all"):
 
     return full_html
 
-def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
+def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in uploaded video with fallback"""
 
@@ -14690,7 +14653,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         return None, f" **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
 
-def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
+def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in live webcam with fallback"""
 

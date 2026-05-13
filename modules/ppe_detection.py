@@ -313,7 +313,10 @@ class PPEDetector:
 
         self.person_model = None
 
-        self.person_model_path = "yolov8n.pt"
+        _repo = os.path.dirname(os.path.dirname(__file__))
+        _yolo_n = os.path.join(_repo, "models", "yolov8n.pt")
+        # Prefer repo-local weights so person detection works regardless of cwd (e.g. apps/)
+        self.person_model_path = _yolo_n if os.path.exists(_yolo_n) else "yolov8n.pt"
 
         self.device = device or self._get_device()
 
@@ -329,11 +332,19 @@ class PPEDetector:
 
         # Single person box approach - detect PPE within person regions
 
-        # Lower person_threshold for better detection of non-standard poses (sitting, cross-legged, etc.)
-        self.person_threshold = 0.10
+        # Person (COCO) — low conf catches small / dim / webcam frames; fallback pass uses even lower
+        self.person_threshold = 0.08
         self.ppe_threshold = 0.06  # Lower confidence for PPE model inference in video
         self.helmet_threshold = 0.05  # More sensitive helmet fallback threshold for video
         self.fallback_threshold = 0.12
+        # When the PPE model reports "helmet" on the head ROI, reject unless confidence is high enough
+        # if hair/styled-hair or skin-dominated head cues fire (reduces hair/shine/bald false positives).
+        self.model_helmet_min_conf_if_hair = 0.52
+        self.model_helmet_min_conf_if_skin = 0.58
+        self.model_helmet_skin_color_override_conf = 0.40  # min color score to keep helmet when skin-like ROI
+        # Raw YOLO "helmet/hardhat" below this is treated as uncertain — skip assigning helmet_detected
+        # (avoids 0.27–0.35 hair FPs when texture heuristics miss). Lower if distant helmets disappear.
+        self.model_helmet_accept_min_conf = 0.42
 
         # Video smoothing state
         self._ppe_history = {} # person_id -> history of results
@@ -341,7 +352,10 @@ class PPEDetector:
 
         self._ensure_model_loaded()
 
-        print(f"[PPE] Initialized - helmet_threshold={self.helmet_threshold}, fallback_enabled=True")
+        print(
+            f"[PPE] Initialized - helmet_threshold={self.helmet_threshold}, "
+            f"model_helmet_accept_min_conf={self.model_helmet_accept_min_conf}, fallback_enabled=True"
+        )
 
     def _get_device(self):
 
@@ -446,6 +460,42 @@ class PPEDetector:
         head_x2 = head_x_center + int(head_width / 2)
 
         return (max(x1, head_x1), max(y1, head_top), min(x2, head_x2), min(y2, head_bottom))
+
+    def _select_helmet_draw_bbox(self, frame, person_bbox, head_anchor_bbox, model_helmet_bbox):
+        """Use YOLO helmet box on the input frame when it aligns with person/head; else head_anchor."""
+        if model_helmet_bbox is None or frame is None:
+            return head_anchor_bbox
+        fh, fw = frame.shape[:2]
+        try:
+            x1, y1, x2, y2 = (int(round(c)) for c in model_helmet_bbox)
+        except (TypeError, ValueError):
+            return head_anchor_bbox
+        x1 = max(0, min(x1, fw - 1))
+        x2 = max(0, min(x2, fw - 1))
+        y1 = max(0, min(y1, fh - 1))
+        y2 = max(0, min(y2, fh - 1))
+        if x2 <= x1 or y2 <= y1:
+            return head_anchor_bbox
+        px1, py1, px2, py2 = person_bbox
+        person_area = max(1, (px2 - px1) * (py2 - py1))
+        model_area = max(1, (x2 - x1) * (y2 - y1))
+        if model_area > 0.72 * person_area:
+            return head_anchor_bbox
+        hx1, hy1, hx2, hy2 = head_anchor_bbox
+        cx = (x1 + x2) * 0.5
+        cy = (y1 + y2) * 0.5
+        margin_w = (px2 - px1) * 0.15
+        margin_top = (py2 - py1) * 0.40
+        if not (px1 - margin_w <= cx <= px2 + margin_w and py1 - margin_top <= cy <= py2 + (py2 - py1) * 0.08):
+            return head_anchor_bbox
+        ix1 = max(x1, hx1)
+        iy1 = max(y1, hy1)
+        ix2 = min(x2, hx2)
+        iy2 = min(y2, hy2)
+        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+        if inter / model_area < 0.10:
+            return head_anchor_bbox
+        return (x1, y1, x2, y2)
 
     def get_face_region(self, person_bbox, frame=None):
         """Extract face/mouth region for mask detection - adaptive based on actual face position"""
@@ -2104,6 +2154,19 @@ class PPEDetector:
 
                     is_worn, worn_conf = self._validate_helmet_position(frame, head_bbox, person_bbox)
 
+                    if self.debug:
+
+                        print(f"[PPE-DEBUG] Direct PPE helmet validation: max_conf={max_conf:.2f}, worn_conf={worn_conf:.2f}, is_worn={is_worn}")
+
+                    # Require stronger validation for low-confidence helmets
+                    if max_conf < 0.35 and (not is_worn or worn_conf < 0.65):
+
+                        if self.debug:
+
+                            print(f"[PPE-DEBUG] Weak direct helmet rejected: low confidence and poor head validation")
+
+                        return False, max_conf * worn_conf, f"direct_ppe_rejected_low_conf"
+
                     if not is_worn:
 
                         if self.debug:
@@ -2120,6 +2183,10 @@ class PPEDetector:
 
             else:
 
+                if self.debug:
+                    print(f"[PPE-DEBUG] Direct PPE model inconclusive: helmet_detected={helmet_detected}, max_conf={max_conf:.2f}, threshold={threshold:.2f}. Falling back to traditional detection.")
+                    print(f"[PPE-DEBUG] head_bbox={head_bbox}, frame_shape={frame.shape}")
+                
                 # Fallback to traditional detection
 
                 return self._detect_helmet_traditional(frame, head_bbox, frame[y1:y2, x1:x2])
@@ -2951,15 +3018,21 @@ class PPEDetector:
             # STEP 3: Detection assign karo
             # ============================================
 
-            # Helmet
+            # Helmet — require min confidence so weak "hair as hardhat" boxes are not assigned to persons
             if class_lower in ['hardhat', 'helmet']:
-                if conf > result['helmet_conf'] and conf >= self.ppe_threshold:
+                min_helmet_assign = max(self.ppe_threshold, self.model_helmet_accept_min_conf)
+                if conf > result['helmet_conf'] and conf >= min_helmet_assign:
                     result['helmet_detected'] = True
                     result['helmet_conf'] = conf
                     result['helmet_class'] = class_name
                     result['helmet_bbox'] = det['bbox']
                     if self.debug:
-                        print(f"[PPE-DEBUG] Helmet accepted: conf={conf:.3f}")
+                        print(f"[PPE-DEBUG] Helmet accepted: conf={conf:.3f} (min_assign={min_helmet_assign:.2f})")
+                elif self.debug and conf >= self.ppe_threshold and conf < min_helmet_assign:
+                    print(
+                        f"[PPE-DEBUG] Helmet REJECTED (weak model score): conf={conf:.3f} "
+                        f"< model_helmet_accept_min_conf={self.model_helmet_accept_min_conf:.2f}"
+                    )
                 elif conf < self.ppe_threshold and self.debug:
                     print(f"[PPE-DEBUG] Helmet REJECTED: conf={conf:.3f} below {self.ppe_threshold:.2f}")
 
@@ -3339,13 +3412,10 @@ class PPEDetector:
 
                             persons = deduped
 
-                    # If no persons detected but we have PPE items, create person from PPE
-                    # Don't create fake persons from PPE - only use actual person detections
-                    # If no persons detected, return empty results
-                    if len(persons) == 0:
-                        if self.debug:
-                            print(f"[PPE-DEBUG] No persons detected, returning empty results")
-                        return []
+                    # If no persons yet, do NOT return here — outer fallback retries person_model
+                    # at lower conf, PPE-model person class, then HOG (was broken by early return []).
+                    if len(persons) == 0 and self.debug:
+                        print("[PPE-DEBUG] No persons from primary PPE path; will run fallback chain if needed")
 
                 else:
 
@@ -3440,9 +3510,14 @@ class PPEDetector:
 
                     try:
 
-                        person_results = self.person_model(frame, conf=0.10, iou=0.45,
-
-                                                          device=self.device, verbose=False, classes=[0])
+                        person_results = self.person_model(
+                            frame,
+                            conf=max(0.05, self.person_threshold * 0.5),
+                            iou=0.50,
+                            device=self.device,
+                            verbose=False,
+                            classes=[0],
+                        )
 
                         for result in person_results:
 
@@ -4132,27 +4207,56 @@ class PPEDetector:
 
                     helmet_method = ppe_items_near_person.get('helmet_class', 'model_detected')
 
-                    # Always use person's head region for helmet bbox (not model's bbox)
-                    # This ensures helmet bbox is drawn according to person's head position
-                    head_bbox = self.get_head_region(person_bbox, frame)
+                    # Head anchor: full head ROI for hair/skin post-checks (not the tight draw box)
+                    head_anchor = self.get_head_region(person_bbox, frame)
+                    head_roi = frame[head_anchor[1]:head_anchor[3], head_anchor[0]:head_anchor[2]]
 
-                    # Relaxed hair check for better video detection (only reject very low confidence)
-                    # Only reject if confidence is very low (< 0.20) AND hair is detected
-                    if helmet_conf < 0.20:
-                        head_roi = frame[head_bbox[1]:head_bbox[3], head_bbox[0]:head_bbox[2]]
-                        if head_roi.size > 0:
-                            has_hair = self._check_hair_texture(head_roi)
-                            has_styled = self._check_styled_hair(head_roi)
-                            if has_hair or has_styled:
-                                helmet_present = False
-                                helmet_conf = helmet_conf * 0.5
-                                helmet_method = 'rejected_hair_detected'
-                                if self.debug:
-                                    print(f"[PPE-DEBUG] Helmet REJECTED: hair/styled hair detected (hair={has_hair}, styled={has_styled}), model conf was {ppe_items_near_person['helmet_conf']:.2f}")
+                    # Post-filter YOLO "helmet" FPs: shiny/short hair and moderate model scores (e.g. 0.34)
+                    # used to skip checks because rejection only ran when conf < 0.20.
+                    if head_roi.size > 0:
+                        has_hair = self._check_hair_texture(head_roi)
+                        has_styled = self._check_styled_hair(head_roi)
+                        if (has_hair or has_styled) and helmet_conf < self.model_helmet_min_conf_if_hair:
+                            helmet_present = False
+                            helmet_conf = helmet_conf * 0.5
+                            helmet_method = 'rejected_hair_detected'
+                            if self.debug:
+                                print(
+                                    f"[PPE-DEBUG] Helmet REJECTED: hair/styled on head ROI "
+                                    f"(hair={has_hair}, styled={has_styled}), model_conf={ppe_items_near_person['helmet_conf']:.2f} "
+                                    f"< min_if_hair={self.model_helmet_min_conf_if_hair:.2f}"
+                                )
+                        if helmet_present:
+                            has_skin = self._check_skin_texture(head_roi)
+                            if has_skin and helmet_conf < self.model_helmet_min_conf_if_skin:
+                                color_ok, color_c, _color_name = self.detect_helmet_by_color(
+                                    head_roi, self.helmet_threshold
+                                )
+                                strong_helmet_color = (
+                                    color_ok and color_c >= self.model_helmet_skin_color_override_conf
+                                )
+                                if not strong_helmet_color:
+                                    helmet_present = False
+                                    helmet_conf = helmet_conf * 0.45
+                                    helmet_method = 'rejected_skin_dominated_head'
+                                    if self.debug:
+                                        print(
+                                            f"[PPE-DEBUG] Helmet REJECTED: skin-dominated head ROI, "
+                                            f"model_conf={ppe_items_near_person['helmet_conf']:.2f} "
+                                            f"< min_if_skin={self.model_helmet_min_conf_if_skin:.2f}, "
+                                            f"color_override={strong_helmet_color} (color_conf={color_c:.2f})"
+                                        )
+
+                    if helmet_present:
+                        head_bbox = self._select_helmet_draw_bbox(
+                            frame, person_bbox, head_anchor, ppe_items_near_person.get('helmet_bbox')
+                        )
+                    else:
+                        head_bbox = head_anchor
 
                     if self.debug and helmet_present:
 
-                        print(f"[PPE-DEBUG] Model detected helmet: {helmet_method} (conf: {helmet_conf:.2f}) bbox: {head_bbox}")
+                        print(f"[PPE-DEBUG] Model detected helmet: {helmet_method} (conf: {helmet_conf:.2f}) draw_bbox: {head_bbox}")
 
                 elif ppe_items_near_person.get('no_hardhat'):
 
@@ -4411,9 +4515,9 @@ class PPEDetector:
 
                     vehicle_type=vehicle_type,
 
-                    head_bbox=head_bbox,  # Always show head region
+                    head_bbox=head_bbox,  # Model-aligned helmet box when available, else head anchor
 
-                    vest_bbox=vest_bbox,  # Always show vest region
+                    vest_bbox=vest_bbox,  # Model vest bbox when available, else estimated torso region
 
                     mask_bbox=mask_bbox,  # Always pass mask_bbox (can be no_mask bbox too)
 

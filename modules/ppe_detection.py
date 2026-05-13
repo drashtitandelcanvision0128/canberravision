@@ -4729,6 +4729,9 @@ class PPEDetector:
 
         h, w = img.shape[:2]
 
+        # Top summary bar occupies ~y 5–35; keep person text strip below it when show_labels
+        summary_band_bottom = 40
+
         def _clamp_bbox(bbox):
             if not bbox:
                 return None
@@ -4813,6 +4816,15 @@ class PPEDetector:
 
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
 
+            # When both helmet and vest are OK, use only the person box (no inner helmet/vest rects)
+            merge_helmet_vest = (
+                self.detection_mode != "mask"
+                and person.helmet.present
+                and person.vest.present
+            )
+            # Mask-only UI: always use person bbox only (no inner mask / NO MASK face box)
+            merge_mask_into_person = self.detection_mode == "mask"
+
             # Draw helmet/vest/mask bounding boxes ONLY if at least one PPE is present
             # If no helmet, no vest, no mask - only show red person bbox
             any_ppe_present = (
@@ -4826,7 +4838,7 @@ class PPEDetector:
 
                 # Draw vest bounding box
 
-                if self.detection_mode != "mask" and person.vest_bbox:
+                if self.detection_mode != "mask" and person.vest_bbox and not merge_helmet_vest:
 
                     clamped_vest_bbox = _clamp_bbox(person.vest_bbox)
                     if clamped_vest_bbox:
@@ -4847,13 +4859,13 @@ class PPEDetector:
 
                 else:
 
-                    if self.debug:
+                    if self.debug and not merge_helmet_vest:
 
                         print(f"[PPE-DEBUG] No vest bbox to draw for person {person.person_id}")
 
                 # Draw helmet bounding box
 
-                if self.detection_mode != "mask" and person.head_bbox:
+                if self.detection_mode != "mask" and person.head_bbox and not merge_helmet_vest:
 
                     clamped_head_bbox = _clamp_bbox(person.head_bbox)
                     if clamped_head_bbox:
@@ -4871,7 +4883,7 @@ class PPEDetector:
 
                 # Draw mask bounding box
 
-                if self.detection_mode != "helmet_vest" and person.mask_bbox:
+                if self.detection_mode != "helmet_vest" and person.mask_bbox and not merge_mask_into_person:
                     if self.debug:
                         print(f"[PPE-DEBUG] Drawing mask bbox: {person.mask_bbox}, present={person.mask.present}")
                     clamped_mask_bbox = _clamp_bbox(person.mask_bbox)
@@ -4893,7 +4905,7 @@ class PPEDetector:
 
                 else:
 
-                    if self.debug:
+                    if self.debug and not merge_mask_into_person:
 
                         print(f"[PPE-DEBUG] No mask bbox to draw for person {person.person_id}")
 
@@ -4928,6 +4940,10 @@ class PPEDetector:
 
                 text_y = y1 - 10 if y1 > 30 else y1 + text_size[1] + 10
 
+                label_top = text_y - text_size[1] - 5
+                if label_top < summary_band_bottom:
+                    text_y = summary_band_bottom + text_size[1] + 6
+
                 # Background rectangle for text
 
                 cv2.rectangle(img, (text_x, text_y - text_size[1] - 5),
@@ -4943,13 +4959,21 @@ class PPEDetector:
         if self.detection_mode == "helmet_vest":
             summary = f"Persons: {result.total_persons} | Helmets: {result.helmet_detected} | Vests: {result.vest_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
         elif self.detection_mode == "mask":
-            summary = f"Persons: {result.total_persons} | Masks: {result.mask_detected} | No Masks: {result.no_mask} | Model: {'OK' if result.model_loaded else 'FB'}"
+            summary = f"Persons: {result.total_persons} | Masks: {result.mask_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
         else:
             summary = f"Persons: {result.total_persons} | Helmets: {result.helmet_detected} | Vests: {result.vest_detected} | Masks: {result.mask_detected} | Model: {'OK' if result.model_loaded else 'FB'}"
 
-        cv2.rectangle(img, (10, 5), (1100, 35), (0, 0, 0), -1)  # Increased width for more columns
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_thick = 2
+        (tw, th), _baseline = cv2.getTextSize(summary, font, font_scale, font_thick)
+        bar_x1, bar_y1 = 10, 5
+        pad_right = 12
+        bar_x2 = min(w - 1, 15 + tw + pad_right)
+        bar_y2 = 35
+        cv2.rectangle(img, (bar_x1, bar_y1), (bar_x2, bar_y2), (0, 0, 0), -1)
 
-        cv2.putText(img, summary, (15, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.putText(img, summary, (15, 25), font, font_scale, (255, 255, 255), font_thick)
 
         if result.error_message:
 

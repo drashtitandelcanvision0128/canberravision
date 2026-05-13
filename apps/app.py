@@ -13625,7 +13625,7 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, de
 
             return None, False
 
-def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, detection_mode="all"):
+def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, detection_mode="all"):
 
     """
 
@@ -13735,7 +13735,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
         if detection_mode == "mask":
             summary_lines.extend([
                 f"- Masks Detected: **{result.mask_detected}**",
-                f"- No Masks: **{result.no_mask}**",
+                f"- No Masks Detected: **{result.no_mask}**",
                 "",
             ])
         # Show relevant PPE counts based on vehicle types detected
@@ -14189,7 +14189,7 @@ def create_ppe_side_panel(result, detection_mode="all"):
 
     return full_html
 
-def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, every_n=5, detection_mode="all"):
+def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in uploaded video with fallback"""
 
@@ -14653,7 +14653,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         return None, f" **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
 
-def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=False, show_confidence=True, every_n=5, detection_mode="all"):
+def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in live webcam with fallback"""
 

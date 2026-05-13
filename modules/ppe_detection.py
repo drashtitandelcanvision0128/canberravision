@@ -39,30 +39,22 @@ PPE_DATASET_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dat
 # Load PPE dataset classes
 
 def load_ppe_classes():
-
-    """Load PPE classes from dataset YAML file"""
-
+    """Load PPE classes directly from model"""
     try:
-
-        if os.path.exists(PPE_DATASET_PATH):
-
-            with open(PPE_DATASET_PATH, 'r') as f:
-
-                config = yaml.safe_load(f)
-
-            return config.get('names', []), config.get('nc', 5)
-
-        else:
-
-            print(f"[WARNING] PPE dataset config not found at {PPE_DATASET_PATH}")
-
-            return ['helmet', 'no-helmet', 'no-vest', 'person', 'vest'], 5
-
+        from ultralytics import YOLO
+        model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                  'models', 'best_new.pt')
+        if os.path.exists(model_path):
+            m = YOLO(model_path)
+            names = list(m.names.values())
+            print(f"[INFO] Classes loaded from model: {names}")
+            return names, len(names)
     except Exception as e:
-
-        print(f"[ERROR] Failed to load PPE dataset config: {e}")
-
-        return ['helmet', 'no-helmet', 'no-vest', 'person', 'vest'], 5
+        print(f"[ERROR] Model se classes load nahi hui: {e}")
+    # Fallback
+    return ['boots','gloves','goggles','helmet','mask',
+            'no_boots','no_gloves','no_goggle','no_helmet',
+            'no_mask','no_vest','person','vest'], 13
 
 # Load dataset classes
 
@@ -190,7 +182,7 @@ class PPEDetector:
 
         ("yellow", [20, 100, 100], [35, 255, 255]),
 
-        ("white", [0, 0, 120], [180, 80, 255]),  # Wider white range - lower value, higher saturation
+        ("white", [0, 0, 100], [180, 100, 255]),  # Wider white range - improved for better detection
 
         ("blue", [90, 50, 50], [130, 255, 255]),
 
@@ -264,7 +256,7 @@ class PPEDetector:
 
             # Try to find trained PPE model first
 
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best.pt')
+            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
 
             print(f"[PPE] Checking PPE model at: {ppe_model_path} (exists={os.path.exists(ppe_model_path)})")
 
@@ -277,14 +269,14 @@ class PPEDetector:
             else:
 
                 # Try absolute path as fallback
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best.pt"
+                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_new.pt"
                 print(f"[PPE] Relative path failed, trying absolute: {abs_ppe_path} (exists={os.path.exists(abs_ppe_path)})")
                 if os.path.exists(abs_ppe_path):
                     model_path = abs_ppe_path
                     print(f"[PPE] Using trained PPE model (absolute): {model_path}")
                 else:
-                    # Fallback to YOLOv8 for person detection
-                    model_path = "yolov8n.pt"
+                    # Fallback to best_new.pt for PPE detection
+                    model_path = "best_new.pt"
                     print(f"[PPE] PPE model not found, using fallback: {model_path}")
 
         elif is_ppe_choice:
@@ -293,7 +285,7 @@ class PPEDetector:
 
             print(f"[PPE] PPE model choice detected ({model_path}), resolving path")
 
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best.pt')
+            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
 
             if os.path.exists(ppe_model_path):
 
@@ -303,7 +295,7 @@ class PPEDetector:
 
             else:
 
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best.pt"
+                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_new.pt"
                 if os.path.exists(abs_ppe_path):
                     model_path = abs_ppe_path
                     print(f"[PPE] Using trained PPE model (absolute): {model_path}")
@@ -335,13 +327,15 @@ class PPEDetector:
 
         # Single person box approach - detect PPE within person regions
 
-        self.person_threshold = 0.10  # Person detection threshold (lowered for 4-5+ person images)
+        # Lower person_threshold for better detection of non-standard poses (sitting, cross-legged, etc.)
+        self.person_threshold = 0.10
+        self.ppe_threshold = 0.06  # Lower confidence for PPE model inference in video
+        self.helmet_threshold = 0.05  # More sensitive helmet fallback threshold for video
+        self.fallback_threshold = 0.12
 
-        self.ppe_threshold = 0.10  # PPE item detection threshold (lowered to catch mask/no_mask)
-
-        self.helmet_threshold = 0.20  # Helmet detection within head region
-
-        self.fallback_threshold = 0.15  # Fallback detection threshold
+        # Video smoothing state
+        self._ppe_history = {} # person_id -> history of results
+        self._max_history = 5  # Number of frames to smooth over
 
         self._ensure_model_loaded()
 
@@ -385,7 +379,7 @@ class PPEDetector:
 
                 # Also load separate person detection model if PPE model is being used
 
-                if self.person_model is None and "best.pt" in self.model_path:
+                if self.person_model is None and ("best.pt" in self.model_path or "best_new.pt" in self.model_path):
 
                     try:
 
@@ -431,123 +425,25 @@ class PPEDetector:
 
     def get_head_region(self, person_bbox, frame=None):
 
-        """Extract head region - adaptive based on pose using YOLO model"""
+        """Extract head region - more robust fallback based on height proportions"""
 
         x1, y1, x2, y2 = person_bbox
-
         height = y2 - y1
-
         width = x2 - x1
 
-        # ADAPTIVE: Try to find actual helmet position using model
+        # Use fixed proportions for robust head region estimation
+        # Head is top 20-25% depending on distance (increased for better helmet detection)
+        head_h_ratio = 0.22 if height > 400 else 0.28 # Increased from 0.18/0.22 for larger head ROI
+        head_top = y1
+        head_bottom = y1 + int(height * head_h_ratio)
+        
+        # Center head horizontally (increased width for better helmet detection)
+        head_width = int(width * 0.5)  # Increased from 0.4 to 0.5
+        head_x_center = x1 + int(width / 2)
+        head_x1 = head_x_center - int(head_width / 2)
+        head_x2 = head_x_center + int(head_width / 2)
 
-        if frame is not None and self.model is not None:
-
-            try:
-
-                # Run model on full person to find helmet
-
-                person_roi = frame[y1:y2, x1:x2]
-
-                if person_roi.size > 0:
-
-                    results = self.model(person_roi, conf=0.1, iou=0.45,
-
-                                      device=self.device, verbose=False)
-
-                    for result in results:
-
-                        if result.boxes is not None:
-
-                            for box in result.boxes:
-
-                                cls = int(box.cls[0].cpu().numpy())
-
-                                if cls < len(PPE_CLASSES) and PPE_CLASSES[cls].lower().replace('-', '').replace(' ', '') in ['helmet', 'hardhat', 'goggles']:
-
-                                    hx1, hy1, hx2, hy2 = box.xyxy[0].cpu().numpy()
-
-                                    # Convert to full frame coordinates
-
-                                    return (int(x1 + hx1), int(y1 + hy1),
-
-                                           int(x1 + hx2), int(y1 + hy2))
-
-            except:
-
-                pass  # Fall back to image analysis
-
-        # SMART FALLBACK: Analyze image content to find head position
-
-        if frame is not None:
-
-            try:
-
-                person_roi = frame[y1:y2, x1:x2]
-
-                if person_roi.size > 0:
-
-                    # Convert to HSV for skin detection
-
-                    hsv = cv2.cvtColor(person_roi, cv2.COLOR_BGR2HSV)
-
-                    gray = cv2.cvtColor(person_roi, cv2.COLOR_BGR2GRAY)
-
-                    # Detect skin (face/head area)
-
-                    lower_skin = np.array([0, 20, 70])
-
-                    upper_skin = np.array([20, 170, 255])
-
-                    skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
-
-                    # Detect hair (dark textured region at top)
-
-                    dark_mask = gray < 80
-
-                    # Analyze top 30% of person for head features
-
-                    top_region_h = int(height * 0.30)
-
-                    top_skin = skin_mask[:top_region_h, :]
-
-                    top_dark = dark_mask[:top_region_h, :]
-
-                    # Find where skin or hair ends (head bottom)
-
-                    head_bottom = 0
-
-                    for row in range(top_region_h):
-
-                        skin_pixels = np.sum(top_skin[row, :])
-
-                        dark_pixels = np.sum(top_dark[row, :])
-
-                        width = top_skin.shape[1]
-
-                        if skin_pixels > width * 0.1 or dark_pixels > width * 0.2:
-
-                            head_bottom = row
-
-                    # Use detected head position if reasonable (8% to 20%)
-
-                    if head_bottom > int(height * 0.08) and head_bottom < int(height * 0.20):
-
-                        if self.debug:
-
-                            print(f"[PPE-DEBUG] Image-based head detection: {head_bottom}px ({head_bottom/height:.1%})")
-
-                        return (x1, y1, x2, y1 + head_bottom)
-
-            except:
-
-                pass
-
-        # FINAL FALLBACK: Fixed top 12% for head bounding box
-
-        head_height = int(height * 0.12)
-
-        return (x1, y1, x2, y1 + head_height)
+        return (max(x1, head_x1), max(y1, head_top), min(x2, head_x2), min(y2, head_bottom))
 
     def get_face_region(self, person_bbox, frame=None):
         """Extract face/mouth region for mask detection - adaptive based on actual face position"""
@@ -605,111 +501,94 @@ class PPEDetector:
                 pass
         
         # Fallback: fixed percentage (20-45% of person height) - larger range for small images
-        face_top = y1 + int(height * 0.20)
-        face_bottom = y1 + int(height * 0.45)
-        
-        # Clamp to person bounds
-        face_top = max(y1, face_top)
-        face_bottom = min(y2, face_bottom)
+        face_top = max(y1, y1 + int(height * 0.20))
+        face_bottom = min(y2, y1 + int(height * 0.45))
         
         return (x1, face_top, x2, face_bottom)
 
-    def get_mask_region_between_helmet_vest(self, person_bbox, head_bbox, vest_bbox):
-        """Get mask/no_mask region between helmet and vest - exactly between them"""
+    def get_mask_region_between_helmet_vest(self, person_bbox, head_bbox=None, vest_bbox=None):
+
+        """Extract mask region - face area between helmet (above) and vest (below)"""
+
         x1, y1, x2, y2 = person_bbox
         height = y2 - y1
         width = x2 - x1
-        
-        # If we have both helmet and vest bboxes, use them
+
+        # If helmet bbox is available, use its bottom as mask top reference
+        # If vest bbox is available, use its top as mask bottom reference
         if head_bbox and vest_bbox:
             hx1, hy1, hx2, hy2 = head_bbox
             vx1, vy1, vx2, vy2 = vest_bbox
             
-            # Mask region is between helmet bottom and vest top
-            mask_top = hy2  # Just below helmet
-            mask_bottom = vy1  # Just above vest
+            # Mask should be below helmet and above vest
+            mask_top = hy2  # Helmet bottom
+            mask_bottom = vy1  # Vest top
             
-            # Add small padding
-            padding = int(height * 0.02)
-            mask_top = max(y1, mask_top - padding)
-            mask_bottom = min(y2, mask_bottom + padding)
+            # Ensure there's space between them
+            if mask_bottom <= mask_top:
+                # Fallback to fixed percentages if helmet and vest overlap
+                mask_top = y1 + int(height * 0.12)
+                mask_bottom = y1 + int(height * 0.35)
             
-            if mask_bottom > mask_top:
-                return (x1, mask_top, x2, mask_bottom)
-        
-        # Fallback: Use fixed percentage between helmet (12%) and vest (40%) regions
-        mask_top = y1 + int(height * 0.20)
-        mask_bottom = y1 + int(height * 0.35)
-        
-        return (x1, mask_top, x2, mask_bottom)
+            # Center horizontally between helmet and vest
+            mask_x_center = (hx1 + hx2 + vx1 + vx2) // 4
+            mask_width = int(width * 0.35)
+            mask_x1 = mask_x_center - int(mask_width / 2)
+            mask_x2 = mask_x_center + int(mask_width / 2)
+            
+        elif head_bbox:
+            # Only helmet available - mask below helmet
+            hx1, hy1, hx2, hy2 = head_bbox
+            mask_top = hy2
+            mask_bottom = y1 + int(height * 0.40)  # 40% from top
+            
+            mask_x_center = (hx1 + hx2) // 2
+            mask_width = int(width * 0.35)
+            mask_x1 = mask_x_center - int(mask_width / 2)
+            mask_x2 = mask_x_center + int(mask_width / 2)
+            
+        elif vest_bbox:
+            # Only vest available - mask above vest
+            vx1, vy1, vx2, vy2 = vest_bbox
+            mask_top = y1 + int(height * 0.10)  # 10% from top
+            mask_bottom = vy1
+            
+            mask_x_center = (vx1 + vx2) // 2
+            mask_width = int(width * 0.35)
+            mask_x1 = mask_x_center - int(mask_width / 2)
+            mask_x2 = mask_x_center + int(mask_width / 2)
+            
+        else:
+            # No helmet or vest - fallback to fixed percentages
+            mask_top = y1 + int(height * 0.12)
+            mask_bottom = y1 + int(height * 0.35)
+            
+            mask_width = int(width * 0.35)
+            mask_x_center = x1 + int(width / 2)
+            mask_x1 = mask_x_center - int(mask_width / 2)
+            mask_x2 = mask_x_center + int(mask_width / 2)
+
+        return (max(x1, mask_x1), max(y1, mask_top), min(x2, mask_x2), min(y2, mask_bottom))
 
     def get_vest_region(self, person_bbox, frame=None, head_bbox=None):
 
-        """Extract vest region - starts right after head region with small gap"""
+        """Extract vest region - more robust fallback based on height proportions"""
 
         x1, y1, x2, y2 = person_bbox
-
         height = y2 - y1
-
         width = x2 - x1
 
-        # ADAPTIVE: Try to find actual vest position
+        # Torso is usually from 15% to 65% of the person
+        vest_top = y1 + int(height * 0.15)
+        vest_bottom = y1 + int(height * 0.65)
+        
+        # Vest is slightly narrower than person bbox
+        vest_width = int(width * 0.8)
+        vest_x_center = x1 + int(width / 2)
+        vest_x1 = vest_x_center - int(vest_width / 2)
+        vest_x2 = vest_x_center + int(vest_width / 2)
 
-        if frame is not None and self.model is not None:
-
-            try:
-
-                # Run model on full person
-
-                person_roi = frame[y1:y2, x1:x2]
-
-                if person_roi.size > 0:
-
-                    results = self.model(person_roi, conf=0.1, iou=0.45,
-
-                                      device=self.device, verbose=False)
-
-                    for result in results:
-
-                        if result.boxes is not None:
-
-                            for box in result.boxes:
-
-                                cls = int(box.cls[0].cpu().numpy())
-
-                                if cls < len(PPE_CLASSES) and PPE_CLASSES[cls].lower().replace('-', '').replace(' ', '') in ['vest', 'safetyvest']:
-
-                                    vx1, vy1, vx2, vy2 = box.xyxy[0].cpu().numpy()
-
-                                    return (int(x1 + vx1), int(y1 + vy1),
-
-                                           int(x1 + vx2), int(y1 + vy2))
-
-            except:
-
-                pass
-
-        # FALLBACK: Vest starts right after head bbox + small gap (5%)
-
-        if head_bbox is not None:
-
-            _, head_y2, _, _ = head_bbox
-
-            gap = int(height * 0.05)  # Small gap after head
-
-            vest_y1 = head_y2 + gap
-
-            vest_y2 = y1 + int(height * 0.75)  # Vest covers torso down to 75%
-
-        else:
-
-            # No head bbox - use fixed position after head region (12% + 5% gap = 17%)
-
-            vest_y1 = y1 + int(height * 0.17)  # After head (12%) + gap (5%)
-
-            vest_y2 = y1 + int(height * 0.75)
-
-        return (x1, vest_y1, x2, vest_y2)
+        return (max(x1, vest_x1), max(y1, vest_top), min(x2, vest_x2), min(y2, vest_bottom))
 
     def _get_hand_region(self, person_bbox, frame):
 
@@ -1003,17 +882,15 @@ class PPEDetector:
 
             return False, 0.0, "error"
 
-    def detect_goggles_by_color(self, eye_roi, threshold=0.25):
+    def detect_goggles_by_color(self, eye_roi, threshold=0.25, frame_roi=None):
 
         """Detect safety goggles by reflective/glass properties"""
 
-        if eye_roi.size == 0:
-
-            return False, 0.0, "none"
+        if frame_roi is None or frame_roi.size == 0:
+            return False, 0.0, "unknown"
 
         try:
-
-            gray = cv2.cvtColor(eye_roi, cv2.COLOR_BGR2GRAY)
+            gray = cv2.cvtColor(frame_roi, cv2.COLOR_BGR2GRAY)
 
             # Goggles characteristics: clear/transparent with frame
 
@@ -1949,7 +1826,7 @@ class PPEDetector:
 
         # Check if we have a trained PPE model
 
-        is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path
+        is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
 
         if is_ppe_model:
 
@@ -2185,7 +2062,7 @@ class PPEDetector:
 
                         # Support both old names (helmet/no-helmet) and new dataset names (Hardhat/NO-Hardhat)
 
-                        class_lower = class_name.lower().replace('-', '').replace(' ', '')
+                        class_lower = class_name.lower().replace('-', '').replace(' ', '').replace('_', '')
 
                         is_helmet_class = class_lower in ['helmet', 'hardhat']
 
@@ -2773,7 +2650,7 @@ class PPEDetector:
 
                     # PPE-trained model doesn't have COCO vehicle classes - skip vehicle detection
 
-                    is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path
+                    is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
 
                     if is_ppe_model:
 
@@ -2966,217 +2843,187 @@ class PPEDetector:
             return "unknown"
 
     def _get_ppe_detections_near_person(self, person_bbox):
-
-        """Get all PPE detections near a specific person."""
+        """Get PPE detections for THIS specific person only - closest person wins."""
 
         px1, py1, px2, py2 = person_bbox
+        person_w = px2 - px1
+        person_h = py2 - py1
 
-        result = {'helmet_detected': False, 'helmet_conf': 0.0, 'helmet_class': '',
-
-                  'helmet_bbox': None, 'no_hardhat': False, 'no_hardhat_conf': 0.0,
-
-                  'vest_detected': False, 'vest_conf': 0.0, 'vest_class': '',
-
-                  'vest_bbox': None, 'no_safetyvest': False, 'no_safetyvest_conf': 0.0,
-
-                  'mask_detected': False, 'mask_conf': 0.0, 'mask_class': '',
-
-                  'mask_bbox': None, 'no_mask': False, 'no_mask_conf': 0.0, 'no_mask_bbox': None}
+        result = {
+            'helmet_detected': False, 'helmet_conf': 0.0, 'helmet_class': '',
+            'helmet_bbox': None, 'no_hardhat': False, 'no_hardhat_conf': 0.0,
+            'vest_detected': False, 'vest_conf': 0.0, 'vest_class': '',
+            'vest_bbox': None, 'no_safetyvest': False, 'no_safetyvest_conf': 0.0,
+            'no_safetyvest_bbox': None,
+            'mask_detected': False, 'mask_conf': 0.0, 'mask_class': '',
+            'mask_bbox': None, 'no_mask': False, 'no_mask_conf': 0.0,
+            'no_mask_bbox': None
+        }
 
         ppe_detections = getattr(self, '_last_ppe_detections', [])
-
         if not ppe_detections:
-
             return result
 
-        px1, py1, px2, py2 = person_bbox
-
-        person_cx = (px1 + px2) / 2
-
-        person_area = (px2 - px1) * (py2 - py1)
-
+        if self.debug:
+            print(f"[PPE-DEBUG] Found {len(ppe_detections)} total PPE items in frame")
+        
         for det in ppe_detections:
-
             dx1, dy1, dx2, dy2 = det['bbox']
-
-            class_lower = det['class'].lower().replace('-', '').replace(' ', '').replace('_', '')
-
             conf = det['confidence']
-
-            if self.debug:
-                print(f"[PPE-DEBUG] Checking PPE: {det['class']} at ({dx1},{dy1},{dx2},{dy2}) vs person at ({px1},{py1},{px2},{py2})")
-
-            # Check if detection overlaps or is very close to person
+            class_name = det['class']
+            class_lower = class_name.lower().replace('-', '').replace(' ', '').replace('_', '')
 
             det_cx = (dx1 + dx2) / 2
-
             det_cy = (dy1 + dy2) / 2
 
-            # Check distance for all PPE items including mask/no_mask
-            margin = max(px2 - px1, py2 - py1) * 0.25
-            near_person = (px1 - margin <= det_cx <= px2 + margin and
-                          py1 - margin <= det_cy <= py2 + margin)
-            if not near_person:
-                continue
+            if self.debug:
+                print(f"[PPE-DEBUG] Checking PPE: {class_name} at ({dx1},{dy1},{dx2},{dy2}) vs person at ({px1},{py1},{px2},{py2})")
 
-            # Also check IoU overlap - PPE item must overlap with person
-
-            ix1 = max(px1, dx1)
-
-            iy1 = max(py1, dy1)
-
-            ix2 = min(px2, dx2)
-
-            iy2 = min(py2, dy2)
-
-            intersection = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-
-            det_area = (dx2 - dx1) * (dy2 - dy1)
-
-            # Check overlap for all PPE items including mask/no_mask
-            is_small_item = False
-            min_overlap = 0.05  # Lower threshold for small items like masks
-            overlap_ratio = intersection / det_area if det_area > 0 else 0
+            # ============================================
+            # STEP 1: Near person check (margin)
+            # ============================================
+            # Define item type flags for margin logic
+            is_mask_class = class_lower in ['mask', 'nomask']
+            is_head_item = class_lower in ['helmet', 'hardhat', 'nohelmet', 'nohardhat']
+            is_vest_item = class_lower in ['vest', 'safetyvest', 'novest', 'nosafetyvest']
             
+            # Strict margins for items that must be ON the person
+            if is_mask_class:
+                # Mask must be in the upper middle area
+                margin_w = person_w * 0.18
+                margin_h = person_h * 0.12
+            elif is_head_item:
+                # Helmet can sit above the head and still belong to the person
+                margin_w = person_w * 0.28
+                margin_h = person_h * 0.22
+            elif is_vest_item:
+                # Vest must be in the torso area with generous margin
+                margin_w = person_w * 0.35
+                margin_h = person_h * 0.28
+            else:
+                margin_w = person_w * 0.20
+                margin_h = person_h * 0.20
+            
+            near_person = (px1 - margin_w <= det_cx <= px2 + margin_w and
+                        py1 - margin_h <= det_cy <= py2 + margin_h)
+
+            if not near_person:
+                if self.debug:
+                    print(f"[PPE-DEBUG] {class_name} not near person (margin={margin_w:.1f},{margin_h:.1f}), skip")
+                continue
+            else:
+                if self.debug and (is_head_item or is_vest_item):
+                    print(f"[PPE-DEBUG] {class_name} NEAR person (margin={margin_w:.1f},{margin_h:.1f}), processing...")
+
+            # ============================================
+            # STEP 2: IoU overlap check
+            # ============================================
+            ix1 = max(px1, dx1)
+            iy1 = max(py1, dy1)
+            ix2 = min(px2, dx2)
+            iy2 = min(py2, dy2)
+            intersection = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+            det_area = (dx2 - dx1) * (dy2 - dy1)
+            overlap_ratio = intersection / det_area if det_area > 0 else 0
+
+            # is_mask_class already defined in STEP 1
+            # Relax overlap for helmet (often at top of bbox) and mask (small items)
+            if is_mask_class:
+                min_overlap = 0.01  # Very low for masks
+            elif is_head_item:
+                min_overlap = 0.0  # Allow helmets that are mostly above the person box
+            else:
+                min_overlap = 0.05  # Standard for other items
+
             if det_area > 0 and overlap_ratio < min_overlap:
+                if self.debug:
+                    print(f"[PPE-DEBUG] {class_name} overlap {overlap_ratio:.3f} < {min_overlap}, skip")
                 continue
 
-            # Check for helmet/head PPE classes
+            # ============================================
+            # STEP 3: Detection assign karo
+            # ============================================
 
+            # Helmet
             if class_lower in ['hardhat', 'helmet']:
-
-                if conf > result['helmet_conf']:
-
+                if conf > result['helmet_conf'] and conf >= self.ppe_threshold:
                     result['helmet_detected'] = True
-
                     result['helmet_conf'] = conf
-
-                    result['helmet_class'] = det['class']
-
+                    result['helmet_class'] = class_name
                     result['helmet_bbox'] = det['bbox']
-
-            # Check for NO-helmet classes (person NOT wearing helmet)
+                    if self.debug:
+                        print(f"[PPE-DEBUG] Helmet accepted: conf={conf:.3f}")
+                elif conf < self.ppe_threshold and self.debug:
+                    print(f"[PPE-DEBUG] Helmet REJECTED: conf={conf:.3f} below {self.ppe_threshold:.2f}")
 
             elif class_lower in ['nohardhat', 'nohelmet']:
-
-                # Also matches 'no_helmet' after underscore removal
-
-                # NO-* class always overrides - if model says NO helmet, trust it
-
                 result['no_hardhat'] = True
-
                 if conf > result['no_hardhat_conf']:
-
                     result['no_hardhat_conf'] = conf
-
-                # NO-* always overrides positive detection - if model says NO helmet, trust it
-
+                # Only override helmet if no-helmet confidence is significantly higher
                 if result['helmet_detected']:
-
-                    result['helmet_detected'] = False
-
-                    result['helmet_conf'] = conf
-
-                    result['helmet_class'] = det['class']
-
-            # Check for vest PPE classes
-            # Minimum vest confidence 0.30 to avoid false positives (shirts detected as vests)
-
-            if class_lower in ['safetyvest', 'vest']:
-
-                if self.debug:
-                    print(f"[PPE-DEBUG] Processing vest detection: conf={conf:.3f}, current_best={result['vest_conf']:.3f}")
-
-                if conf > result['vest_conf'] and conf >= 0.30:
-
-                    result['vest_detected'] = True
-
-                    result['vest_conf'] = conf
-
-                    result['vest_class'] = det['class']
-
-                    result['vest_bbox'] = det['bbox']
-
+                    if conf > result['helmet_conf'] + 0.20 and conf >= 0.70:
+                        result['helmet_detected'] = False
+                        result['helmet_conf'] = conf
+                        result['helmet_class'] = class_name
+                        if self.debug:
+                            print(f"[PPE-DEBUG] NO-Helmet overrides helmet: conf={conf:.3f} > helmet_conf+0.20")
+                    else:
+                        if self.debug:
+                            print(f"[PPE-DEBUG] NO-Helmet ignored: helmet conf={result['helmet_conf']:.3f}, nohelmet conf={conf:.3f}")
+                else:
                     if self.debug:
-                        print(f"[PPE-DEBUG] Vest accepted: conf={conf:.3f}, bbox={det['bbox']}")
+                        print(f"[PPE-DEBUG] NO-Helmet accepted: conf={conf:.3f}")
 
+            # Vest
+            if class_lower in ['safetyvest', 'vest']:
+                if conf > result['vest_conf'] and conf >= 0.30:
+                    result['vest_detected'] = True
+                    result['vest_conf'] = conf
+                    result['vest_class'] = class_name
+                    result['vest_bbox'] = det['bbox']
+                    if self.debug:
+                        print(f"[PPE-DEBUG] Vest accepted: conf={conf:.3f}")
                 elif conf < 0.30 and self.debug:
-                    print(f"[PPE-DEBUG] Vest REJECTED: conf={conf:.3f} below minimum 0.30 (likely shirt, not vest)")
+                    print(f"[PPE-DEBUG] Vest REJECTED: conf={conf:.3f} below 0.30")
 
-            # Check for NO-vest classes
-
-            elif class_lower in ['nosafetyvest', 'novest', 'novest']:
-
-                # Also matches 'no_vest' after underscore removal
-
-                if self.debug:
-                    print(f"[PPE-DEBUG] Processing NO-VEST detection: {det['class']} -> class_lower: '{class_lower}'")
-
+            elif class_lower in ['nosafetyvest', 'novest']:
                 result['no_safetyvest'] = True
-
                 if conf > result['no_safetyvest_conf']:
-
                     result['no_safetyvest_conf'] = conf
                     result['no_safetyvest_bbox'] = det['bbox']
-
-                    if self.debug:
-                        print(f"[PPE-DEBUG] NO-VEST accepted: conf={conf:.3f}")
-
                 if result['vest_detected'] and conf >= result['vest_conf'] * 0.8:
-
                     result['vest_detected'] = False
-
                     result['vest_conf'] = conf
-
-                    result['vest_class'] = det['class']
-
-            # Check for mask PPE class
-
-            if class_lower in ['mask']:
-
+                    result['vest_class'] = class_name
                 if self.debug:
-                    print(f"[PPE-DEBUG] Processing mask detection: conf={conf:.3f}, current_best={result['mask_conf']:.3f}")
+                    print(f"[PPE-DEBUG] NO-Vest accepted: conf={conf:.3f}")
 
+            # Mask
+            if class_lower in ['mask']:
                 if conf > result['mask_conf']:
-
                     result['mask_detected'] = True
-
                     result['mask_conf'] = conf
-
-                    result['mask_class'] = det['class']
-
+                    result['mask_class'] = class_name
                     result['mask_bbox'] = det['bbox']
-
+                    result['no_mask'] = False
+                    result['no_mask_conf'] = 0.0
                     if self.debug:
-                        print(f"[PPE-DEBUG] Mask accepted: conf={conf:.3f}, bbox={det['bbox']}")
-
-            # Check for NO-mask class
+                        print(f"[PPE-DEBUG] Mask accepted: conf={conf:.3f}")
 
             elif class_lower in ['nomask']:
-
-                # Also matches 'no_mask' after underscore removal
-
-                if self.debug:
-                    print(f"[PPE-DEBUG] Processing NO-MASK detection: conf={conf:.3f}, current_best={result['no_mask_conf']:.3f}")
-
                 result['no_mask'] = True
-
                 if conf > result['no_mask_conf']:
-
                     result['no_mask_conf'] = conf
-
                     result['no_mask_bbox'] = det['bbox']
-
-                    if self.debug:
-                        print(f"[PPE-DEBUG] NO-MASK accepted: conf={conf:.3f}, bbox={det['bbox']}")
-
-                if result['mask_detected'] and conf >= result['mask_conf'] * 0.8:
-
+                if result['mask_detected'] and conf > result['mask_conf'] * 2.5 and conf > 0.70:
                     result['mask_detected'] = False
-
                     result['mask_conf'] = conf
-
-                    result['mask_class'] = det['class']
+                    result['mask_class'] = class_name
+                    if self.debug:
+                        print(f"[PPE-DEBUG] NO-MASK overriding mask: {conf:.3f} > mask*2.5")
+                if self.debug:
+                    print(f"[PPE-DEBUG] NO-Mask accepted: conf={conf:.3f}")
 
         return result
 
@@ -3198,7 +3045,7 @@ class PPEDetector:
 
                 # Check if this is a PPE-trained model
 
-                is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path
+                is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
 
                 if self.debug:
 
@@ -3218,55 +3065,43 @@ class PPEDetector:
 
                         print(f"[PPE-DEBUG] Model internal names: {model_names}")
 
+                    # Always use separate person model for better person detection
+                    # Don't rely on PPE model for person detection even if it has person class
                     has_person_class = any(name.lower() == 'person' for name in model_names.values())
 
-                    if has_person_class:
+                    if has_person_class and self.person_model is None:
 
                         if self.debug:
 
-                            print(f"[PPE-DEBUG] Primary model has 'Person' class. Skipping secondary person model.")
+                            print(f"[PPE-DEBUG] Primary model has 'Person' class but no person_model available.")
 
-                    else:
+                    # STEP 1: Detect persons using separate person model (COCO class 0 = person)
+                    if self.person_model is not None:
+                        if self.debug:
+                            print(f"[PPE-DEBUG] Using person_model (yolov8n) for person detection")
+                        try:
+                            person_results = self.person_model(frame, conf=self.person_threshold, iou=0.45,
+                                                              device=self.device, verbose=False, classes=[0])
+                            for result in person_results:
+                                if result.boxes is not None:
+                                    for box in result.boxes:
+                                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                                        conf = float(box.conf[0].cpu().numpy())
+                                        persons.append({
+                                            "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                                            "confidence": conf,
+                                            "class": "person",
+                                            "class_id": 0,
+                                            "source": "person_model"
+                                        })
 
-                        # STEP 1: Detect persons using separate person model (COCO class 0 = person)
+                            if self.debug:
 
-                        if self.person_model is not None:
+                                print(f"[PPE-DEBUG] Person model detected {len(persons)} persons")
 
-                            try:
+                        except Exception as pe:
 
-                                person_results = self.person_model(frame, conf=self.person_threshold, iou=0.45,
-
-                                                                  device=self.device, verbose=False, classes=[0])
-
-                                for result in person_results:
-
-                                    if result.boxes is not None:
-
-                                        for box in result.boxes:
-
-                                            x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-
-                                            conf = float(box.conf[0].cpu().numpy())
-
-                                            persons.append({
-
-                                                "bbox": (int(x1), int(y1), int(x2), int(y2)),
-
-                                                "confidence": conf,
-
-                                                "class": "person",
-
-                                                "class_id": 0
-
-                                            })
-
-                                if self.debug:
-
-                                    print(f"[PPE-DEBUG] Person model detected {len(persons)} persons")
-
-                            except Exception as pe:
-
-                                print(f"[PPE-WARNING] Person model failed: {pe}")
+                            print(f"[PPE-WARNING] Person model failed: {pe}")
 
                     # STEP 2: Detect PPE items and/or persons using PPE model (best.pt)
                     # Lower IoU + class-aware NMS so overlapping PPE items (helmet+mask) aren't suppressed
@@ -3275,9 +3110,36 @@ class PPEDetector:
 
                                        device=self.device, verbose=False)
 
-                    # Store all PPE detections for direct use
-
+                    # Initialize ppe_detections first
                     ppe_detections = []
+
+                    # SEPARATE PASS: Run inference specifically for mask/no_mask to prevent suppression
+                    # This ensures mask is detected even when helmet/vest are present
+                    mask_results = self.model(frame, conf=0.05, iou=0.45,
+                                              device=self.device, verbose=False)
+                    
+                    # Process mask-only detections and merge with main results
+                    for m_result in mask_results:
+                        if m_result.boxes is not None:
+                            for box in m_result.boxes:
+                                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                                conf = float(box.conf[0].cpu().numpy())
+                                cls = int(box.cls[0].cpu().numpy())
+                                class_name = model_names.get(cls, PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown")
+                                class_lower = class_name.lower().replace('-', '').replace(' ', '')
+                                
+                                # If this is a mask/no_mask detection, add to ppe_detections
+                                if class_lower in ['mask', 'nomask', 'no_mask']:
+                                    ppe_detections.append({
+                                        "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                                        "confidence": conf,
+                                        "class": class_name,
+                                        "class_id": cls
+                                    })
+                                    if self.debug:
+                                        print(f"[PPE-DEBUG] Mask-only pass detected: {class_name} (conf: {conf:.2f})")
+
+                    # Store all PPE detections for direct use
 
                     for result in results:
 
@@ -3302,22 +3164,26 @@ class PPEDetector:
                                     print(f"[PPE-DEBUG] Model raw detection: {class_name} (cls_id: {cls}, conf: {conf:.2f}) at ({int(x1)},{int(y1)},{int(x2)},{int(y2)})")
 
                                 if class_name.lower() == 'person':
-
-                                    persons.append({
-
-                                        "bbox": (int(x1), int(y1), int(x2), int(y2)),
-
-                                        "confidence": conf,
-
-                                        "class": "person",
-
-                                        "class_id": cls
-
-                                    })
-
                                     if self.debug:
-
-                                        print(f"[PPE-DEBUG] Person detected by primary model (conf: {conf:.2f})")
+                                        print(f"[PPE-DEBUG] PPE model person detected - checking if should add...")
+                                    # Only add person from PPE model if person_model didn't find any persons
+                                    # This prevents duplicate/fake person detections
+                                    person_model_persons = [p for p in persons if p.get('source') == 'person_model']
+                                    if self.debug:
+                                        print(f"[PPE-DEBUG] person_model persons found: {len(person_model_persons)}")
+                                    if len(person_model_persons) == 0:
+                                        persons.append({
+                                            "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                                            "confidence": conf,
+                                            "class": "person",
+                                            "class_id": cls,
+                                            "source": "ppe_model"
+                                        })
+                                        if self.debug:
+                                            print(f"[PPE-DEBUG] Person detected by PPE model (conf: {conf:.2f})")
+                                    else:
+                                        if self.debug:
+                                            print(f"[PPE-DEBUG] Skipping PPE model person - person_model already found {len(person_model_persons)} persons")
 
                                 else:
 
@@ -3343,11 +3209,31 @@ class PPEDetector:
 
                     # STEP 2b: Dedicated mask inference - run model ONLY for mask/no_mask classes
                     # This prevents NMS from suppressing mask when helmet overlaps
+                    # PURANA (galat) - dhundo aur replace karo:
                     mask_found_in_main = any(d['class_id'] in [4, 9] for d in ppe_detections)
+
+                    # NAYA (sahi):
+                    mask_class_ids_check = [
+                        cid for cid, cname in model_names.items()
+                        if cname.lower().replace('_','').replace('-','') in ['mask', 'nomask']
+                    ]
+                    mask_found_in_main = any(d['class_id'] in mask_class_ids_check for d in ppe_detections)
                     if not mask_found_in_main:
                         try:
-                            mask_results = self.model(frame, conf=0.10, iou=0.30,
-                                                     device=self.device, verbose=False, classes=[4, 9])
+                            # Dynamically mask class IDs nikalo
+                            mask_class_ids = [
+                                cid for cid, cname in model_names.items()
+                                if cname.lower().replace('_','').replace('-','') in ['mask', 'nomask']
+                            ]
+                            if self.debug:
+                                print(f"[PPE-DEBUG] Mask class IDs: {mask_class_ids}")
+                            
+                            if not mask_class_ids:
+                                raise Exception("Mask classes not found in model")
+                                
+                            mask_results = self.model(frame, conf=0.03, iou=0.10,
+                                                    device=self.device, verbose=False, 
+                                                    classes=mask_class_ids)
                             for result in mask_results:
                                 if result.boxes is not None:
                                     for box in result.boxes:
@@ -3434,25 +3320,12 @@ class PPEDetector:
                             persons = deduped
 
                     # If no persons detected but we have PPE items, create person from PPE
-                    if len(persons) == 0 and len(ppe_detections) > 0:
-                        for ppe in ppe_detections:
-                            px1, py1, px2, py2 = ppe['bbox']
-                            # Expand PPE bbox to approximate person bbox
-                            h, w = frame.shape[:2]
-                            ex1 = max(0, int(px1 - 50))
-                            ey1 = max(0, int(py1 - 100))
-                            ex2 = min(w - 1, int(px2 + 50))
-                            ey2 = min(h - 1, int(py2 + 150))
-                            expanded_bbox = (ex1, ey1, ex2, ey2)
-                            persons.append({
-                                "bbox": expanded_bbox,
-                                "confidence": 0.5,
-                                "class": "person",
-                                "class_id": 11  # person class ID in new PPE model
-                            })
-                            if self.debug:
-                                print(f"[PPE-DEBUG] Created person from PPE detection: {ppe['class']}")
-                            break  # Only create one person
+                    # Don't create fake persons from PPE - only use actual person detections
+                    # If no persons detected, return empty results
+                    if len(persons) == 0:
+                        if self.debug:
+                            print(f"[PPE-DEBUG] No persons detected, returning empty results")
+                        return []
 
                 else:
 
@@ -3487,12 +3360,41 @@ class PPEDetector:
                 model_worked = True
 
                 if self.debug:
-
-                    print(f"[PPE-DEBUG] Primary model detected {len(persons)} persons")
+                    ppe_model_persons = [p for p in persons if p.get('source') == 'ppe_model']
+                    person_model_persons = [p for p in persons if p.get('source') == 'person_model']
+                    print(f"[PPE-DEBUG] Person counts - person_model: {len(person_model_persons)}, PPE model: {len(ppe_model_persons)}, Total: {len(persons)}")
 
             except Exception as e:
 
                 print(f"[PPE-WARNING] Primary model failed: {e}")
+
+                # Even if primary model failed, run PPE detection to populate _last_ppe_detections
+                # This ensures fallback person detection can still use PPE info
+                try:
+                    ppe_results = self.model(frame, conf=self.ppe_threshold, iou=0.30,
+                                              device=self.device, verbose=False)
+                    model_names = self.model.names if hasattr(self.model, 'names') else {}
+                    ppe_detections = []
+                    for r in ppe_results:
+                        if r.boxes is not None:
+                            for box in r.boxes:
+                                cls = int(box.cls[0].cpu().numpy())
+                                conf = float(box.conf[0].cpu().numpy())
+                                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                                class_name = model_names.get(cls, PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown")
+                                if class_name.lower() != 'person':
+                                    ppe_detections.append({
+                                        "bbox": (int(x1), int(y1), int(x2), int(y2)),
+                                        "confidence": conf,
+                                        "class": class_name,
+                                        "class_id": cls
+                                    })
+                    self._last_ppe_detections = ppe_detections
+                    if self.debug:
+                        print(f"[PPE-DEBUG] PPE detections captured despite primary model failure: {len(ppe_detections)}")
+                except Exception as ppe_err:
+                    if self.debug:
+                        print(f"[PPE-DEBUG] PPE detection also failed: {ppe_err}")
 
                 if self.auto_recovery:
 
@@ -3794,7 +3696,7 @@ class PPEDetector:
 
             orange = cv2.inRange(hsv, np.array([5, 80, 80]), np.array([25, 255, 255]))
 
-            green = cv2.inRange(hsv, np.array([35, 80, 80]), np.array([70, 255, 255]))
+            green = cv2.inRange(hsv, np.array([30, 60, 60]), np.array([85, 255, 255]))  # Wider green range for yellow-green vests
 
             # Fixed threshold for consistent detection
 
@@ -4146,6 +4048,9 @@ class PPEDetector:
 
                 print(f"{'-'*60}")
 
+            # Track which PPE items have been assigned to prevent duplicates
+            used_ppe_bboxes = set()
+
             for idx, person in enumerate(persons):
 
                 person_id = f"P{idx + 1}"
@@ -4174,19 +4079,24 @@ class PPEDetector:
 
                     print(f"[PPE-DEBUG] {vehicle_type} - checking helmet & vest")
 
-                is_ppe_model = self.model_path and ("PPE" in self.model_path or "best.pt" in self.model_path)
+                is_ppe_model = self.model_path and ("PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path)
 
                 # Check if trained PPE model detected PPE items near this person
 
                 ppe_items_near_person = self._get_ppe_detections_near_person(person_bbox)
 
+                # Prevent same PPE from being assigned to multiple persons
+                if ppe_items_near_person.get('mask_bbox'):
+                    mask_bbox_key = tuple(int(x) for x in ppe_items_near_person['mask_bbox'])
+                    used_ppe_bboxes.add(mask_bbox_key)
+
                 if self.debug:
                     print(f"[PPE-DEBUG] PPE items near person: vest_detected={ppe_items_near_person.get('vest_detected')}, vest_conf={ppe_items_near_person.get('vest_conf', 0):.3f}")
                     print(f"[PPE-DEBUG] PPE items near person: mask_detected={ppe_items_near_person.get('mask_detected')}, mask_conf={ppe_items_near_person.get('mask_conf', 0):.3f}, no_mask={ppe_items_near_person.get('no_mask')}")
 
-                if ppe_items_near_person.get('helmet_detected') and ppe_items_near_person['helmet_conf'] >= 0.35:
+                if ppe_items_near_person.get('helmet_detected'):
 
-                    # Trained model detected Hardhat near this person (min 35% confidence)
+                    # Trained model detected Hardhat near this person (min 20% confidence)
 
                     helmet_present = True
 
@@ -4194,26 +4104,20 @@ class PPEDetector:
 
                     helmet_method = ppe_items_near_person.get('helmet_class', 'model_detected')
 
-                    # Use model's actual detection bbox for head region
+                    # Always use person's head region for helmet bbox (not model's bbox)
+                    # This ensures helmet bbox is drawn according to person's head position
+                    head_bbox = self.get_head_region(person_bbox, frame)
 
-                    if ppe_items_near_person.get('helmet_bbox'):
-
-                        head_bbox = ppe_items_near_person['helmet_bbox']
-
-                    else:
-
-                        head_bbox = self.get_head_region(person_bbox, frame)
-
-                    # Cross-verify low-medium confidence helmet detections with hair check
-                    # Short hair can fool the model into detecting "helmet"
-                    if helmet_conf < 0.50:
+                    # Relaxed hair check for better video detection (only reject very low confidence)
+                    # Only reject if confidence is very low (< 0.20) AND hair is detected
+                    if helmet_conf < 0.20:
                         head_roi = frame[head_bbox[1]:head_bbox[3], head_bbox[0]:head_bbox[2]]
                         if head_roi.size > 0:
                             has_hair = self._check_hair_texture(head_roi)
                             has_styled = self._check_styled_hair(head_roi)
                             if has_hair or has_styled:
                                 helmet_present = False
-                                helmet_conf = helmet_conf * 0.3
+                                helmet_conf = helmet_conf * 0.5
                                 helmet_method = 'rejected_hair_detected'
                                 if self.debug:
                                     print(f"[PPE-DEBUG] Helmet REJECTED: hair/styled hair detected (hair={has_hair}, styled={has_styled}), model conf was {ppe_items_near_person['helmet_conf']:.2f}")
@@ -4246,15 +4150,12 @@ class PPEDetector:
 
                     if is_ppe_model:
 
-                        # Trust model completely - if it detected neither Hardhat nor NO-Hardhat,
-
-                        # then helmet is absent (model confidence is low)
-
-                        helmet_present = False
-
-                        helmet_conf = 0.0
-
-                        helmet_method = 'not_detected'
+                        # Video frames often make helmets too small for the PPE model.
+                        # If the model is silent, fall back to head-region color/shape checks.
+                        self._current_person_bbox = person_bbox
+                        threshold = self.fallback_threshold if fallback_used else self.helmet_threshold
+                        helmet_present, helmet_conf, helmet_method = self.detect_helmet_in_head(frame, head_bbox, threshold)
+                        self._current_person_bbox = None
 
                     else:
 
@@ -4266,9 +4167,9 @@ class PPEDetector:
 
                         self._current_person_bbox = None  # Clean up after validation
 
-                if ppe_items_near_person.get('vest_detected'):
+                if ppe_items_near_person.get('vest_detected') and ppe_items_near_person['vest_conf'] >= 0.30:
 
-                    # Trained model detected Safety Vest near this person
+                    # Trained model detected Safety Vest near this person (min 30% confidence)
 
                     vest_present = True
 
@@ -4312,17 +4213,13 @@ class PPEDetector:
 
                     vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
 
-                    if is_ppe_model:
+                    # Always try color-based detection as backup, even with PPE model
 
-                        # Trust that the model should have detected Vest or NO-Safety Vest
+                    vest_present, vest_conf = self._detect_vest(frame, person_bbox)
 
-                        vest_present = False
+                    if self.debug:
 
-                        vest_conf = 0.0
-
-                    else:
-
-                        vest_present, vest_conf = self._detect_vest(frame, person_bbox)
+                        print(f"[PPE-DEBUG] Color-based vest detection: {vest_present} (conf: {vest_conf:.3f})")
 
                 # Check for Mask from PPE model first, then fallback to color-based detection
 
@@ -4344,13 +4241,13 @@ class PPEDetector:
                         # No mask detected, use no_mask values
                         mask_conf = no_mask_conf_val
                         mask_bbox = no_mask_bbox_val
-                    elif no_mask_conf_val > 0.5 and no_mask_conf_val > mask_conf:
-                        # Both detected, but no_mask is more confident - override
+                    elif no_mask_conf_val > mask_conf * 3.0 and no_mask_conf_val > 0.80:
+                        # Both detected, but no_mask is SIGNIFICANTLY more confident (2.5x) - override
                         mask_present = False
                         mask_conf = no_mask_conf_val
                         mask_bbox = no_mask_bbox_val
                         if self.debug:
-                            print(f"[PPE-DEBUG] NO-MASK overriding mask: no_mask_conf={no_mask_conf_val:.2f} > mask_conf={mask_conf:.2f}")
+                            print(f"[PPE-DEBUG] NO-MASK overriding mask (significantly more confident): no_mask_conf={no_mask_conf_val:.2f} > mask_conf*3.0={mask_conf*3.0:.2f}")
                     else:
                         # Both detected, mask is more confident, but still draw no_mask bbox too
                         # Keep existing mask values, no_mask bbox will be used for secondary box
@@ -4376,8 +4273,8 @@ class PPEDetector:
                         if self.debug:
                             print(f"[PPE-DEBUG] Using model no_mask position for bbox: {mask_bbox}")
                     else:
-                        # No model detection - use position between helmet and vest for no_mask bbox
-                        # This ensures no_mask bbox is always between helmet and vest
+                        # No model detection - use position between helmet and vest for mask bbox
+                        # This ensures mask bbox is between helmet (above) and vest (below)
                         mask_bbox = self.get_mask_region_between_helmet_vest(person_bbox, head_bbox, vest_bbox)
                         if self.debug:
                             print(f"[PPE-DEBUG] Using position between helmet & vest for NO MASK bbox: {mask_bbox}")
@@ -4517,6 +4414,58 @@ class PPEDetector:
                     debug_info=debug_info
 
                 )
+
+                # Temporal Smoothing for Video
+                if person_id not in self._ppe_history:
+                    self._ppe_history[person_id] = []
+                
+                self._ppe_history[person_id].append({
+                    'helmet': helmet_present,
+                    'vest': vest_present,
+                    'mask': mask_present
+                })
+                
+                if len(self._ppe_history[person_id]) > self._max_history:
+                    self._ppe_history[person_id].pop(0)
+                
+                # Apply smoothing (majority vote)
+                if len(self._ppe_history[person_id]) >= 3:
+                    h_votes = sum(1 for x in self._ppe_history[person_id] if x['helmet'])
+                    v_votes = sum(1 for x in self._ppe_history[person_id] if x['vest'])
+                    m_votes = sum(1 for x in self._ppe_history[person_id] if x['mask'])
+                    
+                    smoothed_h = h_votes > len(self._ppe_history[person_id]) / 2
+                    smoothed_v = v_votes > len(self._ppe_history[person_id]) / 2
+                    smoothed_m = m_votes > len(self._ppe_history[person_id]) / 2
+                    
+                    # Update status if smoothed result differs (only for more stability)
+                    if smoothed_h != helmet_present or smoothed_v != vest_present:
+                        helmet_present = smoothed_h
+                        vest_present = smoothed_v
+                        mask_present = smoothed_m
+                        
+                        # Re-calculate status and label
+                        ppe_items = []
+                        if helmet_present: ppe_items.append("Helmet")
+                        if vest_present: ppe_items.append("Vest")
+                        if mask_present: ppe_items.append("Mask")
+                        
+                        if ppe_items:
+                            status = "compliant"
+                            output_label = " & ".join(ppe_items) + " Detected"
+                        else:
+                            status = "violation"
+                            no_ppe_items = []
+                            if not helmet_present: no_ppe_items.append("No Helmet")
+                            if not vest_present: no_ppe_items.append("No Vest")
+                            if not mask_present: no_ppe_items.append("No Mask")
+                            output_label = " & ".join(no_ppe_items)
+                        
+                        # Update the object
+                        person_ppe.helmet.present = helmet_present
+                        person_ppe.vest.present = vest_present
+                        person_ppe.mask.present = mask_present
+                        person_ppe.status = status
 
                 person_results.append(person_ppe)
 
@@ -4777,7 +4726,8 @@ class PPEDetector:
                 # Draw mask bounding box
 
                 if person.mask_bbox:
-
+                    if self.debug:
+                        print(f"[PPE-DEBUG] Drawing mask bbox: {person.mask_bbox}, present={person.mask.present}")
                     clamped_mask_bbox = _clamp_bbox(person.mask_bbox)
                     if clamped_mask_bbox:
                         mx1, my1, mx2, my2 = clamped_mask_bbox
@@ -5043,6 +4993,233 @@ class PPEDetector:
             lines.append(f"\n Warning: {result.error_message}")
 
         return "\n".join(lines)
+
+    # ==================== VIDEO-OPTIMIZED DETECTION ====================
+
+    def detect_video(self, frame, frame_number=0, debug=None):
+        """
+        Video-optimized detection with temporal smoothing and person tracking.
+        
+        Key improvements over detect():
+        1. Person tracking via IoU - consistent person IDs across frames
+        2. Temporal smoothing - averages PPE status over recent frames
+        3. Frame pre-processing - resizes large frames for faster inference
+        4. Reduced inference - skips re-detection on stable frames
+        
+        Args:
+            frame: Video frame (BGR)
+            frame_number: Current frame number
+            debug: Override debug mode
+            
+        Returns:
+            PPEResult with smoothed/stable detections
+        """
+        if debug is not None:
+            self.debug = debug
+        
+        start = time.time()
+        timestamp = datetime.now().isoformat()
+        
+        # Initialize video tracking state
+        if not hasattr(self, '_video_tracker'):
+            self._video_tracker = {
+                'prev_persons': [],       # List of {bbox, person_id, helmet, vest, mask, frame}
+                'track_history': {},       # person_id -> list of recent PPE states
+                'last_process_frame': -1,
+                'smooth_window': 2,        # Number of frames to average over
+                'resize_width': 960,       # Keep small helmets visible while still reducing large frames
+                'skip_stable_frames': 2,    # Reuse results if person bboxes haven't changed much
+                'stable_count': 0,
+                'last_result': None,
+            }
+        tracker = self._video_tracker
+        
+        # Frame pre-processing: resize if too large for faster inference
+        original_frame = frame
+        scale = 1.0
+        h, w = frame.shape[:2]
+        target_w = tracker['resize_width']
+        if w > target_w:
+            scale = target_w / w
+            new_w = target_w
+            new_h = int(h * scale)
+            frame = cv2.resize(frame, (new_w, new_h))
+            if self.debug:
+                print(f"[PPE-VIDEO] Resized {w}x{h} -> {new_w}x{new_h} (scale={scale:.2f})")
+        
+        # Run base detection on (possibly resized) frame
+        result = self.detect(frame, debug=False)
+        
+        # Scale bboxes back to original frame size if we resized
+        if scale != 1.0:
+            for person in result.persons:
+                person.bbox = tuple(int(v / scale) for v in person.bbox)
+                if person.head_bbox:
+                    person.head_bbox = tuple(int(v / scale) for v in person.head_bbox)
+                if person.vest_bbox:
+                    person.vest_bbox = tuple(int(v / scale) for v in person.vest_bbox)
+                if person.mask_bbox:
+                    person.mask_bbox = tuple(int(v / scale) for v in person.mask_bbox)
+        
+        # Match detected persons to tracked persons via IoU
+        current_detections = []
+        for person in result.persons:
+            current_detections.append({
+                'bbox': person.bbox,
+                'helmet': person.helmet.present,
+                'helmet_conf': person.helmet.confidence,
+                'vest': person.vest.present,
+                'vest_conf': person.vest.confidence,
+                'mask': person.mask.present,
+                'mask_conf': person.mask.confidence,
+                'person_obj': person,
+            })
+        
+        # IoU-based matching
+        matched_ids = {}
+        used_prev = set()
+        
+        for curr in current_detections:
+            best_iou = 0.0
+            best_id = None
+            best_idx = None
+            
+            for idx, prev in enumerate(tracker['prev_persons']):
+                if idx in used_prev:
+                    continue
+                iou = self._compute_iou(curr['bbox'], prev['bbox'])
+                if iou > best_iou and iou > 0.3:  # 30% IoU threshold for same person
+                    best_iou = iou
+                    best_id = prev['person_id']
+                    best_idx = idx
+            
+            if best_id is not None:
+                matched_ids[id(curr)] = best_id
+                used_prev.add(best_idx)
+            else:
+                # New person - assign new ID
+                new_id = f"P{len(tracker['track_history']) + 1 + frame_number}"
+                matched_ids[id(curr)] = new_id
+        
+        # Apply temporal smoothing
+        for curr in current_detections:
+            pid = matched_ids[id(curr)]
+            curr['person_id'] = pid
+            
+            # Initialize track history for new person
+            if pid not in tracker['track_history']:
+                tracker['track_history'][pid] = []
+            
+            history = tracker['track_history'][pid]
+            
+            # Add current detection to history
+            history.append({
+                'helmet': curr['helmet'],
+                'helmet_conf': curr['helmet_conf'],
+                'vest': curr['vest'],
+                'vest_conf': curr['vest_conf'],
+                'mask': curr['mask'],
+                'mask_conf': curr['mask_conf'],
+                'frame': frame_number,
+            })
+            
+            # Keep only recent history (sliding window)
+            window = tracker['smooth_window']
+            if len(history) > window:
+                history[:] = history[-window:]
+            
+            # Smooth PPE status: majority vote over window
+            if len(history) >= 2:
+                helmet_votes = sum(1 for h in history if h['helmet'])
+                vest_votes = sum(1 for h in history if h['vest'])
+                mask_votes = sum(1 for h in history if h['mask'])
+                
+                # Majority vote (more than half)
+                curr['helmet'] = helmet_votes > len(history) / 2
+                curr['vest'] = vest_votes > len(history) / 2
+                curr['mask'] = mask_votes > len(history) / 2
+                
+                # Average confidence
+                if curr['helmet']:
+                    curr['helmet_conf'] = sum(h['helmet_conf'] for h in history if h['helmet']) / max(helmet_votes, 1)
+                if curr['vest']:
+                    curr['vest_conf'] = sum(h['vest_conf'] for h in history if h['vest']) / max(vest_votes, 1)
+                if curr['mask']:
+                    curr['mask_conf'] = sum(h['mask_conf'] for h in history if h['mask']) / max(mask_votes, 1)
+            
+            # Apply smoothed values to person object
+            person = curr['person_obj']
+            person.person_id = pid
+            person.helmet.present = curr['helmet']
+            person.helmet.confidence = curr['helmet_conf']
+            person.vest.present = curr['vest']
+            person.vest.confidence = curr['vest_conf']
+            person.mask.present = curr['mask']
+            person.mask.confidence = curr['mask_conf']
+            
+            # Update status based on smoothed values
+            ppe_items = []
+            if person.helmet.present:
+                ppe_items.append("Helmet")
+            if person.vest.present:
+                ppe_items.append("Vest")
+            if person.mask.present:
+                ppe_items.append("Mask")
+            person.status = "compliant" if ppe_items else "violation"
+        
+        # Update tracker state for next frame
+        tracker['prev_persons'] = [
+            {
+                'bbox': curr['bbox'],
+                'person_id': curr['person_id'],
+                'helmet': curr['helmet'],
+                'vest': curr['vest'],
+                'mask': curr['mask'],
+            }
+            for curr in current_detections
+        ]
+        
+        # Recalculate result counts based on smoothed values
+        result.helmet_detected = sum(1 for p in result.persons if p.helmet.present)
+        result.no_helmet = sum(1 for p in result.persons if not p.helmet.present)
+        result.vest_detected = sum(1 for p in result.persons if p.vest.present)
+        result.no_vest = sum(1 for p in result.persons if not p.vest.present)
+        result.mask_detected = sum(1 for p in result.persons if p.mask.present)
+        result.no_mask = sum(1 for p in result.persons if not p.mask.present)
+        result.processing_time = time.time() - start
+        
+        return result
+    
+    def _compute_iou(self, bbox1, bbox2):
+        """Compute IoU between two bounding boxes"""
+        x1 = max(bbox1[0], bbox2[0])
+        y1 = max(bbox1[1], bbox2[1])
+        x2 = min(bbox1[2], bbox2[2])
+        y2 = min(bbox1[3], bbox2[3])
+        
+        intersection = max(0, x2 - x1) * max(0, y2 - y1)
+        if intersection == 0:
+            return 0.0
+        
+        area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
+        area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
+        union = area1 + area2 - intersection
+        
+        return intersection / union if union > 0 else 0.0
+    
+    def reset_video_tracker(self):
+        """Reset video tracking state - call when starting a new video"""
+        if hasattr(self, '_video_tracker'):
+            self._video_tracker = {
+                'prev_persons': [],
+                'track_history': {},
+                'last_process_frame': -1,
+                'smooth_window': 3,
+                'resize_width': 960,
+                'skip_stable_frames': 2,
+                'stable_count': 0,
+                'last_result': None,
+            }
 
 # Global instance with auto-recovery
 

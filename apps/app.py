@@ -2930,17 +2930,27 @@ except ImportError as e:
 
 try:
 
-    from unified_detection_module import process_unified_detection_simple
+    from apps.unified_detection_module import process_unified_detection_simple
 
     UNIFIED_DETECTION_AVAILABLE = True
 
     print("[INFO] Unified detection module loaded")
 
-except ImportError as e:
+except ImportError:
 
-    UNIFIED_DETECTION_AVAILABLE = False
+    try:
 
-    print(f"[WARNING] Unified detection module not available: {e}")
+        from unified_detection_module import process_unified_detection_simple
+
+        UNIFIED_DETECTION_AVAILABLE = True
+
+        print("[INFO] Unified detection module loaded (legacy path)")
+
+    except ImportError as e:
+
+        UNIFIED_DETECTION_AVAILABLE = False
+
+        print(f"[WARNING] Unified detection module not available: {e}")
 
 # Create alias for unified detection function if module loaded
 
@@ -3100,11 +3110,17 @@ if UNIFIED_DETECTION_AVAILABLE:
 
         try:
 
-            from unified_detection_module import process_unified_video_detection
+            from apps.unified_detection_module import process_unified_video_detection
 
         except ImportError:
 
-            return None, "{}", " Unified video detection module not available"
+            try:
+
+                from unified_detection_module import process_unified_video_detection
+
+            except ImportError:
+
+                return None, "{}", " Unified video detection module not available"
 
         if video_path is None:
 
@@ -14911,163 +14927,167 @@ with demo:
 
 """)
 
-    # Sidebar Navigation
+    # Main layout: Row + columns (Gradio 4 compatible; gr.Sidebar requires Gradio 5+)
 
-    with gr.Sidebar():
+    with gr.Row():
 
-        gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Detection </span>
+        with gr.Column(scale=0, min_width=260):
 
-        <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Modes</span></span>""")
+            gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Detection </span>
 
-        vehicle_btn = gr.Button("Vehicle Detection", elem_id="vehicle_btn", variant="primary")
+            <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Modes</span></span>""")
 
-        ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
+            vehicle_btn = gr.Button("Vehicle Detection", elem_id="vehicle_btn", variant="primary")
 
-        gr.HTML("""<div style=\"border-top: 3px solid #48CAE4; margin: 15px 0;\"></div><span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
+            ppe_btn = gr.Button("PPE Detection", elem_id="ppe_btn", variant="secondary")
 
-        <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Selection</span></span>""")
+            gr.HTML("""<div style=\"border-top: 3px solid #48CAE4; margin: 15px 0;\"></div><span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Model </span>
 
-        img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
+            <span style=\"background: linear-gradient(135deg, #48CAE4 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;\">Selection</span></span>""")
 
-    # Vehicle Detection Section
+            img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
 
-    with gr.Column(visible=True) as vehicle_detection_section:
+        with gr.Column(scale=1):
 
-        with gr.Tabs(elem_id="vehicle_tabs") as vehicle_inner_tabs:
+            # Vehicle Detection Section
 
-            with gr.TabItem("Image"):
+            with gr.Column(visible=True) as vehicle_detection_section:
 
-                with gr.Row():
+                with gr.Tabs(elem_id="vehicle_tabs") as vehicle_inner_tabs:
 
-                    with gr.Column(scale=1):
+                    with gr.TabItem("Image"):
 
-                        img_input = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                        with gr.Row():
 
-                        img_btn = gr.Button("Detect Vehicles", variant="primary")
+                            with gr.Column(scale=1):
 
-                    with gr.Column(scale=1):
+                                img_input = gr.Image(type="pil", label="Input", show_label=False, height=350)
 
-                        img_output = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                                img_btn = gr.Button("Detect Vehicles", variant="primary")
 
-                with gr.Row():
+                            with gr.Column(scale=1):
 
-                    with gr.Column(scale=2):
+                                img_output = gr.Image(type="pil", label="Output", show_label=False, height=350)
 
-                        img_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
+                        with gr.Row():
 
-            with gr.TabItem("Video"):
+                            with gr.Column(scale=2):
 
-                with gr.Row():
+                                img_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
 
-                    with gr.Column(scale=1):
+                    with gr.TabItem("Video"):
 
-                        vid_input = gr.Video(label="Input", show_label=False, height=350)
+                        with gr.Row():
 
-                        vid_btn = gr.Button("Process Video", variant="primary")
+                            with gr.Column(scale=1):
 
-                    with gr.Column(scale=1):
+                                vid_input = gr.Video(label="Input", show_label=False, height=350)
 
-                        vid_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                                vid_btn = gr.Button("Process Video", variant="primary")
 
-                with gr.Row():
+                            with gr.Column(scale=1):
 
-                    with gr.Column(scale=2):
+                                vid_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
 
-                        vid_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
+                        with gr.Row():
 
-            with gr.TabItem("Webcam"):
+                            with gr.Column(scale=2):
 
-                with gr.Row():
+                                vid_info = gr.Textbox(label="Status", interactive=False, value="Ready to detect vehicles")
 
-                    with gr.Column(scale=1):
+                    with gr.TabItem("Webcam"):
 
-                        webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                        with gr.Row():
 
-                    with gr.Column(scale=1):
+                            with gr.Column(scale=1):
 
-                        webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                                webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
 
-                with gr.Row():
+                            with gr.Column(scale=1):
 
-                    with gr.Column(scale=2):
+                                webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
 
-                        webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Allow camera access.")
+                        with gr.Row():
+
+                            with gr.Column(scale=2):
+
+                                webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Allow camera access.")
 
 
                 
 
-    # PPE Detection Section
-    with gr.Column(visible=False) as ppe_detection_section:
-        with gr.Tabs(elem_id="ppe_main_tabs"):
-            # --- Helmet & Vest Detection Tab ---
-            with gr.TabItem("Helmet & Vest Detection"):
-                with gr.Tabs(elem_id="ppe_tabs") as ppe_inner_tabs:
-                    with gr.TabItem("Image"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
-                                ppe_btn_img = gr.Button("Detect PPE", variant="primary")
-                            with gr.Column(scale=1):
-                                ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
+            # PPE Detection Section
+            with gr.Column(visible=False) as ppe_detection_section:
+                with gr.Tabs(elem_id="ppe_main_tabs"):
+                    # --- Helmet & Vest Detection Tab ---
+                    with gr.TabItem("Helmet & Vest Detection"):
+                        with gr.Tabs(elem_id="ppe_tabs") as ppe_inner_tabs:
+                            with gr.TabItem("Image"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                        ppe_btn_img = gr.Button("Detect PPE", variant="primary")
+                                    with gr.Column(scale=1):
+                                        ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-                    with gr.TabItem("Video"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                ppe_input_vid = gr.Video(label="Input", show_label=False, height=350)
-                                ppe_btn_vid = gr.Button("Process PPE Video", variant="primary")
-                            with gr.Column(scale=1):
-                                ppe_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
+                            with gr.TabItem("Video"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        ppe_input_vid = gr.Video(label="Input", show_label=False, height=350)
+                                        ppe_btn_vid = gr.Button("Process PPE Video", variant="primary")
+                                    with gr.Column(scale=1):
+                                        ppe_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-                    with gr.TabItem("Webcam"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
-                            with gr.Column(scale=1):
-                                ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
+                            with gr.TabItem("Webcam"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                                    with gr.Column(scale=1):
+                                        ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
 
-            # --- Mask Detection Tab ---
-            with gr.TabItem("Mask Detection"):
-                with gr.Tabs(elem_id="mask_tabs") as mask_inner_tabs:
-                    with gr.TabItem("Image"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                mask_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
-                                mask_btn_img = gr.Button("Detect Mask", variant="primary")
-                            with gr.Column(scale=1):
-                                mask_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                mask_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
+                    # --- Mask Detection Tab ---
+                    with gr.TabItem("Mask Detection"):
+                        with gr.Tabs(elem_id="mask_tabs") as mask_inner_tabs:
+                            with gr.TabItem("Image"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        mask_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                        mask_btn_img = gr.Button("Detect Mask", variant="primary")
+                                    with gr.Column(scale=1):
+                                        mask_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        mask_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
 
-                    with gr.TabItem("Video"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                mask_input_vid = gr.Video(label="Input", show_label=False, height=350)
-                                mask_btn_vid = gr.Button("Process Mask Video", variant="primary")
-                            with gr.Column(scale=1):
-                                mask_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                mask_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
+                            with gr.TabItem("Video"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        mask_input_vid = gr.Video(label="Input", show_label=False, height=350)
+                                        mask_btn_vid = gr.Button("Process Mask Video", variant="primary")
+                                    with gr.Column(scale=1):
+                                        mask_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        mask_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
 
-                    with gr.TabItem("Webcam"):
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                mask_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
-                            with gr.Column(scale=1):
-                                mask_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
-                        with gr.Row():
-                            with gr.Column(scale=2):
-                                mask_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for Mask detection!")
+                            with gr.TabItem("Webcam"):
+                                with gr.Row():
+                                    with gr.Column(scale=1):
+                                        mask_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                                    with gr.Column(scale=1):
+                                        mask_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                                with gr.Row():
+                                    with gr.Column(scale=2):
+                                        mask_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for Mask detection!")
 
     # Navigation Button Handlers
 

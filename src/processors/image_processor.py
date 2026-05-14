@@ -15,7 +15,7 @@ from ..core.detector import YOLODetector
 from ..ocr.text_extractor import TextExtractor
 from ..utils.color_detector import ColorDetector
 from ..config.settings import get_config, PROJECT_ROOT, OUTPUTS_DIR, INPUTS_DIR
-from ...core.exceptions import ProcessingError
+from ..core.exceptions import ProcessingError
 
 
 class ImageProcessor(BaseImageProcessor):

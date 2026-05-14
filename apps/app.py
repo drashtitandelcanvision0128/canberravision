@@ -30,6 +30,8 @@ from pathlib import Path
 
 from typing import List, Dict, Tuple, Optional, Union
 
+import inspect
+
 # Set working directory to project root
 
 script_dir = Path(__file__).parent
@@ -14843,15 +14845,25 @@ theme = gr.themes.Soft(primary_hue="cyan").set(
 
 )
 
+_blocks_fill = {}
+
+if "fill_width" in inspect.signature(gr.Blocks.__init__).parameters:
+
+    _blocks_fill["fill_width"] = True
+
 demo = gr.Blocks(
 
     title="Canberra Vision",
 
     theme=theme,
 
+    **_blocks_fill,
+
     head="""
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg width='32' height='32' viewBox='0 0 32 32' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M16 8C10 8 4.5 12 2 16C4.5 20 10 24 16 24C22 24 27.5 20 30 16C27.5 12 22 8 16 8Z' stroke='%2360A5FA' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='6' stroke='%2360A5FA' stroke-width='2' fill='none'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%231E40AF'/%3E%3Ccircle cx='17.5' cy='14.5' r='1' fill='%23DBEAFE' opacity='0.8'/%3E%3C/svg%3E">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover">
 
 <style>
 
@@ -14893,6 +14905,146 @@ footer { display: none !important; }
     scrollbar-color: #48CAE4 #0a0a1a !important;
 }
 
+/* Full-width shell (pairs with fill_width=True on Blocks) */
+gradio-app,
+.gradio-container,
+#root,
+main.wrap {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* App shell: nav + main — stretch vertically so rails don’t leave dead bands */
+.cv-app-row {
+    width: 100% !important;
+    max-width: 100% !important;
+    align-items: stretch !important;
+    gap: 1rem !important;
+    flex-wrap: nowrap !important;
+    min-height: calc(100vh - 200px) !important;
+}
+
+/* Left control rail — panel + flex column so empty band below fills */
+.cv-nav-rail {
+    flex: 0 0 clamp(280px, 28vw, 400px) !important;
+    min-width: 300px !important;
+    max-width: 420px !important;
+    box-sizing: border-box !important;
+    padding: 12px 16px 20px 16px !important;
+    background: linear-gradient(180deg, #111827 0%, #0b1220 100%) !important;
+    border: 1px solid rgba(72, 202, 228, 0.28) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    align-self: stretch !important;
+}
+
+.cv-nav-rail-spacer {
+    flex: 1 1 auto !important;
+    min-height: 80px !important;
+    pointer-events: none !important;
+    opacity: 0.35 !important;
+    border-radius: 8px !important;
+    margin-top: 8px !important;
+    background: linear-gradient(180deg, rgba(72, 202, 228, 0.06) 0%, transparent 100%) !important;
+}
+
+.cv-nav-rail button {
+    width: 100% !important;
+    justify-content: center !important;
+    margin-bottom: 10px !important;
+    min-height: 44px !important;
+}
+
+.cv-nav-rail .form,
+.cv-nav-rail fieldset {
+    width: 100% !important;
+}
+
+.cv-nav-rail label.wrap,
+.cv-nav-rail .gr-form {
+    margin-top: 4px !important;
+}
+
+.cv-main-workspace {
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+}
+
+.cv-main-workspace .gr-block,
+.cv-main-workspace .form,
+.cv-main-workspace .tabs {
+    max-width: 100% !important;
+}
+
+/* ---- Responsive layout (tablet / phone) ---- */
+@media (max-width: 1024px) {
+    .cv-app-row {
+        flex-wrap: wrap !important;
+        min-height: auto !important;
+    }
+}
+
+@media (max-width: 900px) {
+    .cv-app-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 0.75rem !important;
+    }
+    .cv-nav-rail {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+    .cv-nav-rail-spacer {
+        min-height: 28px !important;
+        flex: 0 0 auto !important;
+    }
+    .cv-main-workspace {
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .gradio-container,
+    gradio-app {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+    .cv-nav-rail {
+        padding: 10px 12px 14px 12px !important;
+        border-radius: 10px !important;
+    }
+    .cv-nav-rail button {
+        min-height: 48px !important;
+        touch-action: manipulation !important;
+    }
+    .cv-main-workspace img,
+    .cv-main-workspace video,
+    .cv-main-workspace canvas {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    .cv-main-workspace [role="tablist"] {
+        flex-wrap: wrap !important;
+        overflow-x: auto !important;
+        gap: 6px !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+}
+
+/* One detection panel visible at a time (both Columns stay visible=True for Gradio Tabs) */
+.cv-detect-hidden {
+    display: none !important;
+}
+
 </style>
 
 """,
@@ -14927,11 +15079,11 @@ with demo:
 
 """)
 
-    # Main layout: Row + columns (Gradio 4 compatible; gr.Sidebar requires Gradio 5+)
+    # Main layout: wide nav rail + main workspace (Gradio 4 & 5+)
 
-    with gr.Row():
+    with gr.Row(elem_classes=["cv-app-row"]):
 
-        with gr.Column(scale=0, min_width=260):
+        with gr.Column(scale=0, min_width=320, variant="panel", elem_classes=["cv-nav-rail"]):
 
             gr.HTML("""<span style=\"font-family: 'Exo 2', sans-serif; text-transform: uppercase; font-size: 20px; font-weight: 600;\"><span style=\"text-shadow: 0 2px 10px rgba(0,0,0,0.3);\">Detection </span>
 
@@ -14947,11 +15099,13 @@ with demo:
 
             img_model = gr.Radio(choices=MODEL_CHOICES, label="Model", value="yolo26n")
 
-        with gr.Column(scale=1):
+            gr.HTML('<div class="cv-nav-rail-spacer" aria-hidden="true"></div>')
+
+        with gr.Column(scale=1, elem_classes=["cv-main-workspace"]):
 
             # Vehicle Detection Section
 
-            with gr.Column(visible=True) as vehicle_detection_section:
+            with gr.Column(visible=True, elem_classes=["cv-detect-panel"]) as vehicle_detection_section:
 
                 with gr.Tabs(elem_id="vehicle_tabs") as vehicle_inner_tabs:
 
@@ -15016,8 +15170,8 @@ with demo:
 
                 
 
-            # PPE Detection Section
-            with gr.Column(visible=False) as ppe_detection_section:
+            # PPE block: same visibility=True as vehicle; .cv-detect-hidden hides until PPE sidebar click
+            with gr.Column(visible=True, elem_classes=["cv-detect-panel", "cv-detect-hidden"]) as ppe_detection_section:
                 with gr.Tabs(elem_id="ppe_main_tabs"):
                     # --- Helmet & Vest Detection Tab ---
                     with gr.TabItem("Helmet & Vest Detection"):
@@ -15093,7 +15247,19 @@ with demo:
 
     vehicle_btn.click(
 
-        lambda: (gr.update(visible=True), gr.update(visible=False), gr.update(variant="primary"), gr.update(variant="secondary"), gr.update(value="yolo26n")),
+        lambda: (
+
+            gr.update(elem_classes=["cv-detect-panel"]),
+
+            gr.update(elem_classes=["cv-detect-panel", "cv-detect-hidden"]),
+
+            gr.update(variant="primary"),
+
+            gr.update(variant="secondary"),
+
+            gr.update(value="yolo26n"),
+
+        ),
 
         inputs=[],
 
@@ -15103,7 +15269,19 @@ with demo:
 
     ppe_btn.click(
 
-        lambda: (gr.update(visible=False), gr.update(visible=True), gr.update(variant="secondary"), gr.update(variant="primary"), gr.update(value="yolov8s")),
+        lambda: (
+
+            gr.update(elem_classes=["cv-detect-panel", "cv-detect-hidden"]),
+
+            gr.update(elem_classes=["cv-detect-panel"]),
+
+            gr.update(variant="secondary"),
+
+            gr.update(variant="primary"),
+
+            gr.update(value="yolov8s"),
+
+        ),
 
         inputs=[],
 
@@ -15200,6 +15378,34 @@ with demo:
             const removeFooter = () => {
 
                 document.querySelectorAll('footer, .built-with-gradio').forEach(f => f.remove());
+
+            };
+
+            const removeStatusTracker = () => {
+
+                try {
+
+                    const roots = [document];
+
+                    document.querySelectorAll('gradio-app').forEach((app) => {
+
+                        if (app.shadowRoot) roots.push(app.shadowRoot);
+
+                    });
+
+                    roots.forEach((root) => {
+
+                        root.querySelectorAll?.('[data-testid="toast"]').forEach((el) => {
+
+                            const wrap = el.closest('.wrap');
+
+                            (wrap || el).remove();
+
+                        });
+
+                    });
+
+                } catch (e) { /* ignore */ }
 
             };
 

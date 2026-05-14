@@ -82,7 +82,7 @@ def get_model(model_name):
     if model_name not in _model_cache:
         # Handle PPE model selection
         if model_name == "best (PPE)":
-            model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best.pt')
+            model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
         # Add .pt extension if not present
         elif not model_name.endswith('.pt'):
             model_path = f"{model_name}.pt"

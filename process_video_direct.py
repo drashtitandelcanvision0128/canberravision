@@ -16,12 +16,12 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def process_ppe_video_stepper(video_path, model_path="models/best.pt", auto_detect=False, skip=1):
+def process_ppe_video_stepper(video_path, model_path="models/best_ppe.pt", auto_detect=False, skip=1):
     """Interactive PPE video player: pause/resume and run detection on demand.
 
     Args:
         video_path: input video path
-        model_path: PPE model path (best.pt)
+        model_path: PPE model path (best_ppe.pt)
         auto_detect: if True, run detection automatically while playing
         skip: process every Nth frame when auto_detect is enabled
     """
@@ -324,7 +324,7 @@ def main():
     parser.add_argument('--mode', default='ultra_fast', choices=['ultra_fast', 'fast', 'balanced'],
                         help='Processing mode')
     parser.add_argument('--ppe_stepper', action='store_true', help='Interactive PPE pause/detect/resume player')
-    parser.add_argument('--ppe_model', default='models/best.pt', help='PPE model path for stepper (default: models/best.pt)')
+    parser.add_argument('--ppe_model', default='models/best_ppe.pt', help='PPE model path for stepper (default: models/best_ppe.pt)')
     parser.add_argument('--ppe_auto', action='store_true', help='Enable auto-detect while playing (stepper mode)')
     parser.add_argument('--ppe_skip', type=int, default=1, help='Process every Nth frame when auto-detect is enabled (default: 1)')
     

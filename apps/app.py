@@ -13593,11 +13593,11 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, de
 
     try:
 
-        # Always use trained PPE model (best_new.pt) for PPE detection
+        # Always use trained PPE model (best_ppe.pt) for PPE detection
         # Ignore the model_name parameter - PPE detection requires the trained model
-        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
+        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
 
-        # Use best_new.pt for PPE detection with detection mode
+        # Use best_ppe.pt for PPE detection with detection mode
         # detection_mode: "all" (default), "helmet_vest" (only helmet & vest), "mask" (only mask)
         detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new, detection_mode=detection_mode)
 

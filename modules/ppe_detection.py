@@ -43,7 +43,7 @@ def load_ppe_classes():
     try:
         from ultralytics import YOLO
         model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
-                                  'models', 'best_new.pt')
+                                  'models', 'best_ppe.pt')
         if os.path.exists(model_path):
             m = YOLO(model_path)
             names = list(m.names.values())
@@ -61,6 +61,32 @@ def load_ppe_classes():
 PPE_CLASSES, NUM_PPE_CLASSES = load_ppe_classes()
 
 print(f"[INFO] PPE Dataset loaded: {PPE_CLASSES} ({NUM_PPE_CLASSES} classes)")
+
+
+def _normalize_yolo_class_name(name: str) -> str:
+
+    return str(name).lower().replace('-', '').replace(' ', '').replace('_', '')
+
+
+# Main PPE forward: only these classes (fewer competing boxes in NMS).
+# Names match normalized labels from your data.yaml (e.g. no_helmet → nohelmet).
+# Other datasets sometimes use Hardhat/Safety Vest — add here only if your weights use those strings.
+_CORE_INFERENCE_CLASS_KEYS = frozenset({
+    'helmet', 'nohelmet',
+    'vest', 'novest',
+    'mask', 'nomask',
+    'person',
+})
+
+
+def core_inference_class_ids_from_names(model_names: Dict) -> Optional[List[int]]:
+
+    if not model_names:
+        return None
+    ids = sorted({int(cid) for cid, cname in model_names.items()
+                  if _normalize_yolo_class_name(str(cname)) in _CORE_INFERENCE_CLASS_KEYS})
+    return ids if ids else None
+
 
 @dataclass
 
@@ -258,7 +284,7 @@ class PPEDetector:
 
             # Try to find trained PPE model first
 
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
+            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
 
             print(f"[PPE] Checking PPE model at: {ppe_model_path} (exists={os.path.exists(ppe_model_path)})")
 
@@ -271,14 +297,14 @@ class PPEDetector:
             else:
 
                 # Try absolute path as fallback
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_new.pt"
+                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_ppe.pt"
                 print(f"[PPE] Relative path failed, trying absolute: {abs_ppe_path} (exists={os.path.exists(abs_ppe_path)})")
                 if os.path.exists(abs_ppe_path):
                     model_path = abs_ppe_path
                     print(f"[PPE] Using trained PPE model (absolute): {model_path}")
                 else:
-                    # Fallback to best_new.pt for PPE detection
-                    model_path = "best_new.pt"
+                    # Fallback to best_ppe.pt for PPE detection
+                    model_path = "best_ppe.pt"
                     print(f"[PPE] PPE model not found, using fallback: {model_path}")
 
         elif is_ppe_choice:
@@ -287,7 +313,7 @@ class PPEDetector:
 
             print(f"[PPE] PPE model choice detected ({model_path}), resolving path")
 
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
+            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
 
             if os.path.exists(ppe_model_path):
 
@@ -297,7 +323,7 @@ class PPEDetector:
 
             else:
 
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_new.pt"
+                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_ppe.pt"
                 if os.path.exists(abs_ppe_path):
                     model_path = abs_ppe_path
                     print(f"[PPE] Using trained PPE model (absolute): {model_path}")
@@ -395,7 +421,7 @@ class PPEDetector:
 
                 # Also load separate person detection model if PPE model is being used
 
-                if self.person_model is None and ("best.pt" in self.model_path or "best_new.pt" in self.model_path):
+                if self.person_model is None and ("best.pt" in self.model_path or "best_ppe.pt" in self.model_path):
 
                     try:
 
@@ -1878,7 +1904,7 @@ class PPEDetector:
 
         # Check if we have a trained PPE model
 
-        is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
+        is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_ppe.pt" in self.model_path
 
         if is_ppe_model:
 
@@ -2086,11 +2112,18 @@ class PPEDetector:
 
             head_region = frame[y1:y2, x1:x2]
 
-            # Detect PPE items in head region
+            model_names = self.model.names if hasattr(self.model, 'names') and self.model.names else {}
 
-            results = self.model(head_region, conf=0.1, iou=0.45,
+            helmet_cls_ids = sorted({
+                int(cid) for cid, cname in model_names.items()
+                if _normalize_yolo_class_name(str(cname)) in ('helmet', 'nohelmet')
+            })
 
-                              device=self.device, verbose=False)
+            pred_h = dict(conf=0.1, iou=0.45, device=self.device, verbose=False)
+            if helmet_cls_ids:
+                pred_h["classes"] = helmet_cls_ids
+
+            results = self.model(head_region, **pred_h)
 
             helmet_detected = False
 
@@ -2108,7 +2141,7 @@ class PPEDetector:
 
                         cls = int(box.cls[0].cpu().numpy())
 
-                        class_name = PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown"
+                        class_name = model_names.get(cls, PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown")
 
                         # Check for helmet or no-helmet classes
 
@@ -2719,7 +2752,7 @@ class PPEDetector:
 
                     # PPE-trained model doesn't have COCO vehicle classes - skip vehicle detection
 
-                    is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
+                    is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_ppe.pt" in self.model_path
 
                     if is_ppe_model:
 
@@ -3072,7 +3105,9 @@ class PPEDetector:
                 if conf > result['no_safetyvest_conf']:
                     result['no_safetyvest_conf'] = conf
                     result['no_safetyvest_bbox'] = det['bbox']
-                if result['vest_detected'] and conf >= result['vest_conf'] * 0.8:
+                # Only let no-vest override a positive vest when it is strictly more confident.
+                # Otherwise low "no_vest" scores (common on orange/unusual vests) erase real vest boxes.
+                if result['vest_detected'] and conf > result['vest_conf']:
                     result['vest_detected'] = False
                     result['vest_conf'] = conf
                     result['vest_class'] = class_name
@@ -3125,7 +3160,7 @@ class PPEDetector:
 
                 # Check if this is a PPE-trained model
 
-                is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path
+                is_ppe_model = "PPE" in self.model_path or "best.pt" in self.model_path or "best_ppe.pt" in self.model_path
 
                 if self.debug:
 
@@ -3140,6 +3175,17 @@ class PPEDetector:
                     # Use separate person_model (yolov8n) for person detection
 
                     model_names = self.model.names if hasattr(self.model, 'names') else {}
+
+                    core_infer_ids = core_inference_class_ids_from_names(model_names)
+
+                    mask_class_ids = [
+                        int(cid) for cid, cname in model_names.items()
+                        if _normalize_yolo_class_name(str(cname)) in ('mask', 'nomask')
+                    ]
+
+                    if self.debug and core_infer_ids:
+
+                        print(f"[PPE-DEBUG] Core-focus YOLO class ids (helmet/vest/mask/person): {core_infer_ids}")
 
                     if self.debug:
 
@@ -3186,17 +3232,30 @@ class PPEDetector:
                     # STEP 2: Detect PPE items and/or persons using PPE model (best.pt)
                     # Lower IoU + class-aware NMS so overlapping PPE items (helmet+mask) aren't suppressed
 
-                    results = self.model(frame, conf=self.ppe_threshold, iou=0.30,
-
-                                       device=self.device, verbose=False)
+                    pred_kw = dict(
+                        conf=self.ppe_threshold,
+                        iou=0.30,
+                        device=self.device,
+                        verbose=False,
+                    )
+                    if core_infer_ids:
+                        pred_kw["classes"] = core_infer_ids
+                    results = self.model(frame, **pred_kw)
 
                     # Initialize ppe_detections first
                     ppe_detections = []
 
-                    # SEPARATE PASS: Run inference specifically for mask/no_mask to prevent suppression
-                    # This ensures mask is detected even when helmet/vest are present
-                    mask_results = self.model(frame, conf=0.05, iou=0.45,
-                                              device=self.device, verbose=False)
+                    if mask_class_ids:
+                        mask_results = self.model(
+                            frame,
+                            conf=0.05,
+                            iou=0.45,
+                            device=self.device,
+                            verbose=False,
+                            classes=mask_class_ids,
+                        )
+                    else:
+                        mask_results = []
                     
                     # Process mask-only detections and merge with main results
                     for m_result in mask_results:
@@ -3206,10 +3265,10 @@ class PPEDetector:
                                 conf = float(box.conf[0].cpu().numpy())
                                 cls = int(box.cls[0].cpu().numpy())
                                 class_name = model_names.get(cls, PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown")
-                                class_lower = class_name.lower().replace('-', '').replace(' ', '')
-                                
+                                cn_key = _normalize_yolo_class_name(class_name)
+
                                 # If this is a mask/no_mask detection, add to ppe_detections
-                                if class_lower in ['mask', 'nomask', 'no_mask']:
+                                if cn_key in ('mask', 'nomask'):
                                     ppe_detections.append({
                                         "bbox": (int(x1), int(y1), int(x2), int(y2)),
                                         "confidence": conf,
@@ -3267,6 +3326,10 @@ class PPEDetector:
 
                                 else:
 
+                                    nk = _normalize_yolo_class_name(class_name)
+                                    if nk not in _CORE_INFERENCE_CLASS_KEYS:
+                                        continue
+
                                     # Store all PPE item detections
 
                                     ppe_detections.append({
@@ -3285,34 +3348,15 @@ class PPEDetector:
 
                                         print(f"[PPE-DEBUG] PPE item: {class_name} (cls_id: {cls}, conf: {conf:.2f}) at ({int(x1)},{int(y1)},{int(x2)},{int(y2)})")
 
-                    # Store PPE detections on the instance for use in detect()
-
-                    # STEP 2b: Dedicated mask inference - run model ONLY for mask/no_mask classes
-                    # This prevents NMS from suppressing mask when helmet overlaps
-                    # PURANA (galat) - dhundo aur replace karo:
-                    mask_found_in_main = any(d['class_id'] in [4, 9] for d in ppe_detections)
-
-                    # NAYA (sahi):
-                    mask_class_ids_check = [
-                        cid for cid, cname in model_names.items()
-                        if cname.lower().replace('_','').replace('-','') in ['mask', 'nomask']
-                    ]
-                    mask_found_in_main = any(d['class_id'] in mask_class_ids_check for d in ppe_detections)
-                    if not mask_found_in_main:
+                    # STEP 2b: Dedicated mask inference when still missing — tight IoU, mask classes only
+                    mask_found_in_main = any(d['class_id'] in mask_class_ids for d in ppe_detections)
+                    if not mask_found_in_main and mask_class_ids:
                         try:
-                            # Dynamically mask class IDs nikalo
-                            mask_class_ids = [
-                                cid for cid, cname in model_names.items()
-                                if cname.lower().replace('_','').replace('-','') in ['mask', 'nomask']
-                            ]
                             if self.debug:
-                                print(f"[PPE-DEBUG] Mask class IDs: {mask_class_ids}")
-                            
-                            if not mask_class_ids:
-                                raise Exception("Mask classes not found in model")
-                                
+                                print(f"[PPE-DEBUG] Mask class IDs (dedicated pass): {mask_class_ids}")
+
                             mask_results = self.model(frame, conf=0.03, iou=0.10,
-                                                    device=self.device, verbose=False, 
+                                                    device=self.device, verbose=False,
                                                     classes=mask_class_ids)
                             for result in mask_results:
                                 if result.boxes is not None:
@@ -3342,8 +3386,7 @@ class PPEDetector:
                     elif self.detection_mode == "mask":
                         ppe_detections = [
                             det for det in ppe_detections
-                            if det.get("class", "").lower().replace('-', '').replace(' ', '').replace('_', '')
-                            in ['mask', 'nomask', 'no_mask']
+                            if _normalize_yolo_class_name(det.get("class", "")) in ('mask', 'nomask')
                         ]
 
                     self._last_ppe_detections = ppe_detections
@@ -3419,11 +3462,18 @@ class PPEDetector:
 
                 else:
 
-                    # Use standard person detection (class 11 = 'person' in new PPE model)
+                    # Non–PPE checkpoint: person class id from names (not hardcoded 11)
+                    model_names = self.model.names if hasattr(self.model, 'names') else {}
+                    person_ids = [
+                        int(cid) for cid, cname in model_names.items()
+                        if _normalize_yolo_class_name(str(cname)) == 'person'
+                    ]
+                    if not person_ids:
+                        person_ids = [11]
 
                     results = self.model(frame, conf=0.15, iou=0.45,
 
-                                       device=self.device, verbose=False, classes=[11])
+                                       device=self.device, verbose=False, classes=person_ids)
 
                     for result in results:
 
@@ -3461,9 +3511,13 @@ class PPEDetector:
                 # Even if primary model failed, run PPE detection to populate _last_ppe_detections
                 # This ensures fallback person detection can still use PPE info
                 try:
-                    ppe_results = self.model(frame, conf=self.ppe_threshold, iou=0.30,
-                                              device=self.device, verbose=False)
                     model_names = self.model.names if hasattr(self.model, 'names') else {}
+                    core_fb = core_inference_class_ids_from_names(model_names)
+                    ppe_kw = dict(conf=self.ppe_threshold, iou=0.30,
+                                  device=self.device, verbose=False)
+                    if core_fb:
+                        ppe_kw["classes"] = core_fb
+                    ppe_results = self.model(frame, **ppe_kw)
                     ppe_detections = []
                     for r in ppe_results:
                         if r.boxes is not None:
@@ -3472,8 +3526,10 @@ class PPEDetector:
                                 conf = float(box.conf[0].cpu().numpy())
                                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                                 class_name = model_names.get(cls, PPE_CLASSES[cls] if cls < len(PPE_CLASSES) else "unknown")
-                                if class_name.lower() != 'person':
-                                    ppe_detections.append({
+                                nk = _normalize_yolo_class_name(class_name)
+                                if nk == 'person' or nk not in _CORE_INFERENCE_CLASS_KEYS:
+                                    continue
+                                ppe_detections.append({
                                         "bbox": (int(x1), int(y1), int(x2), int(y2)),
                                         "confidence": conf,
                                         "class": class_name,
@@ -3557,9 +3613,19 @@ class PPEDetector:
 
                         model_names = self.model.names if hasattr(self.model, 'names') else {}
 
-                        results = self.model(frame, conf=self.ppe_threshold, iou=0.30,
-
-                                           device=self.device, verbose=False)
+                        person_ids = [
+                            int(cid) for cid, cname in model_names.items()
+                            if _normalize_yolo_class_name(str(cname)) == 'person'
+                        ]
+                        pred_fb = dict(
+                            conf=self.ppe_threshold,
+                            iou=0.30,
+                            device=self.device,
+                            verbose=False,
+                        )
+                        if person_ids:
+                            pred_fb["classes"] = person_ids
+                        results = self.model(frame, **pred_fb)
 
                         for result in results:
 
@@ -3785,17 +3851,17 @@ class PPEDetector:
 
             # Simple color ranges - no adaptive conditions
 
-            # Use wide ranges for consistent detection
+            # Use wide ranges for consistent detection (orange vests: lower S/V under shadows/video)
 
-            yellow = cv2.inRange(hsv, np.array([15, 80, 80]), np.array([35, 255, 255]))
+            yellow = cv2.inRange(hsv, np.array([12, 45, 45]), np.array([38, 255, 255]))
 
-            orange = cv2.inRange(hsv, np.array([5, 80, 80]), np.array([25, 255, 255]))
+            orange = cv2.inRange(hsv, np.array([0, 40, 40]), np.array([28, 255, 255]))
 
-            green = cv2.inRange(hsv, np.array([30, 60, 60]), np.array([85, 255, 255]))  # Wider green range for yellow-green vests
+            green = cv2.inRange(hsv, np.array([30, 40, 40]), np.array([90, 255, 255]))  # Hi-vis green / yellow-green
 
             # Fixed threshold for consistent detection
 
-            min_coverage = 0.30  # Balanced threshold
+            min_coverage = 0.24  # Slightly lower — orange torso often split with straps / dark fabric
 
             combined = cv2.bitwise_or(yellow, orange)
 
@@ -3819,7 +3885,9 @@ class PPEDetector:
 
             # Check for horizontal strip pattern using morphology
 
-            kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (torso_roi.shape[1]//3, 1))
+            kernel_w = max(1, torso_roi.shape[1] // 3)
+
+            kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_w, 1))
 
             bright_horizontal = cv2.morphologyEx(bright_mask, cv2.MORPH_CLOSE, kernel_h)
 
@@ -3865,9 +3933,9 @@ class PPEDetector:
 
             else:
 
-                # No strips, moderate coverage = likely shirt, apply penalty
+                # No strips, moderate coverage = likely shirt, apply light penalty (orange vests often lack strong strip cue)
 
-                vest_score = coverage * 0.7
+                vest_score = coverage * 0.82
 
             # Simple confidence calculation
 
@@ -4176,7 +4244,7 @@ class PPEDetector:
 
                     print(f"[PPE-DEBUG] {vehicle_type} - checking helmet & vest")
 
-                is_ppe_model = self.model_path and ("PPE" in self.model_path or "best.pt" in self.model_path or "best_new.pt" in self.model_path)
+                is_ppe_model = self.model_path and ("PPE" in self.model_path or "best.pt" in self.model_path or "best_ppe.pt" in self.model_path)
 
                 # Check if trained PPE model detected PPE items near this person
 
@@ -4326,9 +4394,12 @@ class PPEDetector:
 
                         print(f"[PPE-DEBUG] Model detected vest (conf: {vest_conf:.2f}) bbox: {vest_bbox}")
 
-                elif ppe_items_near_person.get('no_safetyvest'):
+                elif (
+                    ppe_items_near_person.get('no_safetyvest')
+                    and ppe_items_near_person.get('no_safetyvest_conf', 0.0) >= 0.45
+                ):
 
-                    # Model explicitly detected NO-Safety Vest - trust it, skip color fallback
+                    # High-confidence NO-Safety Vest: trust model, skip color fallback
 
                     vest_present = False
 
@@ -4346,7 +4417,7 @@ class PPEDetector:
 
                 else:
 
-                    # Fallback to color-based vest detection
+                    # Fallback to color-based vest detection (also when no_vest is weak — helps orange vests)
                     # Skip vest detection if mode is "mask" only
                     if self.detection_mode != "mask":
                         vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
@@ -5169,6 +5240,32 @@ class PPEDetector:
 
         return "\n".join(lines)
 
+    @staticmethod
+    def _max_person_id_suffix(tracker, matched_ids=None):
+        """Largest numeric suffix from P1, P2, ... seen in tracker (for stable new IDs)."""
+        matched_ids = matched_ids or {}
+        nums = []
+        for k in tracker.get('track_history', {}).keys():
+            if isinstance(k, str) and len(k) >= 2 and k[0].upper() == 'P':
+                try:
+                    nums.append(int(k[1:]))
+                except ValueError:
+                    pass
+        for p in tracker.get('prev_persons', []):
+            pid = p.get('person_id')
+            if isinstance(pid, str) and len(pid) >= 2 and pid[0].upper() == 'P':
+                try:
+                    nums.append(int(pid[1:]))
+                except ValueError:
+                    pass
+        for pid in matched_ids.values():
+            if isinstance(pid, str) and len(pid) >= 2 and pid[0].upper() == 'P':
+                try:
+                    nums.append(int(pid[1:]))
+                except ValueError:
+                    pass
+        return max(nums) if nums else 0
+
     # ==================== VIDEO-OPTIMIZED DETECTION ====================
 
     def detect_video(self, frame, frame_number=0, debug=None):
@@ -5206,6 +5303,7 @@ class PPEDetector:
                 'skip_stable_frames': 2,    # Reuse results if person bboxes haven't changed much
                 'stable_count': 0,
                 'last_result': None,
+                'ghost_ttl': 15,           # keep last bbox for missed frames so IDs can rematch
             }
         tracker = self._video_tracker
         
@@ -5272,9 +5370,9 @@ class PPEDetector:
                 matched_ids[id(curr)] = best_id
                 used_prev.add(best_idx)
             else:
-                # New person - assign new ID
-                new_id = f"P{len(tracker['track_history']) + 1 + frame_number}"
-                matched_ids[id(curr)] = new_id
+                # Truly new track: next id = max(P*) + 1 (never add frame_number — that caused P3, P4 jumps)
+                n = self._max_person_id_suffix(tracker, matched_ids) + 1
+                matched_ids[id(curr)] = f"P{n}"
         
         # Apply temporal smoothing
         for curr in current_detections:
@@ -5342,17 +5440,33 @@ class PPEDetector:
                 ppe_items.append("Mask")
             person.status = "compliant" if ppe_items else "violation"
         
-        # Update tracker state for next frame
-        tracker['prev_persons'] = [
-            {
+        # Update tracker: live detections + short-lived "ghosts" for missed persons (stable P2, etc.)
+        new_prev = []
+        for curr in current_detections:
+            new_prev.append({
                 'bbox': curr['bbox'],
                 'person_id': curr['person_id'],
                 'helmet': curr['helmet'],
                 'vest': curr['vest'],
                 'mask': curr['mask'],
-            }
-            for curr in current_detections
-        ]
+                'ghost_age': 0,
+            })
+        ghost_ttl = int(tracker.get('ghost_ttl', 15))
+        ghosts = []
+        for idx, prev in enumerate(tracker['prev_persons']):
+            if idx in used_prev:
+                continue
+            age = int(prev.get('ghost_age', 0)) + 1
+            if age <= ghost_ttl:
+                ghosts.append({
+                    'bbox': prev['bbox'],
+                    'person_id': prev['person_id'],
+                    'helmet': prev.get('helmet', False),
+                    'vest': prev.get('vest', False),
+                    'mask': prev.get('mask', False),
+                    'ghost_age': age,
+                })
+        tracker['prev_persons'] = new_prev + ghosts
         
         # Recalculate result counts based on smoothed values
         result.helmet_detected = sum(1 for p in result.persons if p.helmet.present)
@@ -5416,6 +5530,7 @@ class PPEDetector:
                 'skip_stable_frames': 2,
                 'stable_count': 0,
                 'last_result': None,
+                'ghost_ttl': 15,
             }
 
 # Global instance with auto-recovery

@@ -1,151 +1,76 @@
-# 🚗 YOLO Car Plate Detection System
+# Canberra Vision AI (YOLO26)
 
-**A comprehensive computer vision system for detecting vehicles and reading license plates in real-time.**
+Computer vision stack for **vehicle detection** and **PPE / safety gear detection** (helmet, vest, mask), with a **Gradio** web UI. Built around **Ultralytics YOLO** and related tooling (OCR, video, webcam).
 
-## 🚀 Quick Start (3 Options)
+## Requirements
 
-### Option 1: Interactive Menu (Recommended)
-```bash
-python QUICK_START.py
-```
-*Shows you all available options with descriptions*
+- Python 3.10+ recommended  
+- CUDA optional (GPU); CPU runs with reduced throughput  
+- [Git](https://git-scm.com/) and [pip](https://pip.pypa.io/)
 
-### Option 2: Main Web Application
-```bash
-python apps/app.py
-```
-*Full-featured web interface for images and videos*
-
-### Option 3: Quick Launch Scripts
-```bash
-start.bat          # Standard startup
-start_fast.bat     # Fast startup  
-start_clean.bat    # Clean startup
-```
-
-## 🎯 Main Features
-
-- ✅ **Car Detection** - Detect all vehicle types using YOLO
-- ✅ **License Plate Recognition** - Read text from license plates
-- ✅ **📸 Image Upload Detection** - Upload license plate images directly
-- ✅ **🎨 Multi-Color Support** - Detect white, yellow, blue, red plates and more
-- ✅ **Real-time Processing** - Live webcam and video processing
-- ✅ **GPU Acceleration** - CUDA support for faster processing
-- ✅ **Multiple Interfaces** - Web app, desktop app, command-line
-- ✅ **Parking Management** - Parking spot detection and monitoring
-
-## 📁 Key Files to Know
-
-| **Purpose** | **File** | **Run Command** |
-|-------------|----------|-----------------|
-| **Main Web App** | `apps/app.py` | `python apps/app.py` |
-| **Car + Plate Detection** | `apps/gradio_car_plate_app.py` | `python apps/gradio_car_plate_app.py` |
-| **📸 Plate Image Upload** | `apps/license_plate_image_detector.py` | `python apps/license_plate_image_detector.py` |
-| **🎯 Enhanced Angle Detector** | `apps/enhanced_plate_detector.py` | `python apps/enhanced_plate_detector.py` |
-| **🚗 GUARANTEED Detector** | `apps/guaranteed_plate_detector.py` | `python apps/guaranteed_plate_detector.py` |
-| **GPU Version** | `apps/app_gpu.py` | `python apps/app_gpu.py` |
-| **Parking System** | `apps/parking_dashboard.py` | `python apps/parking_dashboard.py` |
-| **Interactive Demo** | `apps/demo_car_plate_detection.py` | `python apps/demo_car_plate_detection.py` |
-| **📝 Simple Plate Detector** | `tools/simple_plate_detector.py` | `python tools/simple_plate_detector.py` |
-| **System Test** | `tools/system_test.py` | `python tools/system_test.py` |
-
-## 📖 Documentation
-
-- **📋 Complete Guide**: `CODE_STRUCTURE_GUIDE.md` - Full code structure overview
-- **🚗 Car Detection**: `CAR_PLATE_DETECTION_GUIDE.md` - Car and plate detection guide  
-- **⚡ Fast Processing**: `FAST_PROCESSING_GUIDE.md` - GPU acceleration guide
-- **🏗️ Implementation**: `IMPLEMENTATION_SUMMARY.md` - Technical details
-
-## 🛠️ Installation
+## Setup
 
 ```bash
-# Install dependencies
+cd YOLO26
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux / macOS
+
 pip install -r requirements.txt
-
-# Test system
-python tools/system_test.py
-
-# Start application
-python QUICK_START.py
 ```
 
-## 🎮 Usage Examples
+> **Note:** `requirements.txt` pins **Gradio 5.25** and several heavy deps (PyTorch, PaddleOCR, etc.). Install time and disk use can be large.
 
-### Basic Car and Plate Detection
-```python
-from src.processors.car_plate_video_processor import CarPlateVideoProcessor
+## Run the main app
 
-processor = CarPlateVideoProcessor()
-results = processor.process_video("traffic_video.mp4")
-print(f"Cars detected: {results['cars_detected']}")
-print(f"License plates: {results['unique_plates']}")
-```
-
-### Web Interface
 ```bash
 python apps/app.py
-# Open http://localhost:7860
 ```
 
-### Guaranteed Plate Detector (Works Every Time)
-```bash
-python apps/guaranteed_plate_detector.py
-# Simple, robust detection that WILL find plates
-# Best for: IM4U 555, MH14DX9937, any plate format
-# Opens at http://localhost:7863
-```
+Then open the URL shown in the terminal (default **http://127.0.0.1:7860** unless overridden by env vars).
 
-### Enhanced Angle-Independent Detection
-```bash
-python apps/enhanced_plate_detector.py
-# Best for angled plates, difficult images
-# Works at any angle, smart classification
-# Opens at http://localhost:7862
-```
+The UI includes **Vehicle detection** and **PPE detection** modes (image, video, webcam), plus model selection where configured.
 
-### License Plate Image Upload
-```bash
-python apps/license_plate_image_detector.py
-# Upload license plate images directly
-# Supports: White, Yellow, Blue, Red, Green plates
-# Output: Detected text with confidence scores
-```
+## Other entry points (optional)
 
-### Command Line Plate Detection
-```bash
-python tools/simple_plate_detector.py --image plate_image.jpg
-python tools/simple_plate_detector.py --folder images_folder/
-```
+| Purpose | Command |
+|--------|---------|
+| Interactive launcher menu | `python QUICK_START.py` |
+| Alternate / specialised Gradio apps | See `apps/` (e.g. plate-focused demos if present) |
 
-## 📊 Project Structure
+Windows helpers: `start.bat`, `start_fast.bat`, `start_clean.bat` in the repo root.
 
-```
-YOLO26/
-├── apps/           # 🎯 Main applications (user-facing)
-├── src/            # 🔧 Core source code (developers)
-├── tools/          # 🛠️ Testing and utilities
-├── models/         # 🤖 AI model files
-├── archive/        # 📚 Archived legacy code
-└── docs/           # 📖 Documentation
-```
+## Repository layout
 
-## 🤝 Support
+| Path | Role |
+|------|------|
+| `apps/` | Main applications (`app.py` and other Gradio / demos) |
+| `src/` | Core detection, OCR, processors |
+| `modules/` | Optional features (e.g. vehicle classification / DB helpers) |
+| `models/` | Model weights and assets (as used by your setup) |
+| `database/` | Local DB files (e.g. vehicle data) where applicable |
+| `tools/` | Diagnostics and utilities |
+| `docs/` | Extra documentation (if present) |
 
-1. **Run diagnostics**: `python tools/system_test.py`
-2. **Check OCR**: `python tools/diagnose_ocr.py`  
-3. **GPU issues**: `python tools/force_gpu.py`
-4. **View help**: Run `python QUICK_START.py` and choose option 8
+## Environment (deployment)
 
-## 🌟 Highlights
+Common variables for hosted runs:
 
-- **🎯 Easy to Use**: Multiple user-friendly interfaces
-- **⚡ High Performance**: GPU acceleration available
-- **🌍 International**: Supports multiple license plate formats
-- **🔧 Developer Friendly**: Clean, modular code structure
-- **📚 Well Documented**: Comprehensive guides and examples
+- `APP_ENV` — e.g. `production`  
+- `GRADIO_SERVER_NAME` / `GRADIO_SERVER_PORT` — bind address and port  
+
+See your deployment notes (Docker / Coolify / etc.) for full lists.
+
+## Troubleshooting
+
+1. Run system checks if available: `python tools/system_test.py`  
+2. GPU: ensure PyTorch build matches your CUDA version, or use CPU-only wheels  
+3. If the web UI misbehaves after dependency upgrades, align versions with `requirements.txt` and reinstall in a clean venv  
+
+## License and upstream
+
+Ultralytics and other upstream packages ship their own licenses (e.g. Ultralytics AGPL-3.0 where applicable). Check each dependency and model license for commercial use.
 
 ---
 
-**🚀 Ready to detect cars and read license plates? Run `python QUICK_START.py` to begin!**
-
-*Version: 2.0 | Last Updated: March 2026*
+**Canberra Vision** — [canberravision.com](https://canberravision.com/)

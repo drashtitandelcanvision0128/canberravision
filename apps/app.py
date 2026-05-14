@@ -13569,7 +13569,7 @@ def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n
 
 # ==================== PPE DETECTION FUNCTIONS ====================
 
-def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
+def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, detection_mode="all"):
 
     """
 
@@ -13593,12 +13593,13 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
     try:
 
-        # Always use trained PPE model (best_new.pt) for PPE detection
+        # Always use trained PPE model (best_ppe.pt) for PPE detection
         # Ignore the model_name parameter - PPE detection requires the trained model
-        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_new.pt')
+        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
 
-        # Use best_new.pt for PPE detection
-        detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new)
+        # Use best_ppe.pt for PPE detection with detection mode
+        # detection_mode: "all" (default), "helmet_vest" (only helmet & vest), "mask" (only mask)
+        detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new, detection_mode=detection_mode)
 
         return detector, True
 
@@ -13614,7 +13615,7 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
             from modules.ppe_detection import PPEDetector
 
-            emergency_detector = PPEDetector(model_path=ppe_model_path, debug=debug, auto_recovery=True)
+            emergency_detector = PPEDetector(model_path=ppe_model_path, debug=debug, auto_recovery=True, detection_mode=detection_mode)
 
             return emergency_detector, False
 
@@ -13624,7 +13625,7 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True):
 
             return None, False
 
-def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True):
+def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, detection_mode="all"):
 
     """
 
@@ -13644,7 +13645,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         # Get PPE detector with fallback - ENABLE DEBUG to see details
 
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=True)
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, detection_mode=detection_mode)
 
         # Force enable debug mode on the detector
 
@@ -13728,19 +13729,18 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             f"- Total Persons: **{result.total_persons}**",
 
-            f"- 2-Wheelers: **{two_wheelers}**",
-
-            f"- 4-Wheelers: **{four_wheelers}**",
-
-            f"- Unknown: **{unknown_vehicles}**",
-
             "",
 
         ])
-
+        if detection_mode == "mask":
+            summary_lines.extend([
+                f"- Masks Detected: **{result.mask_detected}**",
+                f"- No Masks Detected: **{result.no_mask}**",
+                "",
+            ])
         # Show relevant PPE counts based on vehicle types detected
 
-        if two_wheelers > 0:
+        if detection_mode != "mask" and two_wheelers > 0:
 
             summary_lines.extend([
 
@@ -13749,19 +13749,6 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
                 f"- Helmets Detected: **{result.helmet_detected}**",
 
                 f"- No Helmets: **{result.no_helmet}**",
-
-                "",
-
-            ])
-
-
-        if unknown_vehicles > 0:
-
-            summary_lines.extend([
-
-                f"**Unknown Vehicle Safety:**",
-
-                f"- Any Safety Equipment: **{result.helmet_detected + result.vest_detected}**",
 
                 "",
 
@@ -13783,7 +13770,11 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             # Determine emoji based on vehicle type and compliance
 
-            if person.vehicle_type == "2-wheeler":
+            if detection_mode == "mask":
+
+                status_emoji = "\U0001f7e9" if person.mask.present else "\U0001f534"
+
+            elif person.vehicle_type == "2-wheeler":
 
                 status_emoji = "\U0001f7e9" if person.helmet.present else "\U0001f534"
 
@@ -13793,44 +13784,34 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             summary_lines.append(f"\n**Person {person.person_id}** {status_emoji}")
 
-            summary_lines.append(f"  - Vehicle Type: **{person.vehicle_type.upper()}**")
-
             # Show only relevant PPE information based on vehicle type
 
             # Show PPE information - Helmet, Vest, Mask only
 
-            if person.helmet.present:
+            if detection_mode != "mask" and person.helmet.present:
 
                 summary_lines.append(f"  -  Helmet: ** Present** (conf: {person.helmet.confidence:.2f})")
 
-            else:
+            elif detection_mode != "mask":
 
                 summary_lines.append(f"  -  Helmet: ** Missing** (conf: {person.helmet.confidence:.2f})")
 
-            if person.vest.present:
+            if detection_mode != "mask" and person.vest.present:
 
                 summary_lines.append(f"  -  Vest: ** Present** (conf: {person.vest.confidence:.2f})")
 
-            else:
+            elif detection_mode != "mask":
 
                 summary_lines.append(f"  -  Vest: ** Missing** (conf: {person.vest.confidence:.2f})")
 
-            if person.mask.present:
+            if detection_mode != "helmet_vest" and person.mask.present:
 
                 summary_lines.append(f"  -  Mask: ** Present** (conf: {person.mask.confidence:.2f})")
 
-            else:
+            elif detection_mode != "helmet_vest":
 
                 # Mask not present - show NO MASK regardless of whether no_mask class was detected
                 summary_lines.append(f"  -  Mask: ** NO MASK** (conf: {person.mask.confidence:.2f})")
-
-            # Show compliance basis
-
-            summary_lines.append(f"  -  **Compliance based on: PPE (Helmet/Vest/Mask)**")
-
-            # Add detection methods
-
-            summary_lines.append(f"  -  Helmet Method: `{person.helmet.detection_method}`")
 
         if result.error_message:
 
@@ -13842,7 +13823,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         # Generate PPE side panel HTML
 
-        side_panel_html = create_ppe_side_panel(result)
+        side_panel_html = create_ppe_side_panel(result, detection_mode=detection_mode)
 
         print(f"[INFO] PPE detection completed: {result.total_persons} persons ({two_wheelers} 2-wheelers, {four_wheelers} 4-wheelers, {unknown_vehicles} unknown)")
 
@@ -13865,7 +13846,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         return image, f" **PPE Detection Issue**\n\nAn error occurred, but the system attempted to recover.\nError: {str(e)[:100]}...\n\nPlease try again or check the image.", ""
 
-def create_ppe_side_panel(result):
+def create_ppe_side_panel(result, detection_mode="all"):
 
     """
 
@@ -13963,7 +13944,7 @@ def create_ppe_side_panel(result):
 
         # Helmets info
 
-        if two_wheelers > 0 or result.helmet_detected > 0:
+        if detection_mode != "mask" and (two_wheelers > 0 or result.helmet_detected > 0):
 
             safety_items += f"""
 
@@ -13991,7 +13972,7 @@ def create_ppe_side_panel(result):
 
         # Vests info
 
-        if result.vest_detected > 0 or result.no_vest > 0:
+        if detection_mode != "mask" and (result.vest_detected > 0 or result.no_vest > 0):
 
             safety_items += f"""
 
@@ -14019,7 +14000,7 @@ def create_ppe_side_panel(result):
 
         # Mask info
 
-        if result.mask_detected > 0 or result.no_mask > 0:
+        if detection_mode != "helmet_vest" and (result.mask_detected > 0 or result.no_mask > 0):
 
             safety_items += f"""
 
@@ -14065,7 +14046,7 @@ def create_ppe_side_panel(result):
 
     vehicle_html = ""
 
-    if two_wheelers > 0 or four_wheelers > 0:
+    if detection_mode != "mask" and (two_wheelers > 0 or four_wheelers > 0):
 
         vehicle_items = ""
 
@@ -14139,7 +14120,30 @@ def create_ppe_side_panel(result):
 
     # Stats section
 
-    stats_html = f"""
+    if detection_mode == "mask":
+        stats_html = f"""
+
+    <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
+                padding: 12px; border-radius: 10px; color: white;">
+        <div style="display: flex; justify-content: space-around; text-align: center;">
+            <div>
+                <div style="font-size: 20px; font-weight: bold;">{result.total_persons}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Persons</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{result.mask_detected}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">Masks</div>
+            </div>
+            <div style="border-left: 1px solid rgba(255,255,255,0.3); padding-left: 15px;">
+                <div style="font-size: 20px; font-weight: bold;">{result.no_mask}</div>
+                <div style="font-size: 10px; color: #a7f3d0;">No Masks</div>
+            </div>
+        </div>
+    </div>
+
+    """
+    else:
+        stats_html = f"""
 
     <div style="background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
                 padding: 12px; border-radius: 10px; color: white;">
@@ -14185,7 +14189,7 @@ def create_ppe_side_panel(result):
 
     return full_html
 
-def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in uploaded video with fallback"""
 
@@ -14235,7 +14239,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         # Get PPE detector with fallback - reuse detector for video frames
         # Enable debug to see helmet detection details
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, force_new=False)
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, force_new=False, detection_mode=detection_mode)
 
         if detector is None:
 
@@ -14428,13 +14432,98 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         # Calculate compliance rate
 
-        total_ppe = total_helmets + total_vests + total_masks
+        if detection_mode == "helmet_vest":
+            total_masks = 0
+            total_no_masks = 0
+        elif detection_mode == "mask":
+            total_helmets = 0
+            total_no_helmets = 0
+            total_vests = 0
+            total_no_vests = 0
 
-        total_violations = total_no_helmets + total_no_vests + total_no_masks
+        total_ppe = (0 if detection_mode == "mask" else total_helmets + total_vests) + (0 if detection_mode == "helmet_vest" else total_masks)
+
+        total_violations = (0 if detection_mode == "mask" else total_no_helmets + total_no_vests) + (0 if detection_mode == "helmet_vest" else total_no_masks)
 
         total_detected = total_ppe + total_violations
 
         compliance_rate = (total_ppe / total_detected * 100) if total_detected > 0 else 0
+
+        helmet_summary_line = "" if detection_mode == "mask" else f"\n-  Helmets Detected: **{total_helmets}**\n"
+        vest_summary_line = "" if detection_mode == "mask" else f"\n-  Vests Detected: **{total_vests}**\n"
+        mask_summary_line = "" if detection_mode == "helmet_vest" else f"\n-  Masks Detected: **{total_masks}**\n-  No Masks: **{total_no_masks}**\n"
+        helmet_dashboard_card = "" if detection_mode == "mask" else f"""
+
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+
+                    <div style="font-size: 24px;"></div>
+
+                    <div style="color: #7d8590; font-size: 10px;">HELMETS</div>
+
+                    <div style="color: #10b981; font-size: 18px; font-weight: 700;">{total_helmets}</div>
+
+                </div>
+
+        """
+        vest_dashboard_card = "" if detection_mode == "mask" else f"""
+
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+
+                    <div style="font-size: 24px;"></div>
+
+                    <div style="color: #7d8590; font-size: 10px;">VESTS</div>
+
+                    <div style="color: #f97316; font-size: 18px; font-weight: 700;">{total_vests}</div>
+
+                </div>
+
+        """
+        mask_dashboard_card = "" if detection_mode == "helmet_vest" else f"""
+
+                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+
+                    <div style="font-size: 24px;"></div>
+
+                    <div style="color: #7d8590; font-size: 10px;">MASKS</div>
+
+                    <div style="color: #06b6d4; font-size: 18px; font-weight: 700;">{total_masks}</div>
+
+                </div>
+
+        """
+        mask_violation_card = "" if detection_mode == "helmet_vest" else f"""
+
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+
+                    <div style="color: #7d8590; font-size: 10px;">NO MASKS</div>
+
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_masks}</div>
+
+                </div>
+
+        """
+        helmet_violation_card = "" if detection_mode == "mask" else f"""
+
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+
+                    <div style="color: #7d8590; font-size: 10px;">NO HELMETS</div>
+
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_helmets}</div>
+
+                </div>
+
+        """
+        vest_violation_card = "" if detection_mode == "mask" else f"""
+
+                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+
+                    <div style="color: #7d8590; font-size: 10px;">NO VESTS</div>
+
+                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_vests}</div>
+
+                </div>
+
+        """
 
         # Priority-based summary
 
@@ -14450,11 +14539,9 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
 - Total Frames Processed: **{processed_count}**
 
--  Helmets Detected: **{total_helmets}**
-
--  Vests Detected: **{total_vests}**
-
--  Masks Detected: **{total_masks}**
+{helmet_summary_line}
+{vest_summary_line}
+{mask_summary_line}
 
 -  No PPE: **{total_no_ppe}**
 
@@ -14494,35 +14581,11 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
 
-                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
+                {helmet_dashboard_card}
 
-                    <div style="font-size: 24px;"></div>
+                {vest_dashboard_card}
 
-                    <div style="color: #7d8590; font-size: 10px;">HELMETS</div>
-
-                    <div style="color: #10b981; font-size: 18px; font-weight: 700;">{total_helmets}</div>
-
-                </div>
-
-                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-
-                    <div style="font-size: 24px;"></div>
-
-                    <div style="color: #7d8590; font-size: 10px;">VESTS</div>
-
-                    <div style="color: #f97316; font-size: 18px; font-weight: 700;">{total_vests}</div>
-
-                </div>
-
-                <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 10px; text-align: center;">
-
-                    <div style="font-size: 24px;"></div>
-
-                    <div style="color: #7d8590; font-size: 10px;">MASKS</div>
-
-                    <div style="color: #06b6d4; font-size: 18px; font-weight: 700;">{total_masks}</div>
-
-                </div>
+                {mask_dashboard_card}
 
             </div>
 
@@ -14558,29 +14621,11 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
 
-                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
+                {helmet_violation_card}
 
-                    <div style="color: #7d8590; font-size: 10px;">NO HELMETS</div>
+                {vest_violation_card}
 
-                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_helmets}</div>
-
-                </div>
-
-                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
-
-                    <div style="color: #7d8590; font-size: 10px;">NO VESTS</div>
-
-                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_vests}</div>
-
-                </div>
-
-                <div style="background: rgba(239,68,68,0.2); border: 1px solid #ef4444; border-radius: 6px; padding: 8px; text-align: center;">
-
-                    <div style="color: #7d8590; font-size: 10px;">NO MASKS</div>
-
-                    <div style="color: #ef4444; font-size: 16px; font-weight: 700;">{total_no_masks}</div>
-
-                </div>
+                {mask_violation_card}
 
             </div>
 
@@ -14608,7 +14653,7 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         return None, f" **PPE Video Processing Issue**\n\nError: {str(e)[:100]}...\n\nSystem attempted to recover but failed. Please try again.", ""
 
-def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5):
+def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, every_n=5, detection_mode="all"):
 
     """Process PPE detection in live webcam with fallback"""
 
@@ -14620,7 +14665,7 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         # Get PPE detector with fallback
 
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=False, force_new=False)
+        detector, is_global = _get_ppe_detector_safe(model_name, debug=False, force_new=False, detection_mode=detection_mode)
 
         if detector is None:
 
@@ -14686,15 +14731,20 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
         # Show relevant PPE counts based on vehicle types detected
 
-        if two_wheelers > 0:
+        if detection_mode == "mask":
+
+            info_lines.append(f" Masks: {result.mask_detected}")
+            info_lines.append(f" No Masks: {result.no_mask}")
+
+        elif two_wheelers > 0:
 
             info_lines.append(f" Helmets: {result.helmet_detected}")
 
-        if unknown_vehicles > 0:
+        if detection_mode not in ("helmet_vest", "mask") and unknown_vehicles > 0:
 
             info_lines.append(f" Masks: {result.mask_detected}")
 
-        if unknown_vehicles > 0:
+        if detection_mode != "mask" and unknown_vehicles > 0:
 
             info_lines.append(f" Vests: {result.vest_detected}")
 
@@ -14716,18 +14766,17 @@ def process_ppe_webcam(frame, confidence_threshold=0.3, model_name="yolov8n", sh
 
             vehicle = person.vehicle_type.upper()[:3] if person.vehicle_type != "unknown" else "???"
 
-            # STRICT PRIORITY: Only ONE label - Helmet > Seatbelt > None
-
-            if person.helmet.present:
-
+            if detection_mode == "mask":
+                ppe_label = "MASK" if person.mask.present else "NO MASK"
+            elif person.helmet.present and person.vest.present:
+                ppe_label = "HELMET+VEST"
+            elif person.helmet.present:
                 ppe_label = "HELMET"
-
-            elif person.seatbelt.present:
-
-                ppe_label = "SEATBELT"
-
+            elif person.vest.present:
+                ppe_label = "VEST"
+            elif detection_mode != "helmet_vest" and person.mask.present:
+                ppe_label = "MASK"
             else:
-
                 ppe_label = "NO PPE"
 
             info_lines.append(f"  P{person.person_id[1:]} [{vehicle}]: {status} [{ppe_label}]")
@@ -14948,68 +14997,77 @@ with demo:
                 
 
     # PPE Detection Section
-
     with gr.Column(visible=False) as ppe_detection_section:
+        with gr.Tabs(elem_id="ppe_main_tabs"):
+            # --- Helmet & Vest Detection Tab ---
+            with gr.TabItem("Helmet & Vest Detection"):
+                with gr.Tabs(elem_id="ppe_tabs") as ppe_inner_tabs:
+                    with gr.TabItem("Image"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                ppe_btn_img = gr.Button("Detect PPE", variant="primary")
+                            with gr.Column(scale=1):
+                                ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-        with gr.Tabs(elem_id="ppe_tabs") as ppe_inner_tabs:
+                    with gr.TabItem("Video"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                ppe_input_vid = gr.Video(label="Input", show_label=False, height=350)
+                                ppe_btn_vid = gr.Button("Process PPE Video", variant="primary")
+                            with gr.Column(scale=1):
+                                ppe_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
 
-            with gr.TabItem("Image"):
+                    with gr.TabItem("Webcam"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                            with gr.Column(scale=1):
+                                ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
 
-                with gr.Row():
+            # --- Mask Detection Tab ---
+            with gr.TabItem("Mask Detection"):
+                with gr.Tabs(elem_id="mask_tabs") as mask_inner_tabs:
+                    with gr.TabItem("Image"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mask_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                mask_btn_img = gr.Button("Detect Mask", variant="primary")
+                            with gr.Column(scale=1):
+                                mask_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                mask_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
 
-                    with gr.Column(scale=1):
+                    with gr.TabItem("Video"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mask_input_vid = gr.Video(label="Input", show_label=False, height=350)
+                                mask_btn_vid = gr.Button("Process Mask Video", variant="primary")
+                            with gr.Column(scale=1):
+                                mask_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                mask_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
 
-                        ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
-
-                        ppe_btn_img = gr.Button("Detect PPE", variant="primary")
-
-                    with gr.Column(scale=1):
-
-                        ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
-
-                with gr.Row():
-
-                    with gr.Column(scale=2):
-
-                        ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
-
-            with gr.TabItem("Video"):
-
-                with gr.Row():
-
-                    with gr.Column(scale=1):
-
-                        ppe_input_vid = gr.Video(label="Input", show_label=False, height=350)
-
-                        ppe_btn_vid = gr.Button("Process PPE Video", variant="primary")
-
-                    with gr.Column(scale=1):
-
-                        ppe_video_output = gr.Video(label="Output", visible=True, height=350, show_label=False)
-
-                with gr.Row():
-
-                    with gr.Column(scale=2):
-
-                        ppe_summary_vid = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
-
-            with gr.TabItem("Webcam"):
-
-                with gr.Row():
-
-                    with gr.Column(scale=1):
-
-                        ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
-
-                    with gr.Column(scale=1):
-
-                        ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
-
-                with gr.Row():
-
-                    with gr.Column(scale=2):
-
-                        ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
+                    with gr.TabItem("Webcam"):
+                        with gr.Row():
+                            with gr.Column(scale=1):
+                                mask_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                            with gr.Column(scale=1):
+                                mask_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                        with gr.Row():
+                            with gr.Column(scale=2):
+                                mask_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for Mask detection!")
 
     # Navigation Button Handlers
 
@@ -15069,7 +15127,7 @@ with demo:
 
     ppe_btn_img.click(
 
-        lambda img, model: process_ppe_detection(img, model_name=model)[:2],
+        lambda img, model: process_ppe_detection(img, model_name=model, detection_mode="helmet_vest")[:2],
 
         inputs=[ppe_input_img, img_model],
 
@@ -15079,24 +15137,38 @@ with demo:
 
     ppe_btn_vid.click(
 
-        lambda vid, model: process_ppe_video(vid, model_name=model, every_n=10)[:2],
+        lambda vid, model: process_ppe_video(vid, model_name=model, every_n=10, detection_mode="helmet_vest")[:2],
 
         inputs=[ppe_input_vid, img_model],
 
         outputs=[ppe_video_output, ppe_summary_vid],
 
     )
-
     ppe_webcam_input.stream(
-
-        lambda frame, model: process_ppe_webcam(frame, model_name=model),
-
+        lambda frame, model: process_ppe_webcam(frame, model_name=model, detection_mode="helmet_vest"),
         inputs=[ppe_webcam_input, img_model],
-
         outputs=[ppe_webcam_output, ppe_webcam_info],
-
         show_progress=False,
+    )
 
+    # Mask Detection Event Handlers
+    mask_btn_img.click(
+        lambda img, model: process_ppe_detection(img, model_name=model, detection_mode="mask")[:2],
+        inputs=[mask_input_img, img_model],
+        outputs=[mask_output_img, mask_summary_img],
+    )
+
+    mask_btn_vid.click(
+        lambda vid, model: process_ppe_video(vid, model_name=model, every_n=10, detection_mode="mask")[:2],
+        inputs=[mask_input_vid, img_model],
+        outputs=[mask_video_output, mask_summary_vid],
+    )
+
+    mask_webcam_input.stream(
+        lambda frame, model: process_ppe_webcam(frame, model_name=model, detection_mode="mask"),
+        inputs=[mask_webcam_input, img_model],
+        outputs=[mask_webcam_output, mask_webcam_info],
+        show_progress=False,
     )
 
     # JavaScript for Button Styling & Status Tracker Removal

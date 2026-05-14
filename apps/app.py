@@ -15301,13 +15301,11 @@ if __name__ == "__main__":
 
     _gradio_port_env = os.environ.get("GRADIO_SERVER_PORT")
 
-    _server_port = 7862
-
     if _gradio_port_env not in (None, "", "0"):
 
-        _server_port = int(_gradio_port_env)
+        _gradio_server_port = int(_gradio_port_env)
 
-    print(f"[INFO] Server will run on port: 7862")
+    print(f"[INFO] Server will run on port: {_gradio_server_port}")
 
     # Use system temp directory to avoid file path issues
     import tempfile
@@ -15415,11 +15413,11 @@ if __name__ == "__main__":
 
                 server_name=_gradio_server_name,
 
-                server_port=7865,  # Changed to 7865 since 7860-7863 are in use
+                server_port=_gradio_server_port,
 
-                favicon_path=r"c:\Users\Sensepart\canberravision\apps\favicon.svg",
+                favicon_path=os.path.join(project_root, "apps", "favicon.svg") if os.path.isfile(os.path.join(project_root, "apps", "favicon.svg")) else None,
 
-                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs", "outputs", r"c:\Users\Sensepart\canberravision\apps"],
+                allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs", "outputs", os.path.join(project_root, "apps")],
 
                 prevent_thread_lock=False
 

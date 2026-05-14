@@ -81,16 +81,14 @@ class PlateInfo:
     associated_vehicle_id: Optional[str] = None
 
 
-# @dataclass
-# class ParkingSlotInfo:
-#     """Parking slot detection data"""
-#     slot_id: int
-#     occupied: bool
-#     confidence: float
-#     bbox: List[float]
-#     associated_vehicle_id: Optional[str] = None
-
-# Parking detection data class commented out as requested
+@dataclass
+class ParkingSlotInfo:
+    """Parking slot detection data (type retained for API/formatter; parking pipeline disabled)."""
+    slot_id: int
+    occupied: bool
+    confidence: float
+    bbox: List[float]
+    associated_vehicle_id: Optional[str] = None
 
 
 @dataclass
@@ -102,7 +100,7 @@ class UnifiedDetectionResult:
     ppe_detections: List[PPEInfo] = field(default_factory=list)
     vehicle_detections: List[VehicleInfo] = field(default_factory=list)
     plate_detections: List[PlateInfo] = field(default_factory=list)
-    # parking_detections: List[ParkingSlotInfo] = field(default_factory=list)  # Commented out parking detection
+    parking_detections: List[ParkingSlotInfo] = field(default_factory=list)
     processing_time_ms: float = 0.0
 
 

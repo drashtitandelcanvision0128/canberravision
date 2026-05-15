@@ -9947,28 +9947,6 @@ def predict_image(
 
     try:
 
-        # Check if ALPR is available
-
-        if not ALPR_AVAILABLE or alpr is None:
-
-            print("[WARNING] ALPR not available, returning original image")
-
-            if hasattr(img, 'convert'):
-
-                return img.convert('RGB'), ""
-
-            elif isinstance(img, np.ndarray):
-
-                if img.dtype == np.uint8 and len(img.shape) == 3 and img.shape[2] == 3:
-
-                    return Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB)), ""
-
-                else:
-
-                    return Image.fromarray(img), ""
-
-            return None, ""
-
         # Convert image to numpy array (OpenCV format)
 
         if hasattr(img, 'convert'):
@@ -10000,6 +9978,45 @@ def predict_image(
         else:
 
             return None, ""
+
+        # If fast_alpr is not installed in production, fall back to YOLO-based detection
+        # so vehicle/image detection still works instead of returning the original frame.
+        if not ALPR_AVAILABLE or alpr is None:
+            print("[WARNING] ALPR not available, using YOLO fallback for image detection")
+            try:
+                model = get_model(model_name)
+                result = model.predict(
+                    source=frame_bgr,
+                    conf=float(conf_threshold),
+                    iou=float(iou_threshold),
+                    imgsz=int(imgsz),
+                    verbose=False,
+                    device=_get_device(),
+                )[0]
+                annotated = _annotate_with_color(
+                    frame_bgr,
+                    result,
+                    show_labels=bool(show_labels),
+                    show_conf=bool(show_conf),
+                    enable_resnet=bool(enable_resnet),
+                    max_boxes=int(max_boxes),
+                    enable_ocr=bool(enable_ocr),
+                    ocr_every_n=1,
+                )
+                summary = _generate_detection_summary(
+                    result,
+                    enable_resnet=bool(enable_resnet),
+                    enable_ocr=bool(enable_ocr),
+                )
+                annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+                return Image.fromarray(annotated_rgb), summary
+            except Exception as yolo_fallback_error:
+                print(f"[ERROR] YOLO fallback failed: {yolo_fallback_error}")
+                if hasattr(img, 'convert'):
+                    return img.convert('RGB'), f"Detection fallback failed: {yolo_fallback_error}"
+                elif isinstance(img, np.ndarray):
+                    return Image.fromarray(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)), f"Detection fallback failed: {yolo_fallback_error}"
+                return None, f"Detection fallback failed: {yolo_fallback_error}"
 
         # Run ALPR detection
 
@@ -13611,11 +13628,19 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, de
 
     try:
 
-        # Always use trained PPE model (best_ppe.pt) for PPE detection
-        # Ignore the model_name parameter - PPE detection requires the trained model
-        ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        candidates = [
+            os.path.join(project_root, "models", "best_ppe.pt"),
+            os.path.join(project_root, "models", "best.pt"),
+            os.path.join(project_root, "best_ppe.pt"),
+            os.path.join(project_root, "best.pt"),
+        ]
+        ppe_model_path = next((p for p in candidates if os.path.isfile(p)), None)
+        if ppe_model_path is None:
+            # Final fallback so production does not silently do nothing when PPE weights are missing.
+            ppe_model_path = model_name if str(model_name).endswith(".pt") else f"{model_name}.pt"
+            print(f"[PPE-WARNING] Trained PPE model not found, falling back to: {ppe_model_path}")
 
-        # Use best_ppe.pt for PPE detection with detection mode
         # detection_mode: "all" (default), "helmet_vest" (only helmet & vest), "mask" (only mask)
         detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new, detection_mode=detection_mode)
 
@@ -15293,7 +15318,7 @@ with demo:
 
     img_btn.click(
 
-        lambda img, model: predict_image(img, model, 0.35, 0.5, True, True, 640, True, 10, True),
+        lambda img, model: predict_image(img, 0.35, 0.5, model, True, True, 640, True, 10, True),
 
         inputs=[img_input, img_model],
 

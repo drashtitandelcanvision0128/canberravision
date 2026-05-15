@@ -125,15 +125,22 @@ def main():
         logger.info(f" Server will be available at: http://0.0.0.0:{_port}")
         print(f"[DEBUG] Starting Gradio on 0.0.0.0:{_port}")
         
-        # Enable queue for production stability
-        demo.queue()
-        
+        # Queue: one heavy job at a time so uploads are not dropped (ClientDisconnect)
+        demo.queue(default_concurrency_limit=1, max_size=16)
+
+        try:
+            from apps.app import warmup_ppe_detector
+            warmup_ppe_detector("helmet_vest")
+        except Exception as warm_err:
+            logger.warning(f"PPE warmup skipped: {warm_err}")
+
         demo.launch(
             server_name=os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0"),
             server_port=_port,
             share=False,
             show_error=True,
-            inbrowser=False
+            inbrowser=False,
+            max_threads=40,
         )
         
     except Exception as e:

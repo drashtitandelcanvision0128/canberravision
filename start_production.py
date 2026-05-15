@@ -41,7 +41,7 @@ def setup_production_environment():
     os.environ.setdefault('PYTHONDONTWRITEBYTECODE', '1')
     
     logger.info("Production environment configured")
-    logger.info("Server: 0.0.0.0:7860")
+    logger.info(f"Server: 0.0.0.0:{int(os.environ.get('GRADIO_SERVER_PORT', os.environ.get('PORT', '7860')))}")
     logger.info(f"Working directory: {os.getcwd()}")
 
 def test_imports():
@@ -121,17 +121,16 @@ def main():
         from apps.app import demo
         
         logger.info(" Application starting successfully")
-        logger.info(" Server will be available at: http://0.0.0.0:7860")
-        
-        print("[DEBUG] Starting Gradio on 0.0.0.0:7860")
+        _port = int(os.environ.get("GRADIO_SERVER_PORT", os.environ.get("PORT", "7860")))
+        logger.info(f" Server will be available at: http://0.0.0.0:{_port}")
+        print(f"[DEBUG] Starting Gradio on 0.0.0.0:{_port}")
         
         # Enable queue for production stability
         demo.queue()
         
-        # Launch with production settings - HARD-CODED for Coolify compatibility
         demo.launch(
-            server_name="0.0.0.0",
-            server_port=7860,
+            server_name=os.environ.get("GRADIO_SERVER_NAME", "0.0.0.0"),
+            server_port=_port,
             share=False,
             show_error=True,
             inbrowser=False

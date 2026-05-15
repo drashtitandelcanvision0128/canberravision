@@ -195,6 +195,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 print(f"[INFO] Using device: {device}")
 
+print("[INFO] Deploy marker: cv-yolo-fallback-webcam-video-2026-05-15 (if missing in logs, container is stale)")
+
 # Enhanced ANPR System Class
 
 class EnhancedANPRSystem:
@@ -10495,19 +10497,17 @@ def _predict_video_original(
 
         print(f"[INFO] Processing video: {video_path} ({file_size / (1024*1024):.1f} MB)")
 
-        # Check if ALPR is available
+        use_alpr = bool(ALPR_AVAILABLE and alpr is not None)
 
-        if not ALPR_AVAILABLE or alpr is None:
+        if not use_alpr:
 
             print("[WARNING] ALPR not available for video processing")
 
-            print("[INFO] Falling back to original video processing without ALPR")
+            print("[INFO] Using YOLO per-frame fallback on sampled frames (same cadence as ALPR path)")
 
-            # Return original video path if ALPR not available
+        else:
 
-            return video_path
-
-        print("[INFO] Using fast_alpr for license plate detection in video")
+            print("[INFO] Using fast_alpr for license plate detection in video")
 
         # Open the video with error handling
 
@@ -10715,155 +10715,225 @@ def _predict_video_original(
 
                     try:
 
-                        # Run ALPR detection
+                        if not use_alpr:
 
-                        drawn = alpr.draw_predictions(frame)
+                            model = get_model(model_name)
 
-                        annotated_frame = drawn.image
+                            pred = model.predict(
 
-                        results = drawn.results
+                                source=frame,
 
-                        # Initialize country recognizer for video (reuse if possible)
+                                conf=float(conf_threshold),
 
-                        country_recognizer = None
+                                iou=float(iou_threshold),
 
-                        if INTERNATIONAL_PLATES_AVAILABLE:
+                                imgsz=int(imgsz),
 
-                            try:
+                                verbose=False,
 
-                                from tools.international_license_plates import InternationalLicensePlateRecognizer
+                                device=_get_device(),
 
-                                country_recognizer = InternationalLicensePlateRecognizer()
+                            )[0]
 
-                            except Exception as e:
+                            annotated_frame = _annotate_with_color(
 
-                                pass
+                                frame,
 
-                        # Process detected plates
+                                pred,
 
-                        frame_plates = []
+                                show_labels,
 
-                        for i, result in enumerate(results, 1):
+                                show_conf,
 
-                            plate_text = result.ocr.text if result.ocr else 'N/A'
+                                bool(enable_resnet),
 
-                            # Detect country for this plate
+                                int(max_boxes),
 
-                            country = 'Unknown'
+                                int(resnet_every_n),
 
-                            if country_recognizer and plate_text != 'N/A':
+                                None,
+
+                                bool(enable_ocr),
+
+                                int(ocr_every_n),
+
+                            )
+
+                            frame_plates = []
+
+                            current_time = datetime.now().strftime('%H:%M:%S')
+
+                            current_date = datetime.now().strftime('%d/%m/%Y')
+
+                            overlay = annotated_frame.copy()
+
+                            cv2.rectangle(overlay, (5, 5), (380, 115), (0, 0, 0), -1)
+
+                            cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+
+                            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
+
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+
+                            cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
+
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+
+                            cv2.putText(annotated_frame, "YOLO (no fast_alpr)", (10, 75),
+
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 200), 1)
+
+                        else:
+
+
+
+                            drawn = alpr.draw_predictions(frame)
+
+                            annotated_frame = drawn.image
+
+                            results = drawn.results
+
+                            # Initialize country recognizer for video (reuse if possible)
+
+                            country_recognizer = None
+
+                            if INTERNATIONAL_PLATES_AVAILABLE:
 
                                 try:
 
-                                    country_matches = country_recognizer.detect_country_from_plate(plate_text)
+                                    from tools.international_license_plates import InternationalLicensePlateRecognizer
 
-                                    if country_matches and len(country_matches) > 0:
+                                    country_recognizer = InternationalLicensePlateRecognizer()
 
-                                        country = country_matches[0]['country']
-
-                                except Exception:
+                                except Exception as e:
 
                                     pass
 
-                            plate_info = {
+                            # Process detected plates
 
-                                'text': plate_text,
+                            frame_plates = []
 
-                                'country': country,
+                            for i, result in enumerate(results, 1):
 
-                                'detection_confidence': float(result.detection.confidence),
+                                plate_text = result.ocr.text if result.ocr else 'N/A'
 
-                                'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+                                # Detect country for this plate
 
-                                'frame': processed_frames,
+                                country = 'Unknown'
 
-                                'bbox': {
+                                if country_recognizer and plate_text != 'N/A':
 
-                                    'x1': int(result.detection.bounding_box.x1),
+                                    try:
 
-                                    'y1': int(result.detection.bounding_box.y1),
+                                        country_matches = country_recognizer.detect_country_from_plate(plate_text)
 
-                                    'x2': int(result.detection.bounding_box.x2),
+                                        if country_matches and len(country_matches) > 0:
 
-                                    'y2': int(result.detection.bounding_box.y2)
+                                            country = country_matches[0]['country']
+
+                                    except Exception:
+
+                                        pass
+
+                                plate_info = {
+
+                                    'text': plate_text,
+
+                                    'country': country,
+
+                                    'detection_confidence': float(result.detection.confidence),
+
+                                    'ocr_confidence': float(result.ocr.confidence) if result.ocr and isinstance(result.ocr.confidence, (int, float)) else 0.0,
+
+                                    'frame': processed_frames,
+
+                                    'bbox': {
+
+                                        'x1': int(result.detection.bounding_box.x1),
+
+                                        'y1': int(result.detection.bounding_box.y1),
+
+                                        'x2': int(result.detection.bounding_box.x2),
+
+                                        'y2': int(result.detection.bounding_box.y2)
+
+                                    }
 
                                 }
 
-                            }
+                                frame_plates.append(plate_info)
 
-                            frame_plates.append(plate_info)
+                                unique_plates.add(f"{plate_text} [{country}]")
 
-                            unique_plates.add(f"{plate_text} [{country}]")
+                                plate_detection_count += 1
 
-                            plate_detection_count += 1
+                                if processed_frames % 30 == 0 or processed_frames <= 5:
 
-                            if processed_frames % 30 == 0 or processed_frames <= 5:
+                                    print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
 
-                                print(f"[INFO] Frame {processed_frames}: Detected plate: {plate_text} [{country}] (Detection: {plate_info['detection_confidence']:.2%})")
+                            # Add country labels on video frames (blue background)
 
-                        # Add country labels on video frames (blue background)
+                            for plate in frame_plates:
 
-                        for plate in frame_plates:
+                                if plate['country'] != 'Unknown':
 
-                            if plate['country'] != 'Unknown':
+                                    x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
 
-                                x1, y1 = plate['bbox']['x1'], plate['bbox']['y1']
+                                    country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
 
-                                country_label = f"{plate['country']} {plate['detection_confidence']:.0%}"
+                                    label_y = y1 - 35 if y1 > 35 else y1 + 20
 
-                                label_y = y1 - 35 if y1 > 35 else y1 + 20
+                                    # Get text size
 
-                                # Get text size
+                                    (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
 
-                                (tw, th), _ = cv2.getTextSize(country_label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                                    # Draw blue background
 
-                                # Draw blue background
+                                    cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
 
-                                cv2.rectangle(annotated_frame, (x1, label_y - th - 5), (x1 + tw, label_y + 5), (255, 100, 0), -1)
+                                    # Draw white text
 
-                                # Draw white text
+                                    cv2.putText(annotated_frame, country_label, (x1, label_y),
 
-                                cv2.putText(annotated_frame, country_label, (x1, label_y),
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-                                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                            # Add timestamp and plate count overlay
 
-                        # Add timestamp and plate count overlay
+                            current_time = datetime.now().strftime('%H:%M:%S')
 
-                        current_time = datetime.now().strftime('%H:%M:%S')
+                            current_date = datetime.now().strftime('%d/%m/%Y')
 
-                        current_date = datetime.now().strftime('%d/%m/%Y')
+                            # Create semi-transparent background for timestamp
 
-                        # Create semi-transparent background for timestamp
+                            overlay = annotated_frame.copy()
 
-                        overlay = annotated_frame.copy()
+                            cv2.rectangle(overlay, (5, 5), (300, 100), (0, 0, 0), -1)
 
-                        cv2.rectangle(overlay, (5, 5), (300, 100), (0, 0, 0), -1)
+                            cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
 
-                        cv2.addWeighted(overlay, 0.7, annotated_frame, 0.3, 0, annotated_frame)
+                            # Add time, date, and plate count
 
-                        # Add time, date, and plate count
+                            cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
 
-                        cv2.putText(annotated_frame, f"Time: {current_time}", (10, 25),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                            cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
 
-                        cv2.putText(annotated_frame, f"Date: {current_date}", (10, 50),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                            cv2.putText(annotated_frame, f"Plates: {len(unique_plates)} | Frame: {len(frame_plates)}", (10, 75),
 
-                        cv2.putText(annotated_frame, f"Plates: {len(unique_plates)} | Frame: {len(frame_plates)}", (10, 75),
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
 
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+                            # Add recent plate text overlay at bottom
 
-                        # Add recent plate text overlay at bottom
+                            if frame_plates:
 
-                        if frame_plates:
+                                recent_plate = frame_plates[-1]['text']
 
-                            recent_plate = frame_plates[-1]['text']
+                                cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, height - 20),
 
-                            cv2.putText(annotated_frame, f"Recent: {recent_plate}", (10, height - 20),
-
-                                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
                     except Exception as alpr_error:
 
@@ -12786,13 +12856,79 @@ def predict_webcam(
 
             return frame, " **Status:** Live Detection Active"
 
-        # Check if ALPR is available
+        # If fast_alpr is missing, use same YOLO path as predict_image so live view still shows boxes/OCR.
 
         if not ALPR_AVAILABLE or alpr is None:
 
-            print("[WARNING] ALPR not available for webcam")
+            print("[WARNING] ALPR not available for webcam, using YOLO fallback")
 
-            return frame, " ALPR not available\n\nPlease install fast_alpr to use license plate detection."
+            frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            try:
+
+                model = get_model(model_name)
+
+                result = model.predict(
+
+                    source=frame_bgr,
+
+                    conf=float(conf_threshold),
+
+                    iou=float(iou_threshold),
+
+                    imgsz=int(imgsz),
+
+                    verbose=False,
+
+                    device=_get_device(),
+
+                )[0]
+
+                annotated = _annotate_with_color(
+
+                    frame_bgr,
+
+                    result,
+
+                    show_labels=bool(show_labels),
+
+                    show_conf=bool(show_conf),
+
+                    enable_resnet=bool(enable_resnet),
+
+                    max_boxes=int(max_boxes),
+
+                    resnet_every_n=int(resnet_every_n),
+
+                    stream_key_prefix=f"webcam_{_webcam_stream_state['frame_idx']}",
+
+                    enable_ocr=bool(enable_ocr),
+
+                    ocr_every_n=int(ocr_every_n),
+
+                )
+
+                summary = _generate_detection_summary(
+
+                    result,
+
+                    enable_resnet=bool(enable_resnet),
+
+                    enable_ocr=bool(enable_ocr),
+
+                )
+
+                out_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
+
+                status = f" **Status:** Live YOLO (fast_alpr not installed)\n\n{summary}"
+
+                return out_rgb, status
+
+            except Exception as yolo_webcam_err:
+
+                print(f"[ERROR] Webcam YOLO fallback failed: {yolo_webcam_err}")
+
+                return frame, f" **Error:** Webcam detection failed: {yolo_webcam_err}"
 
         # Gradio webcam sends RGB, convert to BGR for OpenCV
 
@@ -14999,6 +15135,7 @@ main.wrap {
     min-width: 0 !important;
     width: 100% !important;
     max-width: none !important;
+    position: relative !important;
 }
 
 .cv-main-workspace .gr-block,
@@ -15065,9 +15202,16 @@ main.wrap {
     }
 }
 
-/* One detection panel visible at a time (both Columns stay visible=True for Gradio Tabs) */
-.cv-detect-hidden {
-    display: none !important;
+/* One panel at a time: avoid display:none so nested Gradio Tabs stay interactive */
+.cv-detect-panel.cv-detect-hidden {
+    position: absolute !important;
+    left: -12000px !important;
+    top: 0 !important;
+    width: min(100%, 1400px) !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
 }
 
 </style>

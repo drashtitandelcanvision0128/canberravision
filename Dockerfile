@@ -12,6 +12,7 @@ ENV APP_ENV=production
 ENV PORT=7860
 ENV GRADIO_SERVER_PORT=7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
+ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 
 WORKDIR /app
 
@@ -96,6 +97,10 @@ RUN pip install --no-cache-dir "numpy<2.0.0" "paddlepaddle==2.6.2" || \
     echo "WARNING: paddlepaddle failed - OCR will be limited"
 RUN pip install --no-cache-dir "numpy<2.0.0" "paddleocr>=2.7.0" || \
     echo "WARNING: paddleocr failed - OCR will be limited"
+
+# License plate ALPR (import: fast_alpr). Image/webcam/video use YOLO if this fails.
+RUN pip install --no-cache-dir "onnxruntime>=1.16.0" "fast-alpr" || \
+    echo "WARNING: fast-alpr install failed — plate OCR falls back to YOLO path in app"
 
 # -------------------------------------------------------
 # Copy application

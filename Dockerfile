@@ -1,8 +1,9 @@
 # ============================================================
 # Canberra Vision Detection System - Production Dockerfile
-# Fixed: gradio/huggingface_hub compatibility + Debian Trixie
+# Fixed: gradio/huggingface_hub compatibility + Debian bookworm slim
 # ============================================================
-FROM python:3.10-slim
+# bookworm = stable Debian; avoids trixie’s huge recommended stacks (helps Coolify RAM/disk).
+FROM python:3.10-slim-bookworm
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -16,8 +17,8 @@ ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
 
 WORKDIR /app
 
-# Install system dependencies (Debian Trixie compatible)
-RUN apt-get update && apt-get install -y \
+# Install system dependencies (Debian bookworm)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
@@ -52,8 +53,8 @@ RUN pip install --no-cache-dir "huggingface_hub==0.24.7"
 # -------------------------------------------------------
 # Force reinstall of FastAPI and Pydantic v2 to ensure compatibility with gradio 4.25.0
 RUN pip install --no-cache-dir --force-reinstall "starlette==0.36.3" "jinja2==3.1.2" "fastapi==0.110.0" "pydantic==2.10.6"
+# gradio-client must match gradio (4.32.2 → 0.17.0). Do not downgrade gradio-client.
 RUN pip install --no-cache-dir "gradio==4.32.2"
-RUN pip install --no-cache-dir "gradio-client==0.15.1"
 
 # -------------------------------------------------------
 # Step 3: Core dependencies
@@ -88,6 +89,9 @@ RUN pip install --no-cache-dir \
     ultralytics \
     "transformers==4.37.2" \
     timm
+
+# Ultralytics pulls opencv-python (GUI); we already use headless — drop duplicate to save ~60MB + import clarity.
+RUN pip uninstall -y opencv-python 2>/dev/null || true
 
 # -------------------------------------------------------
 # Step 6: PaddleOCR - CPU version (server has no GPU)

@@ -295,17 +295,13 @@ class PPEDetector:
                 print(f"[PPE] Using trained PPE model: {model_path}")
 
             else:
-
-                # Try absolute path as fallback
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_ppe.pt"
-                print(f"[PPE] Relative path failed, trying absolute: {abs_ppe_path} (exists={os.path.exists(abs_ppe_path)})")
-                if os.path.exists(abs_ppe_path):
-                    model_path = abs_ppe_path
-                    print(f"[PPE] Using trained PPE model (absolute): {model_path}")
+                yolo_n = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'yolov8n.pt')
+                if os.path.exists(yolo_n):
+                    model_path = yolo_n
+                    print(f"[PPE] Using bundled YOLO base model: {model_path}")
                 else:
-                    # Fallback to best_ppe.pt for PPE detection
-                    model_path = "best_ppe.pt"
-                    print(f"[PPE] PPE model not found, using fallback: {model_path}")
+                    model_path = "yolov8n.pt"
+                    print(f"[PPE] PPE weights missing; using {model_path} (Ultralytics cache/download)")
 
         elif is_ppe_choice:
 
@@ -322,11 +318,10 @@ class PPEDetector:
                 print(f"[PPE] Using trained PPE model: {model_path}")
 
             else:
-
-                abs_ppe_path = r"c:\Users\Sensepart\canberravision\models\best_ppe.pt"
-                if os.path.exists(abs_ppe_path):
-                    model_path = abs_ppe_path
-                    print(f"[PPE] Using trained PPE model (absolute): {model_path}")
+                yolo_n = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'yolov8n.pt')
+                if os.path.exists(yolo_n):
+                    model_path = yolo_n
+                    print(f"[PPE] Using bundled YOLO base model: {model_path}")
                 else:
                     model_path = "yolov8n.pt"
                     print(f"[PPE] PPE model file not found, using fallback: {model_path}")

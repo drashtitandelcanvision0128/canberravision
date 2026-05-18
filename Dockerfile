@@ -90,8 +90,13 @@ RUN pip install --no-cache-dir \
     "transformers==4.37.2" \
     timm
 
-# Ultralytics pulls opencv-python (GUI); we already use headless — drop duplicate to save ~60MB + import clarity.
-RUN pip uninstall -y opencv-python 2>/dev/null || true
+# Base YOLO weights for PPE fallback when best_ppe.pt is not mounted (models/ is gitignored locally).
+# Download before removing opencv-python (ultralytics needs cv2 during import).
+RUN mkdir -p /app/models && python -c "import os; os.chdir('/app/models'); from ultralytics import YOLO; YOLO('yolov8n.pt')"
+
+# Ultralytics pulls opencv-python (GUI); keep headless only for runtime.
+RUN pip uninstall -y opencv-python 2>/dev/null || true && \
+    pip install --no-cache-dir opencv-python-headless
 
 # -------------------------------------------------------
 # Step 6: PaddleOCR - CPU version (server has no GPU)

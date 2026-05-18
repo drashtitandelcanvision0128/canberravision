@@ -11080,14 +11080,19 @@ def _predict_video_original(
                     ffmpeg_path, "-y",
                     "-i", output_path,
                     "-c:v", "libx264",
-                    "-preset", "fast",
-                    "-crf", "23",
+                    "-preset", "ultrafast",
+                    "-crf", "28",
                     "-pix_fmt", "yuv420p",
                     "-movflags", "+faststart",
                     h264_path
                 ]
                 print(f"[DEBUG] ffmpeg command: {' '.join(reencode_cmd)}")
-                result = subprocess.run(reencode_cmd, capture_output=True, timeout=120)
+                try:
+                    src_mb = os.path.getsize(output_path) / (1024 * 1024)
+                except OSError:
+                    src_mb = 80.0
+                ffmpeg_timeout = max(120, int(60 + src_mb * 4))
+                result = subprocess.run(reencode_cmd, capture_output=True, timeout=ffmpeg_timeout)
                 print(f"[DEBUG] ffmpeg return code: {result.returncode}")
                 if result.returncode == 0 and os.path.exists(h264_path) and os.path.getsize(h264_path) > 0:
                     # Replace original with H.264 version
@@ -11106,6 +11111,8 @@ def _predict_video_original(
             else:
                 print("[WARNING] ffmpeg not found, video may not play in browser")
                 print("[INFO] To fix: install ffmpeg or 'pip install imageio-ffmpeg'")
+        except subprocess.TimeoutExpired:
+            print("[WARNING] H.264 re-encoding timed out; using original video file")
         except Exception as e:
             print(f"[WARNING] H.264 re-encoding error: {e}")
             import traceback
@@ -13740,7 +13747,77 @@ def process_parking_webcam(frame, confidence_threshold=0.85, model_name="yolov8n
 
 # ==================== PPE DETECTION FUNCTIONS ====================
 
-def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, detection_mode="all"):
+def _ppe_debug_enabled() -> bool:
+    """Heavy PPE console logging slows live uploads; off in production unless PPE_DEBUG=1."""
+    if os.environ.get("PPE_DEBUG", "").strip().lower() in ("1", "true", "yes"):
+        return True
+    return not IS_PRODUCTION
+
+
+def _resize_ppe_input(image, max_side: int = 1280):
+    """Downscale large uploads so paste/upload + inference stay fast on CPU servers."""
+    if image is None:
+        return None
+    try:
+        if isinstance(image, Image.Image):
+            w, h = image.size
+            if max(w, h) <= max_side:
+                return image
+            scale = max_side / float(max(w, h))
+            nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+            return image.resize((nw, nh), Image.Resampling.LANCZOS)
+        if isinstance(image, np.ndarray) and image.size:
+            h, w = image.shape[:2]
+            if max(w, h) <= max_side:
+                return image
+            scale = max_side / float(max(w, h))
+            nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
+            return cv2.resize(image, (nw, nh), interpolation=cv2.INTER_AREA)
+    except Exception as e:
+        print(f"[PPE-WARNING] Image resize skipped: {e}")
+    return image
+
+
+def _resolve_ppe_model_path(model_name="yolov8n") -> str:
+    """Pick trained PPE weights if mounted; otherwise a YOLO base model that exists on disk."""
+    project_root = os.path.dirname(os.path.dirname(__file__))
+    env_path = os.environ.get("PPE_MODEL_PATH", "").strip()
+    candidates = []
+    if env_path:
+        candidates.append(env_path)
+    candidates.extend([
+        os.path.join(project_root, "models", "best_ppe.pt"),
+        os.path.join(project_root, "models", "best.pt"),
+        os.path.join(project_root, "best_ppe.pt"),
+        os.path.join(project_root, "best.pt"),
+        os.path.join(project_root, "models", "yolov8n.pt"),
+        os.path.join(project_root, "yolov8n.pt"),
+    ])
+    for path in candidates:
+        if path and os.path.isfile(path):
+            return path
+    fallback = model_name if str(model_name).endswith(".pt") else f"{model_name}.pt"
+    print(f"[PPE-WARNING] No local .pt found; Ultralytics will fetch or use: {fallback}")
+    return fallback
+
+
+def warmup_ppe_detector(detection_mode: str = "helmet_vest") -> None:
+    """Load PPE model once at startup so first user upload is not stuck waiting."""
+    try:
+        path = _resolve_ppe_model_path("yolov8n")
+        get_ppe_detector(
+            model_path=path,
+            debug=_ppe_debug_enabled(),
+            auto_recovery=True,
+            force_new=False,
+            detection_mode=detection_mode,
+        )
+        print(f"[PPE] Warmed up detector with model: {path}")
+    except Exception as e:
+        print(f"[PPE-WARNING] Startup warmup failed (will retry on first request): {e}")
+
+
+def _get_ppe_detector_safe(model_name="yolov8n", debug=None, force_new=False, detection_mode="all"):
 
     """
 
@@ -13754,28 +13831,18 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=False, force_new=True, de
 
         debug: Enable debug output
 
-        force_new: Always create fresh detector to prevent state leakage (default: True)
+        force_new: Reload YOLO weights (default False — much faster for image upload/paste)
 
     Args:
         model_name: YOLO model to use (IGNORED - always uses trained PPE model)
         debug: Enable debug output
-        force_new: Always create fresh detector to prevent state leakage (default: True)
+        force_new: Reload model each request (only if you need a clean state)
     """
 
     try:
-
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        candidates = [
-            os.path.join(project_root, "models", "best_ppe.pt"),
-            os.path.join(project_root, "models", "best.pt"),
-            os.path.join(project_root, "best_ppe.pt"),
-            os.path.join(project_root, "best.pt"),
-        ]
-        ppe_model_path = next((p for p in candidates if os.path.isfile(p)), None)
-        if ppe_model_path is None:
-            # Final fallback so production does not silently do nothing when PPE weights are missing.
-            ppe_model_path = model_name if str(model_name).endswith(".pt") else f"{model_name}.pt"
-            print(f"[PPE-WARNING] Trained PPE model not found, falling back to: {ppe_model_path}")
+        if debug is None:
+            debug = _ppe_debug_enabled()
+        ppe_model_path = _resolve_ppe_model_path(model_name)
 
         # detection_mode: "all" (default), "helmet_vest" (only helmet & vest), "mask" (only mask)
         detector = get_ppe_detector(model_path=ppe_model_path, debug=debug, auto_recovery=True, force_new=force_new, detection_mode=detection_mode)
@@ -13820,19 +13887,18 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             return None, " **Upload an image to start PPE detection**"
 
+        image = _resize_ppe_input(image)
+        debug = _ppe_debug_enabled()
         print(f"[INFO] Starting PPE detection on image...")
 
-        # Get PPE detector with fallback - ENABLE DEBUG to see details
-
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, detection_mode=detection_mode)
-
-        # Force enable debug mode on the detector
+        detector, is_global = _get_ppe_detector_safe(
+            model_name, debug=debug, force_new=False, detection_mode=detection_mode
+        )
 
         if detector:
-
-            detector.debug = True
-
-            print(f"[DEBUG] PPE Detector debug mode: {detector.debug}")
+            detector.debug = debug
+            if debug:
+                print(f"[DEBUG] PPE Detector debug mode: {detector.debug}")
 
         if detector is None:
 
@@ -13858,9 +13924,7 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             image_np = image
 
-        # Perform detection with the robust detector - ENABLE DEBUG to see details
-
-        result = detector.detect(image_np, debug=True)
+        result = detector.detect(image_np, debug=debug)
 
         # Create annotated image
 
@@ -14418,7 +14482,9 @@ def process_ppe_video(video, confidence_threshold=0.3, model_name="yolov8n", sho
 
         # Get PPE detector with fallback - reuse detector for video frames
         # Enable debug to see helmet detection details
-        detector, is_global = _get_ppe_detector_safe(model_name, debug=True, force_new=False, detection_mode=detection_mode)
+        detector, is_global = _get_ppe_detector_safe(
+            model_name, debug=_ppe_debug_enabled(), force_new=False, detection_mode=detection_mode
+        )
 
         if detector is None:
 
@@ -15202,16 +15268,9 @@ main.wrap {
     }
 }
 
-/* One panel at a time: avoid display:none so nested Gradio Tabs stay interactive */
+/* Hidden via Gradio visible=False; keep class for layout hooks only */
 .cv-detect-panel.cv-detect-hidden {
-    position: absolute !important;
-    left: -12000px !important;
-    top: 0 !important;
-    width: min(100%, 1400px) !important;
-    max-width: 100% !important;
-    box-sizing: border-box !important;
-    pointer-events: none !important;
-    z-index: 0 !important;
+    display: none !important;
 }
 
 </style>
@@ -15339,8 +15398,7 @@ with demo:
 
                 
 
-            # PPE block: same visibility=True as vehicle; .cv-detect-hidden hides until PPE sidebar click
-            with gr.Column(visible=True, elem_classes=["cv-detect-panel", "cv-detect-hidden"]) as ppe_detection_section:
+            with gr.Column(visible=False, elem_classes=["cv-detect-panel"]) as ppe_detection_section:
                 with gr.Tabs(elem_id="ppe_main_tabs"):
                     # --- Helmet & Vest Detection Tab ---
                     with gr.TabItem("Helmet & Vest Detection"):
@@ -15418,9 +15476,9 @@ with demo:
 
         lambda: (
 
-            gr.update(elem_classes=["cv-detect-panel"]),
+            gr.update(visible=True),
 
-            gr.update(elem_classes=["cv-detect-panel", "cv-detect-hidden"]),
+            gr.update(visible=False),
 
             gr.update(variant="primary"),
 
@@ -15440,9 +15498,9 @@ with demo:
 
         lambda: (
 
-            gr.update(elem_classes=["cv-detect-panel", "cv-detect-hidden"]),
+            gr.update(visible=False),
 
-            gr.update(elem_classes=["cv-detect-panel"]),
+            gr.update(visible=True),
 
             gr.update(variant="secondary"),
 
@@ -15537,6 +15595,8 @@ with demo:
         outputs=[mask_webcam_output, mask_webcam_info],
         show_progress=False,
     )
+
+    demo.load(fn=lambda: warmup_ppe_detector("helmet_vest"), inputs=None, outputs=None)
 
     # JavaScript for Button Styling & Status Tracker Removal
 
@@ -15796,6 +15856,11 @@ if __name__ == "__main__":
 
             print("[INFO] Launching Gradio server...")
 
+            demo.queue(default_concurrency_limit=1, max_size=16)
+
+            if IS_PRODUCTION:
+                warmup_ppe_detector("helmet_vest")
+
             demo.launch(
 
                 share=False,
@@ -15814,7 +15879,9 @@ if __name__ == "__main__":
 
                 allowed_paths=[os.getcwd(), custom_temp, tempfile.gettempdir(), "ppe_outputs", "outputs", os.path.join(project_root, "apps")],
 
-                prevent_thread_lock=False
+                prevent_thread_lock=False,
+
+                max_threads=40,
 
             )
 

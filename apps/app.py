@@ -13780,6 +13780,11 @@ def _resize_ppe_input(image, max_side: int = 1280):
 
 def _resolve_ppe_model_path(model_name="yolov8n") -> str:
     """Pick trained PPE weights if mounted; otherwise a YOLO base model that exists on disk."""
+    try:
+        from modules.ppe_detection import resolve_ppe_model_weights
+        return resolve_ppe_model_weights()
+    except Exception as e:
+        print(f"[PPE-WARNING] resolve_ppe_model_weights failed: {e}")
     project_root = os.path.dirname(os.path.dirname(__file__))
     env_path = os.environ.get("PPE_MODEL_PATH", "").strip()
     candidates = []
@@ -13790,6 +13795,8 @@ def _resolve_ppe_model_path(model_name="yolov8n") -> str:
         os.path.join(project_root, "models", "best.pt"),
         os.path.join(project_root, "best_ppe.pt"),
         os.path.join(project_root, "best.pt"),
+        os.path.normpath(os.path.join(project_root, "..", "..", "canberravision", "models", "best_ppe.pt")),
+        os.path.normpath(os.path.join(project_root, "..", "..", "canberravision", "models", "best.pt")),
         os.path.join(project_root, "models", "yolov8n.pt"),
         os.path.join(project_root, "yolov8n.pt"),
     ])

@@ -34,7 +34,49 @@ warnings.filterwarnings('ignore')
 
 # PPE Dataset Configuration
 
-PPE_DATASET_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dataset', 'PPE', 'data.yaml')
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+PPE_DATASET_PATH = os.path.join(_REPO_ROOT, 'dataset', 'PPE', 'data.yaml')
+
+
+def _is_standard_yolo_weights(model_path) -> bool:
+    base = os.path.splitext(os.path.basename(str(model_path or "")))[0].lower()
+    return base in ('yolov8n', 'yolo26n', 'yolov8m', 'yolov8s', 'yolo11n', 'yolo11s')
+
+
+def resolve_ppe_model_weights() -> str:
+    """Locate trained PPE weights (repo, env, or legacy sibling checkout)."""
+    candidates = []
+    env = os.environ.get("PPE_MODEL_PATH", "").strip()
+    if env:
+        candidates.append(env)
+    candidates.extend([
+        os.path.join(_REPO_ROOT, "models", "best_ppe.pt"),
+        os.path.join(_REPO_ROOT, "models", "best.pt"),
+        os.path.join(_REPO_ROOT, "best_ppe.pt"),
+        os.path.join(_REPO_ROOT, "best.pt"),
+        # Legacy folder: Sensepart/canberravision when repo is Sensepart/CVision/canberravision
+        os.path.normpath(os.path.join(_REPO_ROOT, "..", "..", "canberravision", "models", "best_ppe.pt")),
+        os.path.normpath(os.path.join(_REPO_ROOT, "..", "..", "canberravision", "models", "best.pt")),
+    ])
+    for path in candidates:
+        if path and os.path.isfile(path):
+            resolved = os.path.abspath(path)
+            print(f"[PPE] Using trained PPE weights: {resolved}")
+            return resolved
+    for path in (
+        os.path.join(_REPO_ROOT, "models", "yolov8n.pt"),
+        os.path.join(_REPO_ROOT, "yolov8n.pt"),
+    ):
+        if os.path.isfile(path):
+            resolved = os.path.abspath(path)
+            print(
+                f"[PPE-WARNING] No best_ppe.pt / best.pt found — using {resolved}. "
+                "Helmet/vest need trained PPE weights in models/ or set PPE_MODEL_PATH."
+            )
+            return resolved
+    print("[PPE-WARNING] No local .pt found; will try best_ppe.pt via Ultralytics")
+    return "best_ppe.pt"
 
 # Load PPE dataset classes
 
@@ -264,69 +306,20 @@ class PPEDetector:
         self.detection_mode = detection_mode
         print(f"[PPE] Initializing with model_path: {repr(model_path)}, detection_mode: {detection_mode}")
 
-        # Normalize model_path for comparison
-
-        normalized_path = str(model_path).strip().lower() if model_path else ""
-
-        if normalized_path.endswith('.pt'):
-
-            normalized_path = normalized_path[:-3]
-
-        standard_models = ['yolov8n', 'yolo26n', 'yolov8m', 'yolov8s', 'yolo11n', 'yolo11s']
-
-        is_ppe_choice = 'ppe' in normalized_path or 'best' in normalized_path
-
-        is_standard_model = normalized_path in standard_models or model_path is None
-
-        if is_standard_model:
-
-            print(f"[PPE] Standard YOLO model detected ({model_path}), switching to PPE model")
-
-            # Try to find trained PPE model first
-
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
-
-            print(f"[PPE] Checking PPE model at: {ppe_model_path} (exists={os.path.exists(ppe_model_path)})")
-
-            if os.path.exists(ppe_model_path):
-
-                model_path = ppe_model_path
-
-                print(f"[PPE] Using trained PPE model: {model_path}")
-
+        requested = model_path
+        if requested and os.path.isfile(str(requested)):
+            base_lower = os.path.basename(str(requested)).lower()
+            if "best" in base_lower or "ppe" in base_lower:
+                self.model_path = os.path.abspath(str(requested))
             else:
-                yolo_n = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'yolov8n.pt')
-                if os.path.exists(yolo_n):
-                    model_path = yolo_n
-                    print(f"[PPE] Using bundled YOLO base model: {model_path}")
-                else:
-                    model_path = "yolov8n.pt"
-                    print(f"[PPE] PPE weights missing; using {model_path} (Ultralytics cache/download)")
+                print(f"[PPE] Generic YOLO weights ({requested}) — resolving PPE model")
+                self.model_path = resolve_ppe_model_weights()
+        elif _is_standard_yolo_weights(requested) or requested is None:
+            self.model_path = resolve_ppe_model_weights()
+        else:
+            self.model_path = resolve_ppe_model_weights()
 
-        elif is_ppe_choice:
-
-            # User selected "best (PPE)" from dropdown - resolve to actual path
-
-            print(f"[PPE] PPE model choice detected ({model_path}), resolving path")
-
-            ppe_model_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'best_ppe.pt')
-
-            if os.path.exists(ppe_model_path):
-
-                model_path = ppe_model_path
-
-                print(f"[PPE] Using trained PPE model: {model_path}")
-
-            else:
-                yolo_n = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models', 'yolov8n.pt')
-                if os.path.exists(yolo_n):
-                    model_path = yolo_n
-                    print(f"[PPE] Using bundled YOLO base model: {model_path}")
-                else:
-                    model_path = "yolov8n.pt"
-                    print(f"[PPE] PPE model file not found, using fallback: {model_path}")
-
-        self.model_path = model_path
+        model_path = self.model_path
 
         self.model = None
 
@@ -334,10 +327,14 @@ class PPEDetector:
 
         self.person_model = None
 
-        _repo = os.path.dirname(os.path.dirname(__file__))
-        _yolo_n = os.path.join(_repo, "models", "yolov8n.pt")
-        # Prefer repo-local weights so person detection works regardless of cwd (e.g. apps/)
-        self.person_model_path = _yolo_n if os.path.exists(_yolo_n) else "yolov8n.pt"
+        _yolo_n = os.path.join(_REPO_ROOT, "models", "yolov8n.pt")
+        _yolo_root = os.path.join(_REPO_ROOT, "yolov8n.pt")
+        if os.path.exists(_yolo_n):
+            self.person_model_path = _yolo_n
+        elif os.path.exists(_yolo_root):
+            self.person_model_path = _yolo_root
+        else:
+            self.person_model_path = "yolov8n.pt"
 
         self.device = device or self._get_device()
 
@@ -430,7 +427,9 @@ class PPEDetector:
 
                 # Also load separate person detection model if PPE model is being used
 
-                if self.person_model is None and ("best.pt" in self.model_path or "best_ppe.pt" in self.model_path):
+                if self.person_model is None and (
+                    "best.pt" in self.model_path.lower() or "best_ppe" in self.model_path.lower()
+                ):
 
                     try:
 

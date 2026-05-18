@@ -358,8 +358,15 @@ class PPEDetector:
 
         # Single person box approach - detect PPE within person regions
 
-        # Person (COCO) — low conf catches small / dim / webcam frames; fallback pass uses even lower
-        self.person_threshold = 0.08
+        # Person (COCO) — balanced for site/crowd scenes (reduces machinery/partial FPs)
+        self.person_threshold = 0.22
+        self.person_fallback_threshold = 0.14  # second pass when primary finds nobody
+        self.person_dedup_iou = 0.50
+        self.person_center_merge_ratio = 0.28  # merge boxes whose centers are this close (× avg height)
+        self.person_min_height_frac = 0.045  # min box height vs frame (keeps distant workers)
+        self.person_min_area_frac = 0.0012  # min box area vs frame
+        self.person_min_aspect = 0.12  # width/height — allow tall/narrow
+        self.person_max_aspect = 1.05  # reject wider-than-tall (machinery, horizontal blobs)
         self.ppe_threshold = 0.06  # Lower confidence for PPE model inference in video
         self.helmet_threshold = 0.05  # More sensitive helmet fallback threshold for video
         self.fallback_threshold = 0.12
@@ -371,6 +378,12 @@ class PPEDetector:
         # Raw YOLO "helmet/hardhat" below this is treated as uncertain — skip assigning helmet_detected
         # (avoids 0.27–0.35 hair FPs when texture heuristics miss). Lower if distant helmets disappear.
         self.model_helmet_accept_min_conf = 0.42
+        # Vest: color fallback must see real hi-vis; weak model-only vest on street clothes is rejected
+        self.vest_hivis_min_saturation = 95
+        self.vest_color_min_coverage = 0.34
+        self.vest_color_solid_coverage = 0.52
+        self.vest_color_with_strip_coverage = 0.26
+        self.model_vest_min_conf_without_color = 0.58
 
         # Video smoothing state
         self._ppe_history = {} # person_id -> history of results
@@ -379,7 +392,8 @@ class PPEDetector:
         self._ensure_model_loaded()
 
         print(
-            f"[PPE] Initialized - helmet_threshold={self.helmet_threshold}, "
+            f"[PPE] Initialized - person_threshold={self.person_threshold}, "
+            f"helmet_threshold={self.helmet_threshold}, "
             f"model_helmet_accept_min_conf={self.model_helmet_accept_min_conf}, fallback_enabled=True"
         )
 
@@ -650,23 +664,59 @@ class PPEDetector:
 
     def get_vest_region(self, person_bbox, frame=None, head_bbox=None):
 
-        """Extract vest region - more robust fallback based on height proportions"""
+        """Torso band for vest — always below head, never on face."""
 
         x1, y1, x2, y2 = person_bbox
-        height = y2 - y1
+        height = max(1, y2 - y1)
         width = x2 - x1
 
-        # Torso is usually from 15% to 65% of the person
-        vest_top = y1 + int(height * 0.15)
-        vest_bottom = y1 + int(height * 0.65)
-        
-        # Vest is slightly narrower than person bbox
+        if head_bbox is not None:
+            vest_top = head_bbox[3] + max(2, int(height * 0.02))
+        else:
+            vest_top = y1 + int(height * 0.22)
+        vest_top = max(y1 + int(height * 0.18), vest_top)
+        vest_bottom = y1 + int(height * 0.72)
+
         vest_width = int(width * 0.8)
         vest_x_center = x1 + int(width / 2)
-        vest_x1 = vest_x_center - int(vest_width / 2)
-        vest_x2 = vest_x_center + int(vest_width / 2)
+        vest_x1 = vest_x_center - int(vest_width // 2)
+        vest_x2 = vest_x_center + int(vest_width // 2)
 
         return (max(x1, vest_x1), max(y1, vest_top), min(x2, vest_x2), min(y2, vest_bottom))
+
+    def _normalize_vest_bbox(self, vest_bbox, person_bbox, head_bbox=None):
+        """Clip model vest boxes to torso; replace head/face false positives with torso region."""
+        if person_bbox is None:
+            return vest_bbox
+        if vest_bbox is None:
+            return self.get_vest_region(person_bbox, None, head_bbox)
+
+        px1, py1, px2, py2 = person_bbox
+        ph = max(1, py2 - py1)
+        pw = max(1, px2 - px1)
+
+        if head_bbox is not None:
+            torso_top = head_bbox[3] + max(2, int(ph * 0.02))
+        else:
+            torso_top = py1 + int(ph * 0.22)
+        torso_top = max(py1 + int(ph * 0.18), torso_top)
+        torso_bottom = py1 + int(ph * 0.75)
+
+        vx1, vy1, vx2, vy2 = vest_bbox
+        vcy = (vy1 + vy2) / 2
+
+        if vcy < torso_top or vy2 <= torso_top + 2:
+            if self.debug:
+                print(f"[PPE-DEBUG] Vest bbox on head/face — using torso region (was {vest_bbox})")
+            return self.get_vest_region(person_bbox, None, head_bbox)
+
+        cy1 = max(int(vy1), torso_top)
+        cy2 = min(int(vy2), torso_bottom)
+        cx1 = max(int(vx1), px1 + int(pw * 0.08))
+        cx2 = min(int(vx2), px2 - int(pw * 0.08))
+        if cy2 - cy1 < max(8, int(ph * 0.08)) or cx2 <= cx1:
+            return self.get_vest_region(person_bbox, None, head_bbox)
+        return (cx1, cy1, cx2, cy2)
 
     def _get_hand_region(self, person_bbox, frame):
 
@@ -3000,9 +3050,9 @@ class PPEDetector:
                 margin_w = person_w * 0.18
                 margin_h = person_h * 0.12
             elif is_head_item:
-                # Helmet can sit above the head and still belong to the person
-                margin_w = person_w * 0.28
-                margin_h = person_h * 0.22
+                # Helmet can sit above/beside head; generous margin for small/crowded person boxes
+                margin_w = person_w * 0.38
+                margin_h = person_h * 0.38
             elif is_vest_item:
                 # Vest must be in the torso area with generous margin
                 margin_w = person_w * 0.35
@@ -3018,9 +3068,19 @@ class PPEDetector:
                 if self.debug:
                     print(f"[PPE-DEBUG] {class_name} not near person (margin={margin_w:.1f},{margin_h:.1f}), skip")
                 continue
-            else:
-                if self.debug and (is_head_item or is_vest_item):
-                    print(f"[PPE-DEBUG] {class_name} NEAR person (margin={margin_w:.1f},{margin_h:.1f}), processing...")
+
+            if is_vest_item:
+                torso_min_y = py1 + person_h * 0.22
+                if det_cy < torso_min_y:
+                    if self.debug:
+                        print(
+                            f"[PPE-DEBUG] {class_name} rejected: center above torso "
+                            f"(cy={det_cy:.0f} < {torso_min_y:.0f})"
+                        )
+                    continue
+
+            if self.debug and (is_head_item or is_vest_item):
+                print(f"[PPE-DEBUG] {class_name} NEAR person (margin={margin_w:.1f},{margin_h:.1f}), processing...")
 
             # ============================================
             # STEP 2: IoU overlap check
@@ -3141,6 +3201,83 @@ class PPEDetector:
                     print(f"[PPE-DEBUG] NO-Mask accepted: conf={conf:.3f}")
 
         return result
+
+    def _refine_person_detections(self, persons, frame_shape):
+        """Drop non-person-shaped boxes and merge duplicates (crowded sites)."""
+        if not persons:
+            return persons
+
+        h, w = frame_shape[:2]
+        frame_area = max(h * w, 1)
+        min_h = h * self.person_min_height_frac
+        min_area = frame_area * self.person_min_area_frac
+        filtered = []
+
+        for p in persons:
+            x1, y1, x2, y2 = p["bbox"]
+            bw = max(1, x2 - x1)
+            bh = max(1, y2 - y1)
+            if bh < min_h or (bw * bh) < min_area:
+                if self.debug:
+                    print(f"[PPE-DEBUG] Person filter reject (size): bbox={p['bbox']}")
+                continue
+            aspect = bw / bh
+            if aspect < self.person_min_aspect or aspect > self.person_max_aspect:
+                if self.debug:
+                    print(
+                        f"[PPE-DEBUG] Person filter reject (aspect {aspect:.2f}): bbox={p['bbox']}"
+                    )
+                continue
+            filtered.append(p)
+
+        if len(filtered) < len(persons) and self.debug:
+            print(f"[PPE-DEBUG] Person shape filter: {len(persons)} -> {len(filtered)}")
+
+        persons = sorted(filtered, key=lambda p: p.get("confidence", 0), reverse=True)
+        deduped = []
+        iou_thr = self.person_dedup_iou
+        center_ratio = self.person_center_merge_ratio
+
+        for p in persons:
+            px1, py1, px2, py2 = p["bbox"]
+            pcx = (px1 + px2) / 2
+            pcy = (py1 + py2) / 2
+            ph = py2 - py1
+            is_dup = False
+
+            for d in deduped:
+                dx1, dy1, dx2, dy2 = d["bbox"]
+                dcx = (dx1 + dx2) / 2
+                dcy = (dy1 + dy2) / 2
+                dh = dy2 - dy1
+
+                ix1 = max(px1, dx1)
+                iy1 = max(py1, dy1)
+                ix2 = min(px2, dx2)
+                iy2 = min(py2, dy2)
+                inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+                area1 = (px2 - px1) * (py2 - py1)
+                area2 = (dx2 - dx1) * (dy2 - dy1)
+                union = area1 + area2 - inter
+                iou = inter / union if union > 0 else 0
+
+                center_dist = ((pcx - dcx) ** 2 + (pcy - dcy) ** 2) ** 0.5
+                merge_dist = center_ratio * min(ph, dh)
+
+                if iou > iou_thr or center_dist < merge_dist:
+                    is_dup = True
+                    if p.get("confidence", 0) > d.get("confidence", 0):
+                        deduped.remove(d)
+                        deduped.append(p)
+                    break
+
+            if not is_dup:
+                deduped.append(p)
+
+        if len(deduped) < len(filtered) and self.debug:
+            print(f"[PPE-DEBUG] Person dedup: {len(filtered)} -> {len(deduped)} (iou>{iou_thr})")
+
+        return deduped
 
     def detect_persons_with_fallback(self, frame):
 
@@ -3391,70 +3528,6 @@ class PPEDetector:
 
                     self._last_ppe_detections = ppe_detections
 
-                    # Deduplicate person detections - dataset may have both 'Person' and 'person' classes
-
-                    # causing the same person to be detected twice
-
-                    if len(persons) > 1:
-
-                        deduped = []
-
-                        for p in persons:
-
-                            px1, py1, px2, py2 = p['bbox']
-
-                            is_dup = False
-
-                            for d in deduped:
-
-                                dx1, dy1, dx2, dy2 = d['bbox']
-
-                                # Calculate IoU
-
-                                ix1 = max(px1, dx1)
-
-                                iy1 = max(py1, dy1)
-
-                                ix2 = min(px2, dx2)
-
-                                iy2 = min(py2, dy2)
-
-                                inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-
-                                area1 = (px2 - px1) * (py2 - py1)
-
-                                area2 = (dx2 - dx1) * (dy2 - dy1)
-
-                                union = area1 + area2 - inter
-
-                                iou = inter / union if union > 0 else 0
-
-                                if iou > 0.7:
-
-                                    is_dup = True
-
-                                    # Keep the one with higher confidence
-
-                                    if p['confidence'] > d['confidence']:
-
-                                        deduped.remove(d)
-
-                                        deduped.append(p)
-
-                                    break
-
-                            if not is_dup:
-
-                                deduped.append(p)
-
-                        if len(deduped) < len(persons):
-
-                            if self.debug:
-
-                                print(f"[PPE-DEBUG] Deduplicated persons: {len(persons)} -> {len(deduped)}")
-
-                            persons = deduped
-
                     # If no persons yet, do NOT return here — outer fallback retries person_model
                     # at lower conf, PPE-model person class, then HOG (was broken by early return []).
                     if len(persons) == 0 and self.debug:
@@ -3568,7 +3641,7 @@ class PPEDetector:
 
                         person_results = self.person_model(
                             frame,
-                            conf=max(0.05, self.person_threshold * 0.5),
+                            conf=self.person_fallback_threshold,
                             iou=0.50,
                             device=self.device,
                             verbose=False,
@@ -3680,6 +3753,11 @@ class PPEDetector:
                 except Exception as e:
 
                     print(f"[PPE-ERROR] Fallback detection also failed: {e}")
+
+        before_refine = len(persons)
+        persons = self._refine_person_detections(persons, frame.shape)
+        if before_refine != len(persons) and not self.debug:
+            print(f"[PPE] Person refine: {before_refine} -> {len(persons)} boxes")
 
         return persons, model_worked
 
@@ -3819,7 +3897,7 @@ class PPEDetector:
 
     def _detect_vest(self, frame, person_bbox):
 
-        """Adaptive vest detection using high-vis colors in torso region"""
+        """Hi-vis vest on torso only — rejects normal shirts (plaid, black, tan)."""
 
         x1, y1, x2, y2 = person_bbox
 
@@ -3848,118 +3926,63 @@ class PPEDetector:
         try:
 
             hsv = cv2.cvtColor(torso_roi, cv2.COLOR_BGR2HSV)
+            s_min = self.vest_hivis_min_saturation
+            v_min = 75
 
-            # Simple color ranges - no adaptive conditions
+            yellow = cv2.inRange(hsv, np.array([15, s_min, v_min]), np.array([38, 255, 255]))
+            orange = cv2.inRange(hsv, np.array([5, s_min, v_min]), np.array([22, 255, 255]))
+            green = cv2.inRange(hsv, np.array([35, s_min, v_min]), np.array([88, 255, 255]))
 
-            # Use wide ranges for consistent detection (orange vests: lower S/V under shadows/video)
+            hivis = cv2.bitwise_or(yellow, orange)
+            hivis = cv2.bitwise_or(hivis, green)
 
-            yellow = cv2.inRange(hsv, np.array([12, 45, 45]), np.array([38, 255, 255]))
+            roi_area = torso_roi.shape[0] * torso_roi.shape[1]
+            coverage = np.sum(hivis > 0) / roi_area
 
-            orange = cv2.inRange(hsv, np.array([0, 40, 40]), np.array([28, 255, 255]))
-
-            green = cv2.inRange(hsv, np.array([30, 40, 40]), np.array([90, 255, 255]))  # Hi-vis green / yellow-green
-
-            # Fixed threshold for consistent detection
-
-            min_coverage = 0.24  # Slightly lower — orange torso often split with straps / dark fabric
-
-            combined = cv2.bitwise_or(yellow, orange)
-
-            combined = cv2.bitwise_or(combined, green)
-
-            # Simple coverage calculation - no adaptive factors
-
-            coverage = np.sum(combined > 0) / (torso_roi.shape[0] * torso_roi.shape[1])
-
-            # CHECK: Look for reflective strips (white/grey horizontal bands)
-
-            # Real safety vests have reflective strips, shirts don't
-
-            gray = cv2.cvtColor(torso_roi, cv2.COLOR_BGR2GRAY)
-
-            # Look for bright horizontal bands (reflective strips)
-
-            bright_mask = cv2.inRange(hsv, np.array([0, 0, 180]), np.array([180, 50, 255]))
-
-            bright_coverage = np.sum(bright_mask > 0) / (torso_roi.shape[0] * torso_roi.shape[1])
-
-            # Check for horizontal strip pattern using morphology
+            bright_mask = cv2.inRange(hsv, np.array([0, 0, 190]), np.array([180, 45, 255]))
+            bright_coverage = np.sum(bright_mask > 0) / roi_area
 
             kernel_w = max(1, torso_roi.shape[1] // 3)
-
             kernel_h = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_w, 1))
-
             bright_horizontal = cv2.morphologyEx(bright_mask, cv2.MORPH_CLOSE, kernel_h)
-
-            strip_contours, _ = cv2.findContours(bright_horizontal, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            strip_contours, _ = cv2.findContours(
+                bright_horizontal, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
 
             has_reflective_strips = False
-
             for cnt in strip_contours:
-
                 area = cv2.contourArea(cnt)
-
                 if area > 150:
-
-                    x, y, cw, ch = cv2.boundingRect(cnt)
-
-                    aspect = cw / ch if ch > 0 else 0
-
-                    if aspect > 3.5:
-
+                    _x, _y, cw, ch = cv2.boundingRect(cnt)
+                    if cw / max(ch, 1) > 3.5:
                         has_reflective_strips = True
-
                         break
 
-            # BALANCED scoring:
+            solid_thr = self.vest_color_solid_coverage
+            strip_thr = self.vest_color_with_strip_coverage
+            min_thr = self.vest_color_min_coverage
 
-            # - Very high coverage (>0.50) = definitely vest even without strips
-
-            # - Reflective strips = strong vest evidence, lower coverage needed
-
-            # - Low coverage + no strips = likely shirt, reject
-
-            if coverage > 0.50:
-
-                # Very high color coverage = definitely a vest (can't be shirt)
-
-                vest_score = coverage
-
-            elif has_reflective_strips:
-
-                # Has reflective strips = real vest, bonus
-
-                vest_score = coverage + 0.15
-
+            if coverage >= solid_thr:
+                present = True
+                conf = min(0.95, 0.55 + coverage * 0.45)
+            elif has_reflective_strips and coverage >= strip_thr:
+                present = True
+                conf = min(0.92, 0.40 + coverage * 0.55)
+            elif coverage >= min_thr and has_reflective_strips:
+                present = True
+                conf = min(0.85, 0.35 + coverage * 0.50)
             else:
-
-                # No strips, moderate coverage = likely shirt, apply light penalty (orange vests often lack strong strip cue)
-
-                vest_score = coverage * 0.82
-
-            # Simple confidence calculation
-
-            conf = min(vest_score / min_coverage, 1.0)
+                present = False
+                conf = min(0.35, coverage * 0.6)
 
             if self.debug:
-
-                print(f"[PPE-DEBUG] Vest detection:")
-
-                print(f"  - Color coverage: {coverage:.3f}")
-
+                print(f"[PPE-DEBUG] Vest detection (hi-vis):")
+                print(f"  - Hi-vis coverage: {coverage:.3f} (need >={strip_thr} w/strips or >={solid_thr} solid)")
                 print(f"  - Bright coverage: {bright_coverage:.3f}")
-
                 print(f"  - Reflective strips: {has_reflective_strips}")
+                print(f"  - Present: {present}, conf: {conf:.3f}")
 
-                print(f"  - Vest score: {vest_score:.3f}")
-
-                print(f"  - Threshold: {min_coverage:.3f}")
-
-                print(f"  - Confidence: {conf:.3f}")
-
-                print(f"  - Result: {vest_score:.3f} > {min_coverage:.3f} = {vest_score > min_coverage}")
-
-            return vest_score > min_coverage, conf
+            return present, conf
 
         except:
 
@@ -4374,25 +4397,35 @@ class PPEDetector:
 
                 elif ppe_items_near_person.get('vest_detected') and ppe_items_near_person['vest_conf'] >= 0.30:
 
-                    # Trained model detected Safety Vest near this person (min 30% confidence)
+                    model_vest_conf = ppe_items_near_person['vest_conf']
+                    color_vest_ok, color_vest_conf = self._detect_vest(frame, person_bbox)
 
-                    vest_present = True
-
-                    vest_conf = ppe_items_near_person['vest_conf']
-
-                    # Use model's actual detection bbox for vest region
-
-                    if ppe_items_near_person.get('vest_bbox'):
-
-                        vest_bbox = ppe_items_near_person['vest_bbox']
-
+                    if color_vest_ok or model_vest_conf >= self.model_vest_min_conf_without_color:
+                        vest_present = True
+                        vest_conf = max(model_vest_conf, color_vest_conf) if color_vest_ok else model_vest_conf
                     else:
+                        vest_present = False
+                        vest_conf = model_vest_conf * 0.4
+                        if self.debug:
+                            print(
+                                f"[PPE-DEBUG] Model vest REJECTED on street clothes: "
+                                f"model={model_vest_conf:.2f}, color_ok={color_vest_ok}, "
+                                f"need model>={self.model_vest_min_conf_without_color:.2f}"
+                            )
 
+                    if vest_present:
+                        if ppe_items_near_person.get('vest_bbox'):
+                            vest_bbox = ppe_items_near_person['vest_bbox']
+                        else:
+                            vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
+                    else:
                         vest_bbox = self.get_vest_region(person_bbox, frame, head_bbox)
 
-                    if self.debug:
-
-                        print(f"[PPE-DEBUG] Model detected vest (conf: {vest_conf:.2f}) bbox: {vest_bbox}")
+                    if self.debug and vest_present:
+                        print(
+                            f"[PPE-DEBUG] Model vest kept (conf: {vest_conf:.2f}, "
+                            f"color_support={color_vest_ok}) bbox: {vest_bbox}"
+                        )
 
                 elif (
                     ppe_items_near_person.get('no_safetyvest')
@@ -4429,6 +4462,11 @@ class PPEDetector:
                     if self.debug:
 
                         print(f"[PPE-DEBUG] Color-based vest detection: {vest_present} (conf: {vest_conf:.3f})")
+
+                if vest_bbox is not None:
+                    if head_bbox is None:
+                        head_bbox = self.get_head_region(person_bbox, frame)
+                    vest_bbox = self._normalize_vest_bbox(vest_bbox, person_bbox, head_bbox)
 
                 # Check for Mask from PPE model first, then fallback to color-based detection
                 # Skip mask detection if mode is "helmet_vest" only

@@ -13784,6 +13784,39 @@ def _resize_ppe_input(image, max_side: int = 1280):
     return image
 
 
+def _scale_ppe_bbox(bbox, scale: float):
+    if not bbox:
+        return bbox
+    x1, y1, x2, y2 = bbox
+    return (int(x1 * scale), int(y1 * scale), int(x2 * scale), int(y2 * scale))
+
+
+def _scale_ppe_result_to_original(result, scale: float) -> None:
+    """Map detection boxes from inference resolution back to original image size."""
+    if not result or scale == 1.0:
+        return
+    for person in result.persons:
+        person.bbox = _scale_ppe_bbox(person.bbox, scale)
+        person.head_bbox = _scale_ppe_bbox(person.head_bbox, scale)
+        person.vest_bbox = _scale_ppe_bbox(person.vest_bbox, scale)
+        person.gloves_bbox = _scale_ppe_bbox(person.gloves_bbox, scale)
+        person.goggles_bbox = _scale_ppe_bbox(person.goggles_bbox, scale)
+        person.mask_bbox = _scale_ppe_bbox(person.mask_bbox, scale)
+        if person.helmet.bbox:
+            person.helmet.bbox = _scale_ppe_bbox(person.helmet.bbox, scale)
+        if person.vest.bbox:
+            person.vest.bbox = _scale_ppe_bbox(person.vest.bbox, scale)
+        if person.mask.bbox:
+            person.mask.bbox = _scale_ppe_bbox(person.mask.bbox, scale)
+
+
+def _pil_to_bgr(pil_image: Image.Image) -> np.ndarray:
+    arr = np.array(pil_image)
+    if len(arr.shape) == 3 and arr.shape[2] == 3:
+        return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+    return arr
+
+
 def _resolve_ppe_model_path(model_name="yolov8n") -> str:
     """Return trained PPE weights path; auto-downloads if missing."""
     from modules.ppe_detection import ensure_ppe_model_weights
@@ -13864,7 +13897,24 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             return None, " **Upload an image to start PPE detection**"
 
-        image = _resize_ppe_input(image)
+        # Keep original pixels for display; run inference on downscaled copy if needed
+        if isinstance(image, Image.Image):
+            original_pil = image.copy()
+            work_pil = _resize_ppe_input(image)
+            orig_w, orig_h = original_pil.size
+            work_w, work_h = work_pil.size
+            infer_scale = work_w / float(orig_w) if orig_w else 1.0
+            original_np = _pil_to_bgr(original_pil)
+            image_np = _pil_to_bgr(work_pil)
+        else:
+            original_np = image
+            image_np = _resize_ppe_input(image)
+            if image_np is None:
+                image_np = original_np
+            oh, ow = original_np.shape[:2]
+            wh, ww = image_np.shape[:2]
+            infer_scale = ww / float(ow) if ow else 1.0
+
         debug = _ppe_debug_enabled()
         print(f"[INFO] Starting PPE detection on image...")
 
@@ -13881,33 +13931,20 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
             print("[PPE-CRITICAL] PPE detector unavailable — trained model required")
 
-            return image, (
+            return original_pil if isinstance(image, Image.Image) else image, (
                 " **PPE model missing**\n\n"
                 "Auto-download failed. Check internet connection or set `PPE_MODEL_DOWNLOAD_URL` in `.env`.\n\n"
                 "You can also manually place weights at `models/best_ppe.pt`."
             )
 
-        # Convert PIL to numpy if needed
-
-        if isinstance(image, Image.Image):
-
-            image_np = np.array(image)
-
-            # Convert RGB to BGR for OpenCV
-
-            if len(image_np.shape) == 3 and image_np.shape[2] == 3:
-
-                image_np = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-
-        else:
-
-            image_np = image
-
         result = detector.detect(image_np, debug=debug)
 
-        # Create annotated image
+        # Draw on original-resolution frame so output matches input (no stretch/zoom mismatch)
+        if infer_scale != 1.0:
+            box_scale = 1.0 / infer_scale
+            _scale_ppe_result_to_original(result, box_scale)
 
-        annotated_image = detector.visualize(image_np, result, show_labels=show_labels, show_head_region=False)
+        annotated_image = detector.visualize(original_np, result, show_labels=show_labels, show_head_region=False)
 
         # Convert back to RGB for display
 
@@ -15252,6 +15289,35 @@ main.wrap {
     display: none !important;
 }
 
+/* PPE / Mask panels — preserve aspect ratio (no horizontal stretch on output) */
+.cv-detect-panel .image-frame,
+.cv-detect-panel .image-container,
+.cv-detect-panel .image-preview,
+.cv-detect-panel .upload-container,
+.cv-detect-panel .contain {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+    min-height: 350px !important;
+    max-height: 350px !important;
+    background: #0a0a0a !important;
+}
+
+.cv-detect-panel img,
+.cv-detect-panel canvas,
+.cv-detect-panel video,
+.cv-detect-panel .responsive-image img,
+.ppe-aspect-image img {
+    object-fit: contain !important;
+    object-position: center center !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 350px !important;
+    margin: 0 auto !important;
+}
+
 </style>
 
 """,
@@ -15385,10 +15451,10 @@ with demo:
                             with gr.TabItem("Image"):
                                 with gr.Row():
                                     with gr.Column(scale=1):
-                                        ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                        ppe_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                         ppe_btn_img = gr.Button("Detect PPE", variant="primary")
                                     with gr.Column(scale=1):
-                                        ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                                        ppe_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                 with gr.Row():
                                     with gr.Column(scale=2):
                                         ppe_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect PPE")
@@ -15407,9 +15473,9 @@ with demo:
                             with gr.TabItem("Webcam"):
                                 with gr.Row():
                                     with gr.Column(scale=1):
-                                        ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                                        ppe_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                     with gr.Column(scale=1):
-                                        ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                                        ppe_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False, elem_classes=["responsive-image", "ppe-aspect-image"])
                                 with gr.Row():
                                     with gr.Column(scale=2):
                                         ppe_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for PPE detection!")
@@ -15420,10 +15486,10 @@ with demo:
                             with gr.TabItem("Image"):
                                 with gr.Row():
                                     with gr.Column(scale=1):
-                                        mask_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350)
+                                        mask_input_img = gr.Image(type="pil", label="Input", show_label=False, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                         mask_btn_img = gr.Button("Detect Mask", variant="primary")
                                     with gr.Column(scale=1):
-                                        mask_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350)
+                                        mask_output_img = gr.Image(type="pil", label="Output", show_label=False, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                 with gr.Row():
                                     with gr.Column(scale=2):
                                         mask_summary_img = gr.Textbox(label="Status", interactive=False, value="Ready to detect Masks")
@@ -15442,9 +15508,9 @@ with demo:
                             with gr.TabItem("Webcam"):
                                 with gr.Row():
                                     with gr.Column(scale=1):
-                                        mask_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350)
+                                        mask_webcam_input = gr.Image(sources=["webcam"], streaming=True, height=350, elem_classes=["responsive-image", "ppe-aspect-image"])
                                     with gr.Column(scale=1):
-                                        mask_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False)
+                                        mask_webcam_output = gr.Image(type="numpy", label="Output", height=350, show_label=False, elem_classes=["responsive-image", "ppe-aspect-image"])
                                 with gr.Row():
                                     with gr.Column(scale=2):
                                         mask_webcam_info = gr.Textbox(label="Status", interactive=False, value="Ready! Point camera at workers for Mask detection!")

@@ -19,7 +19,9 @@ services:
     environment:
       - GRADIO_SERVER_PORT=7860
       - CUDA_VISIBLE_DEVICES=0
+      - PPE_MODEL_PATH=/app/models/best_ppe.pt
     volumes:
+      - "/app/models"
       - "/app/uploads"
       - "/app/processed"
       - "/app/inputs"

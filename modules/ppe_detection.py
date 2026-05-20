@@ -28,6 +28,15 @@ import yaml
 
 import os
 
+import shutil
+
+try:
+    import supervision as sv
+    _SUPERVISION_AVAILABLE = True
+except ImportError:
+    sv = None
+    _SUPERVISION_AVAILABLE = False
+
 # Suppress warnings for cleaner output
 
 warnings.filterwarnings('ignore')
@@ -35,6 +44,12 @@ warnings.filterwarnings('ignore')
 # PPE Dataset Configuration
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(_REPO_ROOT, ".env"))
+except ImportError:
+    pass
 
 PPE_DATASET_PATH = os.path.join(_REPO_ROOT, 'dataset', 'PPE', 'data.yaml')
 
@@ -44,8 +59,83 @@ def _is_standard_yolo_weights(model_path) -> bool:
     return base in ('yolov8n', 'yolo26n', 'yolov8m', 'yolov8s', 'yolo11n', 'yolo11s')
 
 
+def _valid_ppe_weights(path: str, min_bytes: int = 500_000) -> bool:
+    try:
+        return bool(path) and os.path.isfile(path) and os.path.getsize(path) >= min_bytes
+    except OSError:
+        return False
+
+
+def _download_ppe_weights(dest_path: str) -> bool:
+    """Download public PPE YOLO weights when local best_ppe.pt is missing."""
+    if os.environ.get("PPE_AUTO_DOWNLOAD", "1").strip().lower() in ("0", "false", "no"):
+        return False
+
+    dest_dir = os.path.dirname(dest_path) or "."
+    os.makedirs(dest_dir, exist_ok=True)
+
+    sources: List[str] = []
+    custom = os.environ.get("PPE_MODEL_DOWNLOAD_URL", "").strip()
+    if custom:
+        sources.append(custom)
+    sources.extend([
+        "https://huggingface.co/Hexmon/vyra-yolo-ppe-detection/resolve/main/best.pt",
+        "https://huggingface.co/Tanishjain9/yolov8n-ppe-detection-6classes/resolve/main/best.pt",
+        "https://huggingface.co/keremberke/yolov8s-protective-equipment-detection/resolve/main/best.pt",
+    ])
+
+    for url in sources:
+        tmp_path = dest_path + ".download"
+        try:
+            print(f"[PPE] Downloading trained weights from {url} ...")
+            try:
+                from huggingface_hub import hf_hub_download
+                if "huggingface.co/" in url and "/resolve/main/" in url:
+                    parts = url.split("huggingface.co/", 1)[1].split("/resolve/main/", 1)
+                    if len(parts) == 2:
+                        repo_id, filename = parts[0], parts[1]
+                        cached = hf_hub_download(repo_id=repo_id, filename=filename)
+                        shutil.copy2(cached, tmp_path)
+                    else:
+                        raise ValueError("bad hf url")
+                else:
+                    raise ImportError("use urllib")
+            except Exception:
+                import urllib.request
+                urllib.request.urlretrieve(url, tmp_path)
+
+            if _valid_ppe_weights(tmp_path):
+                os.replace(tmp_path, dest_path)
+                print(f"[PPE] PPE weights saved to {os.path.abspath(dest_path)}")
+                return True
+            if os.path.isfile(tmp_path):
+                os.remove(tmp_path)
+        except Exception as exc:
+            print(f"[PPE-WARNING] Download failed ({url}): {exc}")
+            if os.path.isfile(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+
+    try:
+        from ultralytics import YOLO
+        print("[PPE] Trying Ultralytics HuggingFace loader ...")
+        model = YOLO("hf://Hexmon/vyra-yolo-ppe-detection/best.pt")
+        src = getattr(model, "ckpt_path", None) or getattr(model, "model", None)
+        ckpt = str(getattr(src, "pt_path", src) if src is not None else "")
+        if ckpt and _valid_ppe_weights(ckpt):
+            shutil.copy2(ckpt, dest_path)
+            print(f"[PPE] PPE weights copied to {os.path.abspath(dest_path)}")
+            return True
+    except Exception as exc:
+        print(f"[PPE-WARNING] Ultralytics HF fallback failed: {exc}")
+
+    return False
+
+
 def resolve_ppe_model_weights() -> str:
-    """Locate trained PPE weights (repo, env, or legacy sibling checkout)."""
+    """Locate trained PPE weights (repo, env, auto-download, or legacy paths)."""
     candidates = []
     env = os.environ.get("PPE_MODEL_PATH", "").strip()
     if env:
@@ -55,28 +145,30 @@ def resolve_ppe_model_weights() -> str:
         os.path.join(_REPO_ROOT, "models", "best.pt"),
         os.path.join(_REPO_ROOT, "best_ppe.pt"),
         os.path.join(_REPO_ROOT, "best.pt"),
-        # Legacy folder: Sensepart/canberravision when repo is Sensepart/CVision/canberravision
         os.path.normpath(os.path.join(_REPO_ROOT, "..", "..", "canberravision", "models", "best_ppe.pt")),
         os.path.normpath(os.path.join(_REPO_ROOT, "..", "..", "canberravision", "models", "best.pt")),
     ])
     for path in candidates:
-        if path and os.path.isfile(path):
+        if path and _valid_ppe_weights(path):
             resolved = os.path.abspath(path)
             print(f"[PPE] Using trained PPE weights: {resolved}")
             return resolved
-    for path in (
-        os.path.join(_REPO_ROOT, "models", "yolov8n.pt"),
-        os.path.join(_REPO_ROOT, "yolov8n.pt"),
-    ):
-        if os.path.isfile(path):
-            resolved = os.path.abspath(path)
-            print(
-                f"[PPE-WARNING] No best_ppe.pt / best.pt found — using {resolved}. "
-                "Helmet/vest need trained PPE weights in models/ or set PPE_MODEL_PATH."
-            )
-            return resolved
-    print("[PPE-WARNING] No local .pt found; will try best_ppe.pt via Ultralytics")
-    return "best_ppe.pt"
+
+    default = env or os.path.join(_REPO_ROOT, "models", "best_ppe.pt")
+    if _download_ppe_weights(default) and _valid_ppe_weights(default):
+        resolved = os.path.abspath(default)
+        print(f"[PPE] Using auto-downloaded PPE weights: {resolved}")
+        return resolved
+
+    raise FileNotFoundError(
+        f"PPE model missing: {default}. "
+        "Auto-download failed — check internet or set PPE_MODEL_DOWNLOAD_URL."
+    )
+
+
+def ensure_ppe_model_weights() -> str:
+    """Ensure PPE weights exist on disk; download if needed."""
+    return resolve_ppe_model_weights()
 
 # Load PPE dataset classes
 
@@ -114,8 +206,8 @@ def _normalize_yolo_class_name(name: str) -> str:
 # Names match normalized labels from your data.yaml (e.g. no_helmet → nohelmet).
 # Other datasets sometimes use Hardhat/Safety Vest — add here only if your weights use those strings.
 _CORE_INFERENCE_CLASS_KEYS = frozenset({
-    'helmet', 'nohelmet',
-    'vest', 'novest',
+    'helmet', 'nohelmet', 'hardhat', 'nohardhat',
+    'vest', 'novest', 'safetyvest', 'nosafetyvest',
     'mask', 'nomask',
     'person',
 })
@@ -351,17 +443,19 @@ class PPEDetector:
         # Single person box approach - detect PPE within person regions
 
         # Person (COCO) — balanced for site/crowd scenes (reduces machinery/partial FPs)
-        self.person_threshold = 0.22
-        self.person_fallback_threshold = 0.14  # second pass when primary finds nobody
+        self.person_threshold = 0.40
+        self.person_fallback_threshold = 0.30  # second pass when primary finds nobody
         self.person_dedup_iou = 0.50
         self.person_center_merge_ratio = 0.28  # merge boxes whose centers are this close (× avg height)
         self.person_min_height_frac = 0.045  # min box height vs frame (keeps distant workers)
         self.person_min_area_frac = 0.0012  # min box area vs frame
         self.person_min_aspect = 0.12  # width/height — allow tall/narrow
         self.person_max_aspect = 1.05  # reject wider-than-tall (machinery, horizontal blobs)
-        self.ppe_threshold = 0.06  # Lower confidence for PPE model inference in video
-        self.helmet_threshold = 0.05  # More sensitive helmet fallback threshold for video
-        self.fallback_threshold = 0.12
+        self.ppe_threshold = 0.35  # PPE model inference confidence
+        self.helmet_threshold = 0.45  # Helmet color/heuristic fallback threshold
+        self.fallback_threshold = 0.35
+        self.inference_imgsz = 640
+        self._byte_tracker = None
         # When the PPE model reports "helmet" on the head ROI, reject unless confidence is high enough
         # if hair/styled-hair or skin-dominated head cues fire (reduces hair/shine/bald false positives).
         self.model_helmet_min_conf_if_hair = 0.52
@@ -405,6 +499,30 @@ class PPEDetector:
 
         return "cpu"
 
+    def _yolo_predict(self, model, source, conf=None, iou=0.45, classes=None, imgsz=None, **extra):
+        """Run YOLO predict with letterbox preprocessing (Ultralytics) — preserves aspect ratio."""
+        if model is None:
+            return []
+        kwargs = dict(
+            source=source,
+            imgsz=imgsz or self.inference_imgsz,
+            conf=conf if conf is not None else self.ppe_threshold,
+            iou=iou,
+            device=self.device,
+            verbose=False,
+        )
+        if classes is not None:
+            kwargs["classes"] = classes
+        if self.device != "cpu":
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    kwargs["half"] = True
+            except Exception:
+                pass
+        kwargs.update(extra)
+        return model.predict(**kwargs)
+
     def _ensure_model_loaded(self):
 
         """Ensure model is loaded with retry mechanism"""
@@ -416,6 +534,9 @@ class PPEDetector:
                 self.model_load_attempts += 1
 
                 print(f"[PPE] Loading model (attempt {self.model_load_attempts}/{self.max_load_attempts})...")
+
+                if not os.path.isfile(self.model_path):
+                    raise FileNotFoundError(f"PPE model missing: {self.model_path}")
 
                 self.model = YOLO(self.model_path)
 
@@ -2167,7 +2288,7 @@ class PPEDetector:
             if helmet_cls_ids:
                 pred_h["classes"] = helmet_cls_ids
 
-            results = self.model(head_region, **pred_h)
+            results = self._yolo_predict(self.model, head_region, **pred_h)
 
             helmet_detected = False
 
@@ -2812,9 +2933,9 @@ class PPEDetector:
 
                         vehicle_classes = [2, 3, 5, 7]  # car, motorcycle, bus, truck
 
-                        vehicle_results = self.model(frame, conf=0.3, iou=0.45,
-
-                                                   device=self.device, verbose=False, classes=vehicle_classes)
+                        vehicle_results = self._yolo_predict(
+                            self.model, frame, conf=0.3, iou=0.45, classes=vehicle_classes
+                        )
 
                         detected_vehicles = []
 
@@ -3337,8 +3458,10 @@ class PPEDetector:
                         if self.debug:
                             print(f"[PPE-DEBUG] Using person_model (yolov8n) for person detection")
                         try:
-                            person_results = self.person_model(frame, conf=self.person_threshold, iou=0.45,
-                                                              device=self.device, verbose=False, classes=[0])
+                            person_results = self._yolo_predict(
+                                self.person_model, frame,
+                                conf=self.person_threshold, iou=0.45, classes=[0]
+                            )
                             for result in person_results:
                                 if result.boxes is not None:
                                     for box in result.boxes:
@@ -3363,27 +3486,18 @@ class PPEDetector:
                     # STEP 2: Detect PPE items and/or persons using PPE model (best.pt)
                     # Lower IoU + class-aware NMS so overlapping PPE items (helmet+mask) aren't suppressed
 
-                    pred_kw = dict(
-                        conf=self.ppe_threshold,
-                        iou=0.30,
-                        device=self.device,
-                        verbose=False,
-                    )
+                    pred_kw = dict(conf=self.ppe_threshold, iou=0.30)
                     if core_infer_ids:
                         pred_kw["classes"] = core_infer_ids
-                    results = self.model(frame, **pred_kw)
+                    results = self._yolo_predict(self.model, frame, **pred_kw)
 
                     # Initialize ppe_detections first
                     ppe_detections = []
 
                     if mask_class_ids:
-                        mask_results = self.model(
-                            frame,
-                            conf=0.05,
-                            iou=0.45,
-                            device=self.device,
-                            verbose=False,
-                            classes=mask_class_ids,
+                        mask_results = self._yolo_predict(
+                            self.model, frame,
+                            conf=0.35, iou=0.45, classes=mask_class_ids,
                         )
                     else:
                         mask_results = []
@@ -3486,9 +3600,9 @@ class PPEDetector:
                             if self.debug:
                                 print(f"[PPE-DEBUG] Mask class IDs (dedicated pass): {mask_class_ids}")
 
-                            mask_results = self.model(frame, conf=0.03, iou=0.10,
-                                                    device=self.device, verbose=False,
-                                                    classes=mask_class_ids)
+                            mask_results = self._yolo_predict(
+                                self.model, frame, conf=0.35, iou=0.10, classes=mask_class_ids
+                            )
                             for result in mask_results:
                                 if result.boxes is not None:
                                     for box in result.boxes:
@@ -3538,9 +3652,9 @@ class PPEDetector:
                     if not person_ids:
                         person_ids = [11]
 
-                    results = self.model(frame, conf=0.15, iou=0.45,
-
-                                       device=self.device, verbose=False, classes=person_ids)
+                    results = self._yolo_predict(
+                        self.model, frame, conf=0.40, iou=0.45, classes=person_ids
+                    )
 
                     for result in results:
 
@@ -3580,11 +3694,10 @@ class PPEDetector:
                 try:
                     model_names = self.model.names if hasattr(self.model, 'names') else {}
                     core_fb = core_inference_class_ids_from_names(model_names)
-                    ppe_kw = dict(conf=self.ppe_threshold, iou=0.30,
-                                  device=self.device, verbose=False)
+                    ppe_kw = dict(conf=self.ppe_threshold, iou=0.30)
                     if core_fb:
                         ppe_kw["classes"] = core_fb
-                    ppe_results = self.model(frame, **ppe_kw)
+                    ppe_results = self._yolo_predict(self.model, frame, **ppe_kw)
                     ppe_detections = []
                     for r in ppe_results:
                         if r.boxes is not None:
@@ -3633,13 +3746,9 @@ class PPEDetector:
 
                     try:
 
-                        person_results = self.person_model(
-                            frame,
-                            conf=self.person_fallback_threshold,
-                            iou=0.50,
-                            device=self.device,
-                            verbose=False,
-                            classes=[0],
+                        person_results = self._yolo_predict(
+                            self.person_model, frame,
+                            conf=self.person_fallback_threshold, iou=0.50, classes=[0],
                         )
 
                         for result in person_results:
@@ -3684,15 +3793,10 @@ class PPEDetector:
                             int(cid) for cid, cname in model_names.items()
                             if _normalize_yolo_class_name(str(cname)) == 'person'
                         ]
-                        pred_fb = dict(
-                            conf=self.ppe_threshold,
-                            iou=0.30,
-                            device=self.device,
-                            verbose=False,
-                        )
+                        pred_fb = dict(conf=self.ppe_threshold, iou=0.30)
                         if person_ids:
                             pred_fb["classes"] = person_ids
-                        results = self.model(frame, **pred_fb)
+                        results = self._yolo_predict(self.model, frame, **pred_fb)
 
                         for result in results:
 
@@ -5339,32 +5443,29 @@ class PPEDetector:
             }
         tracker = self._video_tracker
         
-        # Frame pre-processing: resize if too large for faster inference
-        original_frame = frame
-        scale = 1.0
-        h, w = frame.shape[:2]
-        target_w = tracker['resize_width']
-        if w > target_w:
-            scale = target_w / w
-            new_w = target_w
-            new_h = int(h * scale)
-            frame = cv2.resize(frame, (new_w, new_h))
-            if self.debug:
-                print(f"[PPE-VIDEO] Resized {w}x{h} -> {new_w}x{new_h} (scale={scale:.2f})")
-        
-        # Run base detection on (possibly resized) frame
+        # Run detection on full-resolution frame — YOLO letterboxes internally (no stretch)
         result = self.detect(frame, debug=False)
-        
-        # Scale bboxes back to original frame size if we resized
-        if scale != 1.0:
-            for person in result.persons:
-                person.bbox = tuple(int(v / scale) for v in person.bbox)
-                if person.head_bbox:
-                    person.head_bbox = tuple(int(v / scale) for v in person.head_bbox)
-                if person.vest_bbox:
-                    person.vest_bbox = tuple(int(v / scale) for v in person.vest_bbox)
-                if person.mask_bbox:
-                    person.mask_bbox = tuple(int(v / scale) for v in person.mask_bbox)
+
+        # ByteTrack stabilizes person boxes across frames (reduces flicker/jump)
+        if _SUPERVISION_AVAILABLE and result.persons:
+            try:
+                if self._byte_tracker is None:
+                    self._byte_tracker = sv.ByteTrack()
+                xyxy = np.array([list(p.bbox) for p in result.persons], dtype=np.float32)
+                confidences = np.array(
+                    [max(float(p.confidence), 0.01) for p in result.persons], dtype=np.float32
+                )
+                class_ids = np.zeros(len(result.persons), dtype=int)
+                detections = sv.Detections(xyxy=xyxy, confidence=confidences, class_id=class_ids)
+                tracked = self._byte_tracker.update_with_detections(detections)
+                if tracked.xyxy is not None and len(tracked.xyxy) > 0:
+                    for i, person in enumerate(result.persons):
+                        if i < len(tracked.xyxy):
+                            x1, y1, x2, y2 = tracked.xyxy[i]
+                            person.bbox = (int(x1), int(y1), int(x2), int(y2))
+            except Exception as bt_err:
+                if self.debug:
+                    print(f"[PPE-VIDEO] ByteTrack skipped: {bt_err}")
         
         # Match detected persons to tracked persons via IoU
         current_detections = []
@@ -5552,6 +5653,7 @@ class PPEDetector:
     
     def reset_video_tracker(self):
         """Reset video tracking state - call when starting a new video"""
+        self._byte_tracker = None
         if hasattr(self, '_video_tracker'):
             self._video_tracker = {
                 'prev_persons': [],
@@ -5571,7 +5673,7 @@ _ppe_detector = None
 
 _lock = threading.Lock()
 
-def get_ppe_detector(model_path="yolov8n.pt", debug=False, auto_recovery=True, force_new=False, detection_mode="all"):
+def get_ppe_detector(model_path=None, debug=False, auto_recovery=True, force_new=False, detection_mode="all"):
 
     """Get or create PPE detector with auto-recovery"""
 

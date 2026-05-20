@@ -14,6 +14,7 @@ ENV PORT=7860
 ENV GRADIO_SERVER_PORT=7860
 ENV GRADIO_SERVER_NAME=0.0.0.0
 ENV YOLO_CONFIG_DIR=/tmp/Ultralytics
+ENV PPE_MODEL_PATH=/app/models/best_ppe.pt
 
 WORKDIR /app
 
@@ -90,8 +91,8 @@ RUN pip install --no-cache-dir \
     "transformers==4.37.2" \
     timm
 
-# Base YOLO weights for PPE fallback when best_ppe.pt is not mounted (models/ is gitignored locally).
-# Download before removing opencv-python (ultralytics needs cv2 during import).
+# Trained PPE weights must be mounted at runtime (models/ is gitignored).
+# yolov8n.pt below is only for COCO person detection, NOT PPE classes.
 RUN mkdir -p /app/models && python -c "import os; os.chdir('/app/models'); from ultralytics import YOLO; YOLO('yolov8n.pt')"
 
 # Ultralytics pulls opencv-python (GUI); keep headless only for runtime.
@@ -115,6 +116,10 @@ RUN pip install --no-cache-dir "onnxruntime>=1.16.0" "fast-alpr" || \
 # Copy application
 # -------------------------------------------------------
 COPY . .
+
+# Pre-download PPE weights so Docker/Coolify starts with helmet/vest detection ready
+RUN python -c "from modules.ppe_detection import ensure_ppe_model_weights; ensure_ppe_model_weights()" || \
+    echo "WARNING: PPE weights download skipped at build — will retry at runtime"
 
 # Cache buster - forces rebuild when Gradio versions change
 RUN echo "Build timestamp: $(date)" > /app/build_info.txt

@@ -33,3 +33,4 @@ setuptools==68.0.0
 # Fast ALPR for license plate recognition
 fast-alpr
 onnxruntime
+supervision>=0.18.0

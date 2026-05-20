@@ -12,7 +12,9 @@ services:
       - GRADIO_SERVER_NAME=0.0.0.0
       - APP_ENV=production
       - CUDA_VISIBLE_DEVICES=0
+      - PPE_MODEL_PATH=/app/models/best_ppe.pt
     volumes:
+      - ./models:/app/models
       - ./uploads:/app/uploads
       - ./processed:/app/processed
       - ./inputs:/app/inputs

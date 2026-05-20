@@ -42,6 +42,12 @@ os.chdir(project_root)
 
 sys.path.insert(0, str(project_root))
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(project_root / ".env")
+except ImportError:
+    pass
+
 print(f"[INFO] Working directory set to: {os.getcwd()}")
 
 print(f"[INFO] Project root: {project_root}")
@@ -13779,39 +13785,16 @@ def _resize_ppe_input(image, max_side: int = 1280):
 
 
 def _resolve_ppe_model_path(model_name="yolov8n") -> str:
-    """Pick trained PPE weights if mounted; otherwise a YOLO base model that exists on disk."""
-    try:
-        from modules.ppe_detection import resolve_ppe_model_weights
-        return resolve_ppe_model_weights()
-    except Exception as e:
-        print(f"[PPE-WARNING] resolve_ppe_model_weights failed: {e}")
-    project_root = os.path.dirname(os.path.dirname(__file__))
-    env_path = os.environ.get("PPE_MODEL_PATH", "").strip()
-    candidates = []
-    if env_path:
-        candidates.append(env_path)
-    candidates.extend([
-        os.path.join(project_root, "models", "best_ppe.pt"),
-        os.path.join(project_root, "models", "best.pt"),
-        os.path.join(project_root, "best_ppe.pt"),
-        os.path.join(project_root, "best.pt"),
-        os.path.normpath(os.path.join(project_root, "..", "..", "canberravision", "models", "best_ppe.pt")),
-        os.path.normpath(os.path.join(project_root, "..", "..", "canberravision", "models", "best.pt")),
-        os.path.join(project_root, "models", "yolov8n.pt"),
-        os.path.join(project_root, "yolov8n.pt"),
-    ])
-    for path in candidates:
-        if path and os.path.isfile(path):
-            return path
-    fallback = model_name if str(model_name).endswith(".pt") else f"{model_name}.pt"
-    print(f"[PPE-WARNING] No local .pt found; Ultralytics will fetch or use: {fallback}")
-    return fallback
+    """Return trained PPE weights path; auto-downloads if missing."""
+    from modules.ppe_detection import ensure_ppe_model_weights
+    return ensure_ppe_model_weights()
 
 
 def warmup_ppe_detector(detection_mode: str = "helmet_vest") -> None:
-    """Load PPE model once at startup so first user upload is not stuck waiting."""
+    """Load PPE model once at startup (auto-downloads weights if missing)."""
     try:
-        path = _resolve_ppe_model_path("yolov8n")
+        from modules.ppe_detection import ensure_ppe_model_weights
+        path = ensure_ppe_model_weights()
         get_ppe_detector(
             model_path=path,
             debug=_ppe_debug_enabled(),
@@ -13858,25 +13841,12 @@ def _get_ppe_detector_safe(model_name="yolov8n", debug=None, force_new=False, de
 
     except Exception as e:
 
-        print(f"[PPE-WARNING] Failed to get PPE detector: {e}")
+        print(f"[PPE-ERROR] Failed to get PPE detector: {e}")
 
-        print("[PPE] Creating emergency detector...")
+        if isinstance(e, FileNotFoundError):
+            print("[PPE-ERROR] Trained PPE model required. Set PPE_MODEL_PATH or place weights at models/best_ppe.pt")
 
-        try:
-
-            # Create a fresh detector as emergency fallback
-
-            from modules.ppe_detection import PPEDetector
-
-            emergency_detector = PPEDetector(model_path=ppe_model_path, debug=debug, auto_recovery=True, detection_mode=detection_mode)
-
-            return emergency_detector, False
-
-        except Exception as e2:
-
-            print(f"[PPE-ERROR] Emergency detector also failed: {e2}")
-
-            return None, False
+        return None, False
 
 def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n", show_labels=True, show_confidence=True, detection_mode="all"):
 
@@ -13909,11 +13879,13 @@ def process_ppe_detection(image, confidence_threshold=0.3, model_name="yolov8n",
 
         if detector is None:
 
-            # Ultimate fallback - return original image with message
+            print("[PPE-CRITICAL] PPE detector unavailable — trained model required")
 
-            print("[PPE-CRITICAL] All PPE detection methods failed")
-
-            return image, " **PPE Detection in Fallback Mode**\n\nSystem is running in limited mode. Please check model installation."
+            return image, (
+                " **PPE model missing**\n\n"
+                "Auto-download failed. Check internet connection or set `PPE_MODEL_DOWNLOAD_URL` in `.env`.\n\n"
+                "You can also manually place weights at `models/best_ppe.pt`."
+            )
 
         # Convert PIL to numpy if needed
 

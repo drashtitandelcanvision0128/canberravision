@@ -15270,11 +15270,20 @@ main.wrap {
         min-height: 48px !important;
         touch-action: manipulation !important;
     }
-    .cv-main-workspace img,
+    .cv-main-workspace .block.image .image-container img,
+    .cv-main-workspace .block.image .image-preview img,
     .cv-main-workspace video,
     .cv-main-workspace canvas {
         max-width: 100% !important;
         height: auto !important;
+        object-fit: contain !important;
+    }
+    .cv-main-workspace .block.image button,
+    .cv-main-workspace .block.image button svg {
+        min-width: 34px !important;
+        min-height: 34px !important;
+        width: 22px !important;
+        height: 22px !important;
     }
     .cv-main-workspace [role="tablist"] {
         flex-wrap: wrap !important;
@@ -15289,33 +15298,125 @@ main.wrap {
     display: none !important;
 }
 
-/* PPE / Mask panels — preserve aspect ratio (no horizontal stretch on output) */
+/* PPE / Mask panels — preserve aspect ratio on preview only (not toolbar icons) */
 .cv-detect-panel .image-frame,
 .cv-detect-panel .image-container,
 .cv-detect-panel .image-preview,
-.cv-detect-panel .upload-container,
 .cv-detect-panel .contain {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     overflow: hidden !important;
-    min-height: 350px !important;
-    max-height: 350px !important;
+    min-height: 280px !important;
+    max-height: 300px !important;
     background: #0a0a0a !important;
 }
 
-.cv-detect-panel img,
-.cv-detect-panel canvas,
-.cv-detect-panel video,
-.cv-detect-panel .responsive-image img,
-.ppe-aspect-image img {
+.cv-detect-panel .image-frame img,
+.cv-detect-panel .image-container img,
+.cv-detect-panel .image-preview img,
+.cv-detect-panel .responsive-image .image-container img,
+.ppe-aspect-image .image-container img {
     object-fit: contain !important;
     object-position: center center !important;
     width: auto !important;
     height: auto !important;
     max-width: 100% !important;
-    max-height: 350px !important;
+    max-height: 300px !important;
     margin: 0 auto !important;
+}
+
+.cv-detect-panel canvas,
+.cv-detect-panel video {
+    object-fit: contain !important;
+    max-width: 100% !important;
+    max-height: 300px !important;
+}
+
+/* ===== Gradio Image toolbar: Upload / Webcam / Paste icons (all sections) ===== */
+.gradio-container .block.image .icon-button,
+.gradio-container .block.image .icon-wrap,
+.gradio-container .block.image button,
+.cv-main-workspace .block.image button,
+.cv-detect-panel .block.image button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 8px 10px !important;
+    margin: 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+    color: #48CAE4 !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+    border: 1px solid rgba(72, 202, 228, 0.35) !important;
+    border-radius: 8px !important;
+    cursor: pointer !important;
+}
+
+.gradio-container .block.image button:hover,
+.cv-main-workspace .block.image button:hover {
+    background: rgba(72, 202, 228, 0.15) !important;
+    border-color: #48CAE4 !important;
+}
+
+.gradio-container .block.image button svg,
+.gradio-container .block.image button img,
+.gradio-container .block.image .icon-button svg,
+.gradio-container .block.image .icon-button img,
+.gradio-container .block.image .small svg,
+.gradio-container .block.image .medium svg,
+.cv-main-workspace .block.image button svg,
+.cv-main-workspace .block.image button img {
+    width: 22px !important;
+    height: 22px !important;
+    min-width: 22px !important;
+    min-height: 22px !important;
+    max-width: 22px !important;
+    max-height: 22px !important;
+    object-fit: contain !important;
+    display: block !important;
+    flex-shrink: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Icon row container — keep upload / webcam / paste in one visible row */
+.gradio-container .block.image .icon-button-group,
+.gradio-container .block.image .toolbar,
+.gradio-container .block.image .source-selection,
+.gradio-container .block.image .icon-wrap,
+.cv-main-workspace .block.image .icon-button-group,
+.cv-detect-panel .block.image .icon-button-group {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    flex-wrap: nowrap !important;
+    padding: 10px 14px !important;
+    min-height: 52px !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    width: 100% !important;
+    background: rgba(8, 12, 22, 0.98) !important;
+    border-top: 1px solid rgba(72, 202, 228, 0.22) !important;
+    box-sizing: border-box !important;
+}
+
+/* Vehicle detection image preview — same contain rules */
+.cv-main-workspace .block.image .image-container img,
+.cv-main-workspace .block.image .image-preview img {
+    object-fit: contain !important;
+    max-width: 100% !important;
+    max-height: 300px !important;
+    width: auto !important;
+    height: auto !important;
 }
 
 </style>
